@@ -48,8 +48,10 @@
 #define MHZ(x)	((x)*1000*1000)
 
 #define PPM_DURATION			10
+#define PPM_DUMP_TIME			5
 
 enum {
+	NO_BENCHMARK,
 	TUNER_BENCHMARK,
 	PPM_BENCHMARK
 } test_mode;
@@ -73,7 +75,7 @@ void usage(void)
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-t enable Elonics E4000 tuner benchmark]\n"
 #ifndef _WIN32
-		"\t[-p[seconds] enable PPM error measurement]\n"
+		"\t[-p[seconds] enable PPM error measurement (default: 10 seconds)]\n"
 #endif
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
 		"\t[-S force sync output (default: async)]\n");
@@ -145,11 +147,11 @@ static int ppm_gettime(struct timespec *ts)
 	return rv;
 }
 
-static int ppm_report(uint64_t nsamples, uint64_t interaval)
+static int ppm_report(uint64_t nsamples, uint64_t interval)
 {
 	double real_rate, ppm;
 
-	real_rate = nsamples * 1e9 / interaval;
+	real_rate = nsamples * 1e9 / interval;
 	ppm = 1e6 * (real_rate / (double)samp_rate - 1.);
 	return (int)round(ppm);
 }
@@ -157,41 +159,54 @@ static int ppm_report(uint64_t nsamples, uint64_t interaval)
 static void ppm_test(uint32_t len)
 {
 	static uint64_t nsamples = 0;
-	static uint64_t interaval = 0;
+	static uint64_t interval = 0;
 	static uint64_t nsamples_total = 0;
-	static uint64_t interaval_total = 0;
+	static uint64_t interval_total = 0;
 	static int ppm_init = 0;
 	struct timespec ppm_now;
-	static struct timespec ppm_recent;
+	static struct timespec ppm_recent = {0, 0};
 
 	ppm_gettime(&ppm_now);
 	if (!ppm_init) {
+		/*
+		 * Kyle Keen wrote:
+		 * PPM_DUMP_TIME throws out the first N seconds of data.
+		 * The dongle's PPM is usually very bad when first starting up,
+		 * typically incorrect by more than twice the final value.
+		 * Discarding the first few seconds allows the value to stabilize much faster.
+		*/
+		if (ppm_recent.tv_sec == 0 && ppm_recent.tv_nsec == 0) {
+			ppm_recent.tv_sec = ppm_now.tv_sec + PPM_DUMP_TIME;
+			return;
+		}
+		if (ppm_recent.tv_sec < ppm_now.tv_sec)
+			return;
 		ppm_recent.tv_sec = ppm_now.tv_sec;
 		ppm_recent.tv_nsec = ppm_now.tv_nsec;
 		ppm_init = 1;
 		return;
 	}
 	nsamples += (uint64_t)(len / 2UL);
-	interaval = (uint64_t)(ppm_now.tv_sec - ppm_recent.tv_sec);
-	if (interaval >= ppm_duration) {
-		interaval *= 1000000000UL;
-		interaval += (int64_t)(ppm_now.tv_nsec - ppm_recent.tv_nsec);
-		printf("real sample rate: %i current PPM: %i",
-			(int)((1000000000UL * nsamples) / interaval), ppm_report(nsamples, interaval));
-		nsamples_total += nsamples;
-		interaval_total += interaval;
-		printf(" cumulative PPM: %i\n", ppm_report(nsamples_total, interaval_total));
-		ppm_recent.tv_sec = ppm_now.tv_sec;
-		ppm_recent.tv_nsec = ppm_now.tv_nsec;
-		nsamples = 0;
-	}
+	interval = (uint64_t)(ppm_now.tv_sec - ppm_recent.tv_sec);
+	if (interval < ppm_duration)
+		return;
+	interval *= 1000000000UL;
+	interval += (int64_t)(ppm_now.tv_nsec - ppm_recent.tv_nsec);
+	nsamples_total += nsamples;
+	interval_total += interval;
+	printf("real sample rate: %i current PPM: %i cumulative PPM: %i\n",
+		(int)((1000000000UL * nsamples) / interval),
+		ppm_report(nsamples, interval),
+		ppm_report(nsamples_total, interval_total));
+	ppm_recent.tv_sec = ppm_now.tv_sec;
+	ppm_recent.tv_nsec = ppm_now.tv_nsec;
+	nsamples = 0;
 }
 #endif
 
 static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 {
 	underrun_test(buf, len, 0);
-
 #ifndef _WIN32
 	if (test_mode == PPM_BENCHMARK)
 		ppm_test(len);
@@ -258,7 +273,7 @@ int main(int argc, char **argv)
 	int count;
 	int gains[100];
 
-	while ((opt = getopt(argc, argv, "d:s:b:tp::S")) != -1) {
+	while ((opt = getopt(argc, argv, "d:s:b:tp::Sh")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -276,11 +291,12 @@ int main(int argc, char **argv)
 		case 'p':
 			test_mode = PPM_BENCHMARK;
 			if (optarg)
-				ppm_duration = (int)atoi(optarg);
+				ppm_duration = atoi(optarg);
 			break;
 		case 'S':
 			sync_mode = 1;
 			break;
+		case 'h':
 		default:
 			usage();
 			break;
@@ -355,7 +371,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Press ^C after a few minutes.\n");
 	}
 
-	if (!(test_mode == PPM_BENCHMARK)) {
+	if (test_mode == NO_BENCHMARK) {
 		fprintf(stderr, "\nInfo: This tool will continuously"
 				" read from the device, and report if\n"
 				"samples get lost. If you observe no "
