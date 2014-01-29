@@ -162,12 +162,15 @@ static void ppm_test(uint32_t len)
 	static uint64_t interval = 0;
 	static uint64_t nsamples_total = 0;
 	static uint64_t interval_total = 0;
-	static int ppm_init = 0;
 	struct timespec ppm_now;
-	static struct timespec ppm_recent = {0, 0};
+	static struct timespec ppm_recent;
+#define PPM_INIT_NO	0
+#define PPM_INIT_DUMP	1
+#define PPM_INIT_RUN	2
+	static int ppm_init = PPM_INIT_NO;
 
 	ppm_gettime(&ppm_now);
-	if (!ppm_init) {
+	if (ppm_init != PPM_INIT_RUN) {
 		/*
 		 * Kyle Keen wrote:
 		 * PPM_DUMP_TIME throws out the first N seconds of data.
@@ -175,15 +178,16 @@ static void ppm_test(uint32_t len)
 		 * typically incorrect by more than twice the final value.
 		 * Discarding the first few seconds allows the value to stabilize much faster.
 		*/
-		if (ppm_recent.tv_sec == 0 && ppm_recent.tv_nsec == 0) {
+		if (ppm_init == PPM_INIT_NO) {
 			ppm_recent.tv_sec = ppm_now.tv_sec + PPM_DUMP_TIME;
+			ppm_init = PPM_INIT_DUMP;
 			return;
 		}
-		if (ppm_recent.tv_sec < ppm_now.tv_sec)
+		if (ppm_init == PPM_INIT_DUMP && ppm_recent.tv_sec < ppm_now.tv_sec)
 			return;
 		ppm_recent.tv_sec = ppm_now.tv_sec;
 		ppm_recent.tv_nsec = ppm_now.tv_nsec;
-		ppm_init = 1;
+		ppm_init = PPM_INIT_RUN;
 		return;
 	}
 	nsamples += (uint64_t)(len / 2UL);
