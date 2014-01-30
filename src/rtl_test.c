@@ -54,7 +54,7 @@ enum {
 	NO_BENCHMARK,
 	TUNER_BENCHMARK,
 	PPM_BENCHMARK
-} test_mode;
+} test_mode = NO_BENCHMARK;
 
 static int do_exit = 0;
 static rtlsdr_dev_t *dev = NULL;
@@ -164,10 +164,11 @@ static void ppm_test(uint32_t len)
 	static uint64_t interval_total = 0;
 	struct timespec ppm_now;
 	static struct timespec ppm_recent;
-#define PPM_INIT_NO	0
-#define PPM_INIT_DUMP	1
-#define PPM_INIT_RUN	2
-	static int ppm_init = PPM_INIT_NO;
+	static enum {
+		PPM_INIT_NO,
+		PPM_INIT_DUMP,
+		PPM_INIT_RUN
+	} ppm_init = PPM_INIT_NO;
 
 	ppm_gettime(&ppm_now);
 	if (ppm_init != PPM_INIT_RUN) {
