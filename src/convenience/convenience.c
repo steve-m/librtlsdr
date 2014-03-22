@@ -243,7 +243,7 @@ int verbose_reset_buffer(rtlsdr_dev_t *dev)
 
 int verbose_device_search(char *s)
 {
-	int i, device_count, device, offset;
+	int i, r, device_count, device, offset;
 	char *s2;
 	char vendor[256], product[256], serial[256];
 	device_count = rtlsdr_get_device_count();
@@ -253,8 +253,12 @@ int verbose_device_search(char *s)
 	}
 	fprintf(stderr, "Found %d device(s):\n", device_count);
 	for (i = 0; i < device_count; i++) {
-		rtlsdr_get_device_usb_strings(i, vendor, product, serial);
-		fprintf(stderr, "  %d:  %s, %s, SN: %s\n", i, vendor, product, serial);
+		r = rtlsdr_get_device_usb_strings(i, vendor, product, serial);
+		if (r < 0) {
+			fprintf(stderr, "  %d: Failed to get device description, error %d.\n", i, r);
+		} else {
+			fprintf(stderr, "  %d:  %s, %s, SN: %s\n", i, vendor, product, serial);
+		}
 	}
 	fprintf(stderr, "\n");
 	/* does string look like raw id number */
