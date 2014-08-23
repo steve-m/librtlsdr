@@ -502,7 +502,7 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	 */
         
 	vco_div = (pll_ref + 65536 * vco_freq) / (2 * pll_ref);
-        nint = (uint32_t) (vco_div / 65536);
+	nint = (uint32_t) (vco_div / 65536);
 	sdm = (uint32_t) (vco_div % 65536);
 
 #if 0
