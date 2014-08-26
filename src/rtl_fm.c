@@ -1936,6 +1936,7 @@ int main(int argc, char **argv)
 				demod.rate_in = 170000;
 				demod.rate_out = 170000;
 				demod.rate_out2 = 32000;
+				output.rate = 32000;
 				demod.custom_atan = 1;
 				//demod.post_downsample = 4;
 				demod.deemph = 1;
