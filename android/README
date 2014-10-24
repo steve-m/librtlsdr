@@ -1,0 +1,24 @@
+librtlsdr for Android
+=====================
+
+Building:
+---------
+
+To build librtlsdr for Android do the following:
+
+ 1. Download the latest NDK from:
+    http://developer.android.com/tools/sdk/ndk/index.html
+
+ 2. Extract the NDK.
+
+ 3. Open a shell and make sure there exist an NDK global variable
+    set to the directory where you extracted the NDK.
+
+ 4. Change directory to librtlsdr's "android/jni"
+
+ 5. Set LIBUSB_INCLUDES and LIBUSB_PREBUILDS for proper locations.
+
+ 6. Run "$NDK/ndk-build".
+
+The librtlsdr library and tools can then be found in:
+    "android/libs/$ARCH"
