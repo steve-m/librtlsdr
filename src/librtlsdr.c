@@ -28,6 +28,7 @@
 #endif
 
 #include <libusb.h>
+#include "rtlsdr_rpc.h"
 
 /*
  * All libusb callback functions should be marked with the LIBUSB_CALL macro
@@ -714,6 +715,11 @@ int rtlsdr_set_xtal_freq(rtlsdr_dev_t *dev, uint32_t rtl_freq, uint32_t tuner_fr
 {
 	int r = 0;
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_xtal_freq(dev, rtl_freq, tuner_freq);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -750,6 +756,11 @@ int rtlsdr_set_xtal_freq(rtlsdr_dev_t *dev, uint32_t rtl_freq, uint32_t tuner_fr
 
 int rtlsdr_get_xtal_freq(rtlsdr_dev_t *dev, uint32_t *rtl_freq, uint32_t *tuner_freq)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_xtal_freq(dev, rtl_freq, tuner_freq);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -771,6 +782,11 @@ int rtlsdr_get_usb_strings(rtlsdr_dev_t *dev, char *manufact, char *product,
 	libusb_device *device = NULL;
 	const int buf_max = 256;
 	int r = 0;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_usb_strings(dev, manufact, product, serial);
+	}
 
 	if (!dev || !dev->devh)
 		return -1;
@@ -811,6 +827,11 @@ int rtlsdr_write_eeprom(rtlsdr_dev_t *dev, uint8_t *data, uint8_t offset, uint16
 	int i;
 	uint8_t cmd[2];
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_write_eeprom(dev, data, offset, len);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -848,6 +869,11 @@ int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data, uint8_t offset, uint16_
 	int r = 0;
 	int i;
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_read_eeprom(dev, data, offset, len);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -872,6 +898,11 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 {
 	int r = -1;
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_center_freq(dev, freq);
+	}
+
 	if (!dev || !dev->tuner)
 		return -1;
 
@@ -893,6 +924,11 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 
 uint32_t rtlsdr_get_center_freq(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_center_freq(dev);
+	}
+
 	if (!dev)
 		return 0;
 
@@ -902,6 +938,11 @@ uint32_t rtlsdr_get_center_freq(rtlsdr_dev_t *dev)
 int rtlsdr_set_freq_correction(rtlsdr_dev_t *dev, int ppm)
 {
 	int r = 0;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_freq_correction(dev, ppm);
+	}
 
 	if (!dev)
 		return -1;
@@ -926,6 +967,11 @@ int rtlsdr_set_freq_correction(rtlsdr_dev_t *dev, int ppm)
 
 int rtlsdr_get_freq_correction(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_freq_correction(dev);
+	}
+
 	if (!dev)
 		return 0;
 
@@ -934,6 +980,11 @@ int rtlsdr_get_freq_correction(rtlsdr_dev_t *dev)
 
 enum rtlsdr_tuner rtlsdr_get_tuner_type(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return (enum rtlsdr_tuner)rtlsdr_rpc_get_tuner_type(dev);
+	}
+
 	if (!dev)
 		return RTLSDR_TUNER_UNKNOWN;
 
@@ -958,6 +1009,11 @@ int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains)
 
 	const int *ptr = NULL;
 	int len = 0;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_tuner_gains(dev, gains);
+	}
 
 	if (!dev)
 		return -1;
@@ -998,6 +1054,11 @@ int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
 {
 	int r = 0;
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_tuner_gain(dev, gain);
+	}
+
 	if (!dev || !dev->tuner)
 		return -1;
 
@@ -1017,6 +1078,11 @@ int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
 
 int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_tuner_gain(dev);
+	}
+
 	if (!dev)
 		return 0;
 
@@ -1026,6 +1092,11 @@ int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
 int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain)
 {
 	int r = 0;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_tuner_if_gain(dev, stage, gain);
+	}
 
 	if (!dev || !dev->tuner)
 		return -1;
@@ -1042,6 +1113,11 @@ int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain)
 int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int mode)
 {
 	int r = 0;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_tuner_gain_mode(dev, mode);
+	}
 
 	if (!dev || !dev->tuner)
 		return -1;
@@ -1061,6 +1137,11 @@ int rtlsdr_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 	uint16_t tmp;
 	uint32_t rsamp_ratio, real_rsamp_ratio;
 	double real_rate;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_sample_rate(dev, samp_rate);
+	}
 
 	if (!dev)
 		return -1;
@@ -1109,6 +1190,11 @@ int rtlsdr_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 
 uint32_t rtlsdr_get_sample_rate(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_sample_rate(dev);
+	}
+
 	if (!dev)
 		return 0;
 
@@ -1117,6 +1203,11 @@ uint32_t rtlsdr_get_sample_rate(rtlsdr_dev_t *dev)
 
 int rtlsdr_set_testmode(rtlsdr_dev_t *dev, int on)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_testmode(dev, on);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -1125,6 +1216,11 @@ int rtlsdr_set_testmode(rtlsdr_dev_t *dev, int on)
 
 int rtlsdr_set_agc_mode(rtlsdr_dev_t *dev, int on)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_agc_mode(dev, on);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -1134,6 +1230,11 @@ int rtlsdr_set_agc_mode(rtlsdr_dev_t *dev, int on)
 int rtlsdr_set_direct_sampling(rtlsdr_dev_t *dev, int on)
 {
 	int r = 0;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_direct_sampling(dev, on);
+	}
 
 	if (!dev)
 		return -1;
@@ -1196,6 +1297,11 @@ int rtlsdr_set_direct_sampling(rtlsdr_dev_t *dev, int on)
 
 int rtlsdr_get_direct_sampling(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_direct_sampling(dev);
+	}
+ 
 	if (!dev)
 		return -1;
 
@@ -1205,6 +1311,11 @@ int rtlsdr_get_direct_sampling(rtlsdr_dev_t *dev)
 int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on)
 {
 	int r = 0;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_offset_tuning(dev, on);
+	}
 
 	if (!dev)
 		return -1;
@@ -1234,6 +1345,11 @@ int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on)
 
 int rtlsdr_get_offset_tuning(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_offset_tuning(dev);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -1264,6 +1380,11 @@ uint32_t rtlsdr_get_device_count(void)
 	struct libusb_device_descriptor dd;
 	ssize_t cnt;
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_device_count();
+	}
+
 	libusb_init(&ctx);
 
 	cnt = libusb_get_device_list(ctx, &list);
@@ -1291,6 +1412,11 @@ const char *rtlsdr_get_device_name(uint32_t index)
 	rtlsdr_dongle_t *device = NULL;
 	uint32_t device_count = 0;
 	ssize_t cnt;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_device_name(index);
+	}
 
 	libusb_init(&ctx);
 
@@ -1332,6 +1458,12 @@ int rtlsdr_get_device_usb_strings(uint32_t index, char *manufact,
 	uint32_t device_count = 0;
 	ssize_t cnt;
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_device_usb_strings
+	    (index, manufact, product, serial);
+	}
+
 	libusb_init(&ctx);
 
 	cnt = libusb_get_device_list(ctx, &list);
@@ -1370,6 +1502,11 @@ int rtlsdr_get_index_by_serial(const char *serial)
 	int i, cnt, r;
 	char str[256];
 
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_index_by_serial(serial);
+	}
+
 	if (!serial)
 		return -1;
 
@@ -1398,6 +1535,11 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	struct libusb_device_descriptor dd;
 	uint8_t reg;
 	ssize_t cnt;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_open((void**)out_dev, index);
+	}
 
 	dev = malloc(sizeof(rtlsdr_dev_t));
 	if (NULL == dev)
@@ -1585,6 +1727,11 @@ err:
 
 int rtlsdr_close(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_close(dev);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -1623,6 +1770,11 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 
 int rtlsdr_reset_buffer(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_reset_buffer(dev);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -1634,6 +1786,11 @@ int rtlsdr_reset_buffer(rtlsdr_dev_t *dev)
 
 int rtlsdr_read_sync(rtlsdr_dev_t *dev, void *buf, int len, int *n_read)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_read_sync(dev, buf, len, n_read);
+	}
+
 	if (!dev)
 		return -1;
 
@@ -1670,6 +1827,11 @@ static void LIBUSB_CALL _libusb_callback(struct libusb_transfer *xfer)
 
 int rtlsdr_wait_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_wait_async(dev, cb, ctx);
+	}
+
 	return rtlsdr_read_async(dev, cb, ctx, 0, 0);
 }
 
@@ -1738,6 +1900,11 @@ int rtlsdr_read_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx,
 	struct timeval tv = { 1, 0 };
 	struct timeval zerotv = { 0, 0 };
 	enum rtlsdr_async_status next_status = RTLSDR_INACTIVE;
+
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_read_async(dev, cb, ctx, buf_num, buf_len);
+	}
 
 	if (!dev)
 		return -1;
@@ -1836,6 +2003,11 @@ int rtlsdr_read_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx,
 
 int rtlsdr_cancel_async(rtlsdr_dev_t *dev)
 {
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_cancel_async(dev);
+	}
+
 	if (!dev)
 		return -1;
 

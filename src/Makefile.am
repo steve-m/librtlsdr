@@ -9,10 +9,10 @@ AM_CFLAGS = ${CFLAGS} -fPIC ${SYMBOL_VISIBILITY}
 
 lib_LTLIBRARIES = librtlsdr.la
 
-librtlsdr_la_SOURCES = librtlsdr.c tuner_e4k.c tuner_fc0012.c tuner_fc0013.c tuner_fc2580.c tuner_r82xx.c
+librtlsdr_la_SOURCES = librtlsdr.c tuner_e4k.c tuner_fc0012.c tuner_fc0013.c tuner_fc2580.c tuner_r82xx.c rtlsdr_rpc.c rtlsdr_rpc_msg.c
 librtlsdr_la_LDFLAGS = -version-info $(LIBVERSION)
 
-bin_PROGRAMS         = rtl_sdr rtl_tcp rtl_test rtl_fm rtl_eeprom rtl_adsb rtl_power
+bin_PROGRAMS         = rtl_sdr rtl_tcp rtl_test rtl_fm rtl_eeprom rtl_adsb rtl_power rtl_rpcd
 
 rtl_sdr_SOURCES      = rtl_sdr.c convenience/convenience.c
 rtl_sdr_LDADD        = librtlsdr.la
@@ -34,3 +34,6 @@ rtl_adsb_LDADD        = librtlsdr.la $(LIBM)
 
 rtl_power_SOURCES     = rtl_power.c convenience/convenience.c
 rtl_power_LDADD       = librtlsdr.la $(LIBM)
+
+rtl_rpcd_SOURCES     = rtl_rpcd.c rtlsdr_rpc_msg.c convenience/convenience.c
+rtl_rpcd_LDADD       = librtlsdr.la
