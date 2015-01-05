@@ -531,6 +531,43 @@ static int handle_query
       break ;
     }
 
+  case RTLSDR_RPC_OP_GET_USB_STRINGS:
+    {
+      uint32_t did;
+      char manuf[256];
+      char product[256];
+      char serial[256];
+
+      PRINTF("get_usb_strings()\n");
+
+      if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
+
+      if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
+
+      err = rtlsdr_get_usb_strings(rpcd->dev, manuf, product, serial);
+      if (err) goto on_error;
+
+      if (rtlsdr_rpc_msg_push_str(r, manuf))
+      {
+	err = -1;
+	goto on_error;
+      }
+
+      if (rtlsdr_rpc_msg_push_str(r, product))
+      {
+	err = -1;
+	goto on_error;
+      }
+
+      if (rtlsdr_rpc_msg_push_str(r, serial))
+      {
+	err = -1;
+	goto on_error;
+      }
+
+      break ;
+    }
+
   case RTLSDR_RPC_OP_SET_CENTER_FREQ:
     {
       uint32_t did;
