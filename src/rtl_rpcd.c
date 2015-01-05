@@ -454,7 +454,12 @@ static int handle_query
     {
       PRINTF("open()\n");
 
-      if (rpcd->dev != NULL) goto on_error;
+      if (rpcd->dev != NULL)
+      {
+	/* already opened */
+	err = 0;
+	goto on_error;
+      }
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &rpcd->did)) goto on_error;
       err = rtlsdr_open(&rpcd->dev, rpcd->did);
