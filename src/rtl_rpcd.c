@@ -19,7 +19,11 @@
 
 #if 1
 #include <stdio.h>
-#define PRINTF(__s, ...) fprintf(stderr, __s, ##__VA_ARGS__)
+#define PRINTF(__s, ...)			\
+do {						\
+  fprintf(stderr, __s, ##__VA_ARGS__);		\
+  fflush(stderr);				\
+} while (0)
 #define TRACE() PRINTF("[t] %s,%u\n", __FILE__, __LINE__)
 #define ERROR() PRINTF("[e] %s,%u\n", __FILE__, __LINE__)
 #else
@@ -333,25 +337,26 @@ static int send_reply(rpcd_t* rpcd, rtlsdr_rpc_msg_t* r)
 static void read_async_cb
 (unsigned char* buf, uint32_t len, void* ctx)
 {
-  rpcd_t* const rpcd = ctx;
   const size_t off = offsetof(rtlsdr_rpc_fmt_t, data);
-  rtlsdr_rpc_fmt_t fmt;
+
+  rpcd_t* const rpcd = ctx;
+  uint8_t fmt[offsetof(rtlsdr_rpc_fmt_t, data)];
   rtlsdr_rpc_msg_t msg;
   unsigned int is_recv;
 
   if (rpcd->reply_msg.off)
   {
     send_reply(rpcd, &rpcd->reply_msg);
-    rpcd->reply_msg.off = 0;
+    rpcd->reply_msg.off = off;
   }
 
   msg.off = off;
   msg.size = off + len;
-  msg.fmt = (uint8_t*)&fmt;
+  msg.fmt = fmt;
   rtlsdr_rpc_msg_set_size(&msg, msg.size);
   rtlsdr_rpc_msg_set_op(&msg, RTLSDR_RPC_OP_READ_ASYNC);
 
-  send_all(rpcd->cli_sock, (const uint8_t*)&fmt, off);
+  send_all(rpcd->cli_sock, fmt, off);
   send_all_check_recv(rpcd->cli_sock, buf, len, &is_recv);
 
   if (is_recv) rtlsdr_cancel_async(rpcd->dev);
