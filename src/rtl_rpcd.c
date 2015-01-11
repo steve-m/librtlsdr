@@ -853,6 +853,21 @@ static int handle_query
       break ;
     }
 
+  case RTLSDR_RPC_OP_GET_DIRECT_SAMPLING:
+    {
+      uint32_t did;
+
+      PRINTF("get_direct_sampling()\n");
+
+      if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
+
+      if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
+
+      err = rtlsdr_get_direct_sampling(rpcd->dev);
+
+      break ;
+    }
+
   case RTLSDR_RPC_OP_RESET_BUFFER:
     {
       uint32_t did;
