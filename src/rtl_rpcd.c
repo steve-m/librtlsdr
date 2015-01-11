@@ -663,6 +663,87 @@ static int handle_query
       break ;
     }
 
+  case RTLSDR_RPC_OP_GET_TUNER_GAINS:
+    {
+      uint32_t did;
+      size_t new_size;
+      uint8_t* buf;
+      size_t gain_size;
+
+      if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
+
+      if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
+
+      err = rtlsdr_get_tuner_gains(rpcd->dev, NULL);
+      if (err <= 0) goto on_error;
+      gain_size = err * sizeof(int);
+
+      new_size = r->off + sizeof(uint32_t) + gain_size;
+      if (rtlsdr_rpc_msg_realloc(r, new_size)) goto on_error;
+      buf = r->fmt + r->off + sizeof(uint32_t);
+
+      err = rtlsdr_get_tuner_gains(rpcd->dev, (int*)buf);
+      if (err <= 0) goto on_error;
+
+      rtlsdr_rpc_msg_push_uint32_safe(r, gain_size);
+      rtlsdr_rpc_msg_skip_safe(r, gain_size);
+
+      break ;
+    }
+
+  case RTLSDR_RPC_OP_SET_TUNER_GAIN:
+    {
+      uint32_t did;
+      uint32_t gain;
+
+      PRINTF("set_tuner_gain()\n");
+
+      if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
+      if (rtlsdr_rpc_msg_pop_uint32(q, &gain)) goto on_error;
+
+      if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
+
+      err = rtlsdr_set_tuner_gain(rpcd->dev, (int)gain);
+      if (err) goto on_error;
+
+      break ;
+    }
+
+  case RTLSDR_RPC_OP_GET_TUNER_GAIN:
+    {
+      uint32_t did;
+
+      PRINTF("get_tuner_gain()\n");
+
+      if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
+
+      if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
+
+      err = rtlsdr_get_tuner_gain(rpcd->dev);
+
+      break ;
+    }
+
+  case RTLSDR_RPC_OP_SET_TUNER_IF_GAIN:
+    {
+      uint32_t did;
+      uint32_t stage;
+      uint32_t gain;
+
+      PRINTF("set_tuner_if_gain()\n");
+
+      if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
+      if (rtlsdr_rpc_msg_pop_uint32(q, &stage)) goto on_error;
+      if (rtlsdr_rpc_msg_pop_uint32(q, &gain)) goto on_error;
+
+      if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
+
+      err = rtlsdr_set_tuner_if_gain(rpcd->dev, (int)stage, (int)gain);
+      if (err) goto on_error;
+
+      break ;
+    }
+
   case RTLSDR_RPC_OP_SET_TUNER_GAIN_MODE:
     {
       uint32_t did;

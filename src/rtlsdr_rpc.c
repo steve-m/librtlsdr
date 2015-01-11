@@ -647,28 +647,101 @@ int rtlsdr_rpc_get_tuner_type(void* devp)
   return err;
 }
 
-int rtlsdr_rpc_get_tuner_gains(void* dev, int* gainsp)
+int rtlsdr_rpc_get_tuner_gains(void* devp, int* gainsp)
 {
-  UNIMPL();
-  return -1;
+  rtlsdr_rpc_dev_t* const dev = devp;
+  rtlsdr_rpc_cli_t* const cli = dev->cli;
+  rtlsdr_rpc_msg_t* const q = &cli->query;
+  rtlsdr_rpc_msg_t* const r = &cli->reply;
+  const uint8_t* tmp;
+  size_t size;
+  int err = 0;
+
+  rtlsdr_rpc_msg_reset(q);
+  rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_GET_TUNER_GAINS);
+  if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error;
+
+  if (send_recv_msg(cli, q, r)) goto on_error;
+
+  err = rtlsdr_rpc_msg_get_err(r);
+  if (err <= 0) goto on_error;
+
+  if (rtlsdr_rpc_msg_pop_buf(r, &tmp, &size))
+  {
+    err = 0;
+    goto on_error;
+  }
+
+  /* TODO: endianess */
+  memcpy(gainsp, tmp, size);
+
+ on_error:
+  return err;
 }
 
-int rtlsdr_rpc_set_tuner_gain(void* dev, int gain)
+int rtlsdr_rpc_set_tuner_gain(void* devp, int gain)
 {
-  UNIMPL();
-  return -1;
+  rtlsdr_rpc_dev_t* const dev = devp;
+  rtlsdr_rpc_cli_t* const cli = dev->cli;
+  rtlsdr_rpc_msg_t* const q = &cli->query;
+  rtlsdr_rpc_msg_t* const r = &cli->reply;
+  int err = -1;
+
+  rtlsdr_rpc_msg_reset(q);
+  rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_SET_TUNER_GAIN);
+  if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error;
+  if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)gain)) goto on_error;
+
+  if (send_recv_msg(cli, q, r)) goto on_error;
+
+  err = rtlsdr_rpc_msg_get_err(r);
+  if (err) goto on_error;
+
+ on_error:
+  return err;
 }
 
-int rtlsdr_rpc_get_tuner_gain(void* dev)
+int rtlsdr_rpc_get_tuner_gain(void* devp)
 {
-  UNIMPL();
-  return -1;
+  rtlsdr_rpc_dev_t* const dev = devp;
+  rtlsdr_rpc_cli_t* const cli = dev->cli;
+  rtlsdr_rpc_msg_t* const q = &cli->query;
+  rtlsdr_rpc_msg_t* const r = &cli->reply;
+  int err = -1;
+
+  rtlsdr_rpc_msg_reset(q);
+  rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_GET_TUNER_GAIN);
+  if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error;
+
+  if (send_recv_msg(cli, q, r)) goto on_error;
+
+  err = rtlsdr_rpc_msg_get_err(r);
+
+ on_error:
+  return err;
 }
 
-int rtlsdr_rpc_set_tuner_if_gain(void* dev, int stage, int gain)
+int rtlsdr_rpc_set_tuner_if_gain(void* devp, int stage, int gain)
 {
-  UNIMPL();
-  return -1;
+  rtlsdr_rpc_dev_t* const dev = devp;
+  rtlsdr_rpc_cli_t* const cli = dev->cli;
+  rtlsdr_rpc_msg_t* const q = &cli->query;
+  rtlsdr_rpc_msg_t* const r = &cli->reply;
+  int err = -1;
+
+  rtlsdr_rpc_msg_reset(q);
+  rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_SET_TUNER_IF_GAIN);
+  if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error;
+  if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)stage)) goto on_error;
+  if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)gain)) goto on_error;
+
+  if (send_recv_msg(cli, q, r)) goto on_error;
+
+  err = rtlsdr_rpc_msg_get_err(r);
+  if (err) goto on_error;
+
+ on_error:
+  return err;
 }
 
 int rtlsdr_rpc_set_tuner_gain_mode(void* devp, int manual)
