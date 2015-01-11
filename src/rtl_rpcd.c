@@ -355,6 +355,7 @@ static void read_async_cb
   msg.fmt = fmt;
   rtlsdr_rpc_msg_set_size(&msg, msg.size);
   rtlsdr_rpc_msg_set_op(&msg, RTLSDR_RPC_OP_READ_ASYNC);
+  rtlsdr_rpc_msg_set_err(&msg, 0);
 
   send_all(rpcd->cli_sock, fmt, off);
   send_all_check_recv(rpcd->cli_sock, buf, len, &is_recv);

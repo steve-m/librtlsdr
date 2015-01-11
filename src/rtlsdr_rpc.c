@@ -1010,6 +1010,11 @@ int rtlsdr_rpc_read_async
   size_t size;
   int err = -1;
 
+  /* fixme: required, otherwise rtl_fm controller thread */
+  /* uses socket concurrently. this is not a good solution */
+  /* but is working for now. */
+  usleep(100000);
+
   rtlsdr_rpc_msg_reset(q);
   rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_READ_ASYNC);
   if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error_0;
