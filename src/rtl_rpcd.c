@@ -1021,7 +1021,7 @@ int main(int ac, char** av)
   const char* port;
 
   addr = getenv("RTLSDR_RPC_SERV_ADDR");
-  if (addr == NULL) addr = "127.0.0.1";
+  if (addr == NULL) addr = "0.0.0.0";
 
   port = getenv("RTLSDR_RPC_SERV_PORT");
   if (port == NULL) port = "40000";
