@@ -718,6 +718,24 @@ static int handle_query
       break ;
     }
 
+  case RTLSDR_RPC_OP_SET_TESTMODE:
+    {
+      uint32_t did;
+      uint32_t on;
+
+      PRINTF("set_testmode()\n");
+
+      if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
+      if (rtlsdr_rpc_msg_pop_uint32(q, &on)) goto on_error;
+
+      if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
+
+      err = rtlsdr_set_testmode(rpcd->dev, (int)on);
+      if (err) goto on_error;
+
+      break ;
+    }
+
   case RTLSDR_RPC_OP_RESET_BUFFER:
     {
       uint32_t did;
