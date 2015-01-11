@@ -380,8 +380,6 @@ static int handle_query
     {
       uint32_t n;
 
-      PRINTF("get_device_count()\n");
-
       n = rtlsdr_get_device_count();
       if (rtlsdr_rpc_msg_push_uint32(r, n)) goto on_error;
       err = 0;
@@ -392,8 +390,6 @@ static int handle_query
     {
       const char* s;
       uint32_t i;
-
-      PRINTF("get_device_name()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &i)) goto on_error;
 
@@ -413,8 +409,6 @@ static int handle_query
       char product[256];
       char serial[256];
       uint32_t i;
-
-      PRINTF("get_device_usb_strings()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &i)) goto on_error;
 
@@ -446,8 +440,6 @@ static int handle_query
     {
       const char* serial;
 
-      PRINTF("get_index_by_serial()\n");
-
       if (rtlsdr_rpc_msg_pop_str(q, &serial)) goto on_error;
       err = rtlsdr_get_index_by_serial(serial);
       if (err < 0) goto on_error;
@@ -457,8 +449,6 @@ static int handle_query
 
   case RTLSDR_RPC_OP_OPEN:
     {
-      PRINTF("open()\n");
-
       if (rpcd->dev != NULL)
       {
 	/* already opened */
@@ -481,8 +471,6 @@ static int handle_query
     {
       uint32_t did;
 
-      PRINTF("close()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
       err = rtlsdr_close(rpcd->dev);
@@ -496,8 +484,6 @@ static int handle_query
       uint32_t did;
       uint32_t rtl_freq;
       uint32_t tuner_freq;
-
-      PRINTF("set_xtal_freq()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &rtl_freq)) goto on_error;
@@ -516,8 +502,6 @@ static int handle_query
       uint32_t did;
       uint32_t rtl_freq;
       uint32_t tuner_freq;
-
-      PRINTF("get_xtal_freq()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
@@ -547,8 +531,6 @@ static int handle_query
       char manuf[256];
       char product[256];
       char serial[256];
-
-      PRINTF("get_usb_strings()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
@@ -583,8 +565,6 @@ static int handle_query
       uint32_t did;
       uint32_t freq;
 
-      PRINTF("set_center_freq()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &freq)) goto on_error;
 
@@ -600,8 +580,6 @@ static int handle_query
     {
       uint32_t did;
       uint32_t freq;
-
-      PRINTF("get_center_freq()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
@@ -620,8 +598,6 @@ static int handle_query
       uint32_t did;
       uint32_t ppm;
 
-      PRINTF("set_freq_correction()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &ppm)) goto on_error;
 
@@ -637,8 +613,6 @@ static int handle_query
     {
       uint32_t did;
 
-      PRINTF("get_freq_correction()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
       if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
@@ -651,8 +625,6 @@ static int handle_query
   case RTLSDR_RPC_OP_GET_TUNER_TYPE:
     {
       uint32_t did;
-
-      PRINTF("get_tuner_type()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
@@ -696,8 +668,6 @@ static int handle_query
       uint32_t did;
       uint32_t gain;
 
-      PRINTF("set_tuner_gain()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &gain)) goto on_error;
 
@@ -713,8 +683,6 @@ static int handle_query
     {
       uint32_t did;
 
-      PRINTF("get_tuner_gain()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
       if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
@@ -729,8 +697,6 @@ static int handle_query
       uint32_t did;
       uint32_t stage;
       uint32_t gain;
-
-      PRINTF("set_tuner_if_gain()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &stage)) goto on_error;
@@ -749,8 +715,6 @@ static int handle_query
       uint32_t did;
       uint32_t manual;
 
-      PRINTF("set_tuner_gain_mode()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &manual)) goto on_error;
 
@@ -767,8 +731,6 @@ static int handle_query
       uint32_t did;
       uint32_t rate;
 
-      PRINTF("set_sample_rate()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &rate)) goto on_error;
 
@@ -784,8 +746,6 @@ static int handle_query
     {
       uint32_t did;
       uint32_t rate;
-
-      PRINTF("get_sample_rate()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
@@ -804,8 +764,6 @@ static int handle_query
       uint32_t did;
       uint32_t on;
 
-      PRINTF("set_testmode()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &on)) goto on_error;
 
@@ -821,8 +779,6 @@ static int handle_query
     {
       uint32_t did;
       uint32_t on;
-
-      PRINTF("set_agc_mode()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &on)) goto on_error;
@@ -840,8 +796,6 @@ static int handle_query
       uint32_t did;
       uint32_t on;
 
-      PRINTF("set_direct_sampling()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &on)) goto on_error;
 
@@ -857,8 +811,6 @@ static int handle_query
     {
       uint32_t did;
 
-      PRINTF("get_direct_sampling()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
       if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
@@ -872,8 +824,6 @@ static int handle_query
     {
       uint32_t did;
       uint32_t on;
-
-      PRINTF("set_offset_tuning()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &on)) goto on_error;
@@ -890,8 +840,6 @@ static int handle_query
     {
       uint32_t did;
 
-      PRINTF("get_offset_tuning()\n");
-
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
       if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
@@ -904,8 +852,6 @@ static int handle_query
   case RTLSDR_RPC_OP_RESET_BUFFER:
     {
       uint32_t did;
-
-      PRINTF("reset_buffer()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
@@ -922,8 +868,6 @@ static int handle_query
       uint32_t did;
       uint32_t buf_num;
       uint32_t buf_len;
-
-      PRINTF("read_async()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &buf_num)) goto on_error;
@@ -948,8 +892,6 @@ static int handle_query
   case RTLSDR_RPC_OP_CANCEL_ASYNC:
     {
       uint32_t did;
-
-      PRINTF("cancel_async()\n");
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
 
