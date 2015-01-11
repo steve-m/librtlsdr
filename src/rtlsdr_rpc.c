@@ -853,10 +853,26 @@ int rtlsdr_rpc_set_agc_mode(void* devp, int on)
   return err;
 }
 
-int rtlsdr_rpc_set_direct_sampling(void* dev, int on)
+int rtlsdr_rpc_set_direct_sampling(void* devp, int on)
 {
-  UNIMPL();
-  return -1;
+  rtlsdr_rpc_dev_t* const dev = devp;
+  rtlsdr_rpc_cli_t* const cli = dev->cli;
+  rtlsdr_rpc_msg_t* const q = &cli->query;
+  rtlsdr_rpc_msg_t* const r = &cli->reply;
+  int err = -1;
+
+  rtlsdr_rpc_msg_reset(q);
+  rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_SET_DIRECT_SAMPLING);
+  if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error_0;
+  if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)on)) goto on_error_0;
+
+  if (send_recv_msg(cli, q, r)) goto on_error_0;
+
+  err = rtlsdr_rpc_msg_get_err(r);
+  if (err) goto on_error_0;
+
+ on_error_0:
+  return err;
 }
 
 int rtlsdr_rpc_get_direct_sampling(void* dev)
