@@ -668,8 +668,6 @@ static int handle_query
 	rtlsdr_rpc_msg_skip_safe(r, gain_size);
       }
 
-      err *= sizeof(int);
-
       break ;
     }
 
