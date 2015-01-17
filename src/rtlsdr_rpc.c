@@ -285,6 +285,31 @@ static int send_recv_msg
   return 0;
 }
 
+static int send_flush_msgs
+(rtlsdr_rpc_cli_t* cli, rtlsdr_rpc_msg_t* q)
+{
+  struct timeval tm;
+  ssize_t n;
+  fd_set rset;
+  uint8_t buf[256];
+
+  rtlsdr_rpc_msg_set_size(q, (uint32_t)q->off);
+  rtlsdr_rpc_msg_set_mid(q, get_mid(cli));
+  if (send_msg(cli->sock, q)) return -1;
+
+  while (1)
+  {
+    FD_ZERO(&rset);
+    FD_SET(cli->sock, &rset);
+    tm.tv_sec = 0;
+    tm.tv_usec = 200000;
+    if (select(cli->sock + 1, &rset, NULL, NULL, &tm) < 0) break ;
+    if (recv(cli->sock, buf, sizeof(buf), 0) <= 0) break ;
+  }
+
+  return 0;
+}
+
 uint32_t rtlsdr_rpc_get_device_count(void)
 {
   rtlsdr_rpc_cli_t* const cli = &rtlsdr_rpc_cli;
@@ -1007,6 +1032,7 @@ int rtlsdr_rpc_read_sync
   return err;
 }
 
+
 static volatile unsigned int is_cancel;
 int rtlsdr_rpc_read_async
 (
@@ -1049,6 +1075,9 @@ int rtlsdr_rpc_read_async
       goto on_error_0;
     }
 
+    if (rtlsdr_rpc_msg_get_op(r) != RTLSDR_RPC_OP_READ_ASYNC)
+      continue ;
+
     size = rtlsdr_rpc_msg_get_size(r);
     cb(r->fmt + off, size - off, ctx);
   }
@@ -1056,7 +1085,7 @@ int rtlsdr_rpc_read_async
   rtlsdr_rpc_msg_reset(q);
   rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_CANCEL_ASYNC);
   rtlsdr_rpc_msg_push_uint32(q, dev->index);
-  send_recv_msg(cli, q, r);
+  send_flush_msgs(cli, q);
 
  on_error_0:
   return err;
