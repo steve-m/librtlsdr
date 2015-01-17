@@ -344,7 +344,7 @@ static void read_async_cb
   rtlsdr_rpc_msg_t msg;
   unsigned int is_recv;
 
-  if (rpcd->reply_msg.off)
+  if (rpcd->reply_msg.off != off)
   {
     send_reply(rpcd, &rpcd->reply_msg);
     rpcd->reply_msg.off = off;
@@ -361,6 +361,52 @@ static void read_async_cb
   send_all_check_recv(rpcd->cli_sock, buf, len, &is_recv);
 
   if (is_recv) rtlsdr_cancel_async(rpcd->dev);
+}
+
+__attribute__((unused))
+static const char* op_to_string(rtlsdr_rpc_op_t op)
+{
+  const char* const s[] =
+  {
+    "RTLSDR_RPC_OP_GET_DEVICE_COUNT",
+    "RTLSDR_RPC_OP_GET_DEVICE_NAME",
+    "RTLSDR_RPC_OP_GET_DEVICE_USB_STRINGS",
+    "RTLSDR_RPC_OP_GET_INDEX_BY_SERIAL",
+    "RTLSDR_RPC_OP_OPEN",
+    "RTLSDR_RPC_OP_CLOSE",
+    "RTLSDR_RPC_OP_SET_XTAL_FREQ",
+    "RTLSDR_RPC_OP_GET_XTAL_FREQ",
+    "RTLSDR_RPC_OP_GET_USB_STRINGS",
+    "RTLSDR_RPC_OP_WRITE_EEPROM",
+    "RTLSDR_RPC_OP_READ_EEPROM",
+    "RTLSDR_RPC_OP_SET_CENTER_FREQ",
+    "RTLSDR_RPC_OP_GET_CENTER_FREQ",
+    "RTLSDR_RPC_OP_SET_FREQ_CORRECTION",
+    "RTLSDR_RPC_OP_GET_FREQ_CORRECTION",
+    "RTLSDR_RPC_OP_GET_TUNER_TYPE",
+    "RTLSDR_RPC_OP_GET_TUNER_GAINS",
+    "RTLSDR_RPC_OP_SET_TUNER_GAIN",
+    "RTLSDR_RPC_OP_GET_TUNER_GAIN",
+    "RTLSDR_RPC_OP_SET_TUNER_IF_GAIN",
+    "RTLSDR_RPC_OP_SET_TUNER_GAIN_MODE",
+    "RTLSDR_RPC_OP_SET_SAMPLE_RATE",
+    "RTLSDR_RPC_OP_GET_SAMPLE_RATE",
+    "RTLSDR_RPC_OP_SET_TESTMODE",
+    "RTLSDR_RPC_OP_SET_AGC_MODE",
+    "RTLSDR_RPC_OP_SET_DIRECT_SAMPLING",
+    "RTLSDR_RPC_OP_GET_DIRECT_SAMPLING",
+    "RTLSDR_RPC_OP_SET_OFFSET_TUNING",
+    "RTLSDR_RPC_OP_GET_OFFSET_TUNING",
+    "RTLSDR_RPC_OP_RESET_BUFFER",
+    "RTLSDR_RPC_OP_READ_SYNC",
+    "RTLSDR_RPC_OP_WAIT_ASYNC",
+    "RTLSDR_RPC_OP_READ_ASYNC",
+    "RTLSDR_RPC_OP_CANCEL_ASYNC",
+    "RTLSDR_RPC_OP_EVENT_STATE",
+    "RTLSDR_RPC_OP_INVALID"
+  };
+  if (op >= RTLSDR_RPC_OP_INVALID) op = RTLSDR_RPC_OP_INVALID;
+  return s[op];
 }
 
 static int handle_query
