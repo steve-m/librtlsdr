@@ -408,7 +408,7 @@ int rtlsdr_rpc_open(void** devp, uint32_t index)
   if (err) goto on_error_1;
 
   dev->index = index;
-  dev->gain_count = 0;
+  dev->gain_count = 32;
   dev->cli = cli;
   *devp = dev;
 
