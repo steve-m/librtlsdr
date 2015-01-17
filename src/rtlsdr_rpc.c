@@ -48,6 +48,7 @@ typedef void (*rtlsdr_rpc_read_async_cb_t)
 typedef struct rtlsdr_rpc_dev
 {
   uint32_t index;
+  size_t gain_size;
   rtlsdr_rpc_cli_t* cli;
 } rtlsdr_rpc_dev_t;
 
@@ -407,6 +408,7 @@ int rtlsdr_rpc_open(void** devp, uint32_t index)
   if (err) goto on_error_1;
 
   dev->index = index;
+  dev->gain_size = 0;
   dev->cli = cli;
   *devp = dev;
 
@@ -653,6 +655,8 @@ int rtlsdr_rpc_get_tuner_gains(void* devp, int* gainsp)
   rtlsdr_rpc_cli_t* const cli = dev->cli;
   rtlsdr_rpc_msg_t* const q = &cli->query;
   rtlsdr_rpc_msg_t* const r = &cli->reply;
+  const uint32_t is_null = (gainsp == NULL);
+  const uint32_t gain_size = (uint32_t)dev->gain_size;
   const uint8_t* tmp;
   size_t size;
   int err = 0;
@@ -660,20 +664,27 @@ int rtlsdr_rpc_get_tuner_gains(void* devp, int* gainsp)
   rtlsdr_rpc_msg_reset(q);
   rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_GET_TUNER_GAINS);
   if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error;
+  if (rtlsdr_rpc_msg_push_uint32(q, is_null)) goto on_error;
+  if (rtlsdr_rpc_msg_push_uint32(q, gain_size)) goto on_error;
 
   if (send_recv_msg(cli, q, r)) goto on_error;
 
   err = rtlsdr_rpc_msg_get_err(r);
   if (err <= 0) goto on_error;
 
-  if (rtlsdr_rpc_msg_pop_buf(r, &tmp, &size))
-  {
-    err = 0;
-    goto on_error;
-  }
+  dev->gain_size = (size_t)err;
 
-  /* TODO: endianess */
-  memcpy(gainsp, tmp, size);
+  if (is_null != 0)
+  {
+    if (rtlsdr_rpc_msg_pop_buf(r, &tmp, &size))
+    {
+      err = 0;
+      goto on_error;
+    }
+
+    /* TODO: endianess */
+    memcpy(gainsp, tmp, size);
+  }
 
  on_error:
   return err;
