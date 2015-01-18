@@ -273,16 +273,16 @@ rtlsdr_rpc_op_t rtlsdr_rpc_msg_get_op(const rtlsdr_rpc_msg_t* msg)
   return (rtlsdr_rpc_op_t)get_uint8(&fmt->op);
 }
 
-void rtlsdr_rpc_msg_set_mid(rtlsdr_rpc_msg_t* msg, uint16_t mid)
+void rtlsdr_rpc_msg_set_id(rtlsdr_rpc_msg_t* msg, uint8_t id)
 {
   rtlsdr_rpc_fmt_t* const fmt = (rtlsdr_rpc_fmt_t*)msg->fmt;
-  put_uint16(&fmt->mid, mid);
+  put_uint16(&fmt->id, id);
 }
 
-uint16_t rtlsdr_rpc_msg_get_mid(const rtlsdr_rpc_msg_t* msg)
+uint8_t rtlsdr_rpc_msg_get_id(const rtlsdr_rpc_msg_t* msg)
 {
   const rtlsdr_rpc_fmt_t* const fmt = (const rtlsdr_rpc_fmt_t*)msg->fmt;
-  return get_uint16(&fmt->mid);
+  return get_uint8(&fmt->id);
 }
 
 void rtlsdr_rpc_msg_set_err(rtlsdr_rpc_msg_t* msg, int err)

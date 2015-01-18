@@ -53,7 +53,7 @@ typedef struct
   /* raw network format */
   uint32_t size;
   uint8_t op;
-  uint16_t mid;
+  uint8_t id;
   uint32_t err;
   uint8_t data[1];
 } __attribute__((packed)) rtlsdr_rpc_fmt_t;
@@ -74,8 +74,8 @@ void rtlsdr_rpc_msg_set_size(rtlsdr_rpc_msg_t*, size_t);
 size_t rtlsdr_rpc_msg_get_size(const rtlsdr_rpc_msg_t*);
 void rtlsdr_rpc_msg_set_op(rtlsdr_rpc_msg_t*, rtlsdr_rpc_op_t);
 rtlsdr_rpc_op_t rtlsdr_rpc_msg_get_op(const rtlsdr_rpc_msg_t*);
-void rtlsdr_rpc_msg_set_mid(rtlsdr_rpc_msg_t*, uint16_t);
-uint16_t rtlsdr_rpc_msg_get_mid(const rtlsdr_rpc_msg_t*);
+void rtlsdr_rpc_msg_set_id(rtlsdr_rpc_msg_t*, uint8_t);
+uint8_t rtlsdr_rpc_msg_get_id(const rtlsdr_rpc_msg_t*);
 void rtlsdr_rpc_msg_set_err(rtlsdr_rpc_msg_t*, int);
 int rtlsdr_rpc_msg_get_err(const rtlsdr_rpc_msg_t*);
 

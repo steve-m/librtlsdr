@@ -45,6 +45,9 @@ typedef struct
   rtlsdr_rpc_msg_t reply_msg;
   rtlsdr_rpc_msg_t event_msg;
 
+  unsigned int async_replied;
+  uint8_t async_id;
+
 } rpcd_t;
 
 static int resolve_ip_addr
@@ -344,10 +347,10 @@ static void read_async_cb
   rtlsdr_rpc_msg_t msg;
   unsigned int is_recv;
 
-  if (rpcd->reply_msg.off != off)
+  if (rpcd->async_replied == 0)
   {
     send_reply(rpcd, &rpcd->reply_msg);
-    rpcd->reply_msg.off = off;
+    rpcd->async_replied = 1;
   }
 
   msg.off = off;
@@ -355,6 +358,7 @@ static void read_async_cb
   msg.fmt = fmt;
   rtlsdr_rpc_msg_set_size(&msg, msg.size);
   rtlsdr_rpc_msg_set_op(&msg, RTLSDR_RPC_OP_READ_ASYNC);
+  rtlsdr_rpc_msg_set_id(&msg, rpcd->async_id);
   rtlsdr_rpc_msg_set_err(&msg, 0);
 
   send_all(rpcd->cli_sock, fmt, off);
@@ -922,6 +926,10 @@ static int handle_query
       uint32_t did;
       uint32_t buf_num;
       uint32_t buf_len;
+      rtlsdr_rpc_op_t new_op;
+      rtlsdr_rpc_msg_t* new_q;
+      rtlsdr_rpc_msg_t* new_r;
+      uint8_t id;
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &buf_num)) goto on_error;
@@ -930,16 +938,35 @@ static int handle_query
       if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
 
       /* prepare the reply here */
+      id = rtlsdr_rpc_msg_get_id(q);
       rtlsdr_rpc_msg_set_size(r, r->off);
       rtlsdr_rpc_msg_set_op(r, op);
-      rtlsdr_rpc_msg_set_mid(r, rtlsdr_rpc_msg_get_mid(q));
+      rtlsdr_rpc_msg_set_id(r, id);
       rtlsdr_rpc_msg_set_err(r, 0);
+      
+      rpcd->async_id = id;
+      rpcd->async_replied = 0;
+      while (1)
+      {
+	rtlsdr_read_async
+	  (rpcd->dev, read_async_cb, rpcd, buf_num, buf_len);
 
-      rtlsdr_read_async
-	(rpcd->dev, read_async_cb, rpcd, buf_num, buf_len);
+	if (rpcd->async_replied == 0) goto on_error;
+
+	if (recv_query(rpcd, &new_q)) goto on_error;
+
+	new_op = rtlsdr_rpc_msg_get_op(new_q);
+
+	/* do not reply is cancel_async */
+	if (new_op == RTLSDR_RPC_OP_CANCEL_ASYNC) return 0;
+	handle_query(rpcd, new_q, &new_r);
+
+	if (new_r != NULL) send_reply(rpcd, new_r);
+      }
 
       /* do not resend reply */
-      return 0;
+      if (rpcd->async_replied) return 0;
+      goto on_error;
       break ;
     }
 
@@ -993,7 +1020,7 @@ static int handle_query
  on_error:
   rtlsdr_rpc_msg_set_size(r, r->off);
   rtlsdr_rpc_msg_set_op(r, op);
-  rtlsdr_rpc_msg_set_mid(r, rtlsdr_rpc_msg_get_mid(q));
+  rtlsdr_rpc_msg_set_id(r, rtlsdr_rpc_msg_get_id(q));
   rtlsdr_rpc_msg_set_err(r, err);
   *rr = r;
   return 0;
