@@ -23,3 +23,8 @@ rtlizer
 This implementation still has some limitations, but
 works well in most cases. Please report any bug to
 texane@gmail.com
+
+Also, note that the latest version of libusb should be
+used as librtlsdr crashed when used with older version
+(esp. the rtlsdr_read_async routine):
+https://github.com/libusb/libusb.git
