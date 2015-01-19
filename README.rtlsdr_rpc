@@ -28,3 +28,10 @@ Also, note that the latest version of libusb should be
 used as librtlsdr crashed when used with older version
 (esp. the rtlsdr_read_async routine):
 https://github.com/libusb/libusb.git
+
+list of known working software:
+rtl_fm
+rtl_power
+rtlsdr-waterfall
+rtlizer
+gnuradio-companion
