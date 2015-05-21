@@ -271,7 +271,7 @@ int cic_9_tables[][10] = {
 	{9, -199, -362, 5303, -25505, 77489, -25505, 5303, -362, -199},
 };
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER ) || defined(__ANDROID__)
 double log2(double n)
 {
 	return log(n) / log(2.0);
