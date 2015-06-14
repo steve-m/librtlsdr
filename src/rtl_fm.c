@@ -4,6 +4,7 @@
  * Copyright (C) 2012 by Hoernchen <la@tfc-server.de>
  * Copyright (C) 2012 by Kyle Keen <keenerd@gmail.com>
  * Copyright (C) 2013 by Elias Oenal <EliasOenal@gmail.com>
+ * Copyright (C) 2015 by Hayati Ayguen <h_ayguen@web.de>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -91,6 +92,13 @@ static int ACTUAL_BUF_LENGTH;
 static int *atan_lut = NULL;
 static int atan_lut_size = 131072; /* 512 KB */
 static int atan_lut_coef = 8;
+
+static int verbosity = 0;
+static int printLevels = 0;
+static int printLevelNo = 1;
+static int levelMax = 0;
+static int levelMaxMax = 0;
+static double levelSum = 0.0;
 
 struct dongle_state
 {
@@ -187,16 +195,21 @@ void usage(void)
 		"\t-f frequency_to_tune_to [Hz]\n"
 		"\t    use multiple -f for scanning (requires squelch)\n"
 		"\t    ranges supported, -f 118M:137M:25k\n"
+		"\t[-v verbosity (default: 0)]\n"
 		"\t[-M modulation (default: fm)]\n"
-		"\t    fm, wbfm, raw, am, usb, lsb\n"
+		"\t    fm or nbfm or nfm, wbfm or wfm, raw or iq, am, usb, lsb\n"
 		"\t    wbfm == -M fm -s 170k -o 4 -A fast -r 32k -l 0 -E deemp\n"
 		"\t    raw mode outputs 2x16 bit IQ pairs\n"
 		"\t[-s sample_rate (default: 24k)]\n"
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-g tuner_gain (default: automatic)]\n"
 		"\t[-l squelch_level (default: 0/off)]\n"
+		"\t[-L N  prints levels every N calculations]\n"
+		"\t    output are comma separated values (csv):\n"
+		"\t    mean since last output, max since last output, overall max, squelch\n"
+		"\t[-c de-emphasis_time_constant in us for wbfm. 'us' or 'eu' for 75/50 us (default: us)]\n"
 		//"\t    for fm squelch is inverted\n"
-		//"\t[-o oversampling (default: 1, 4 recommended)]\n"
+		"\t[-o oversampling (default: 1, 4 recommended)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
 		"\t[-E enable_option (default: none)]\n"
 		"\t    use multiple -E to enable multiple options\n"
@@ -759,6 +772,24 @@ void full_demod(struct demod_state *d)
 		} else {
 			d->squelch_hits = 0;}
 	}
+
+	if (printLevels) {
+		if (!sr)
+			sr = rms(d->lowpassed, d->lp_len, 1);
+		--printLevelNo;
+		if (printLevels) {
+			levelSum += sr;
+			if (levelMax < sr)		levelMax = sr;
+			if (levelMaxMax < sr)	levelMaxMax = sr;
+			if  (!printLevelNo) {
+				printLevelNo = printLevels;
+				fprintf(stderr, "%f, %d, %d, %d\n", (levelSum / printLevels), levelMax, levelMaxMax, d->squelch_level );
+				levelMax = 0;
+				levelSum = 0;
+			}
+		}
+	}
+
 	d->mode_demod(d);  /* lowpassed -> result */
 	if (d->mode_demod == &raw_demod) {
 		return;
@@ -864,9 +895,16 @@ static void optimal_settings(int freq, int rate)
 	}
 	capture_freq = freq;
 	capture_rate = dm->downsample * dm->rate_in;
+	if (verbosity)
+		fprintf(stderr, "capture_rate = dm->downsample * dm->rate_in = %d * %d = %d\n", dm->downsample, dm->rate_in, capture_rate );
 	if (!d->offset_tuning) {
-		capture_freq = freq + capture_rate/4;}
+		capture_freq = freq + capture_rate/4;
+		if (verbosity)
+			fprintf(stderr, "optimal_settings(freq = %d): capture_freq = freq + capture_rate/4 = %d\n", freq, capture_freq );
+	}
 	capture_freq += cs->edge * dm->rate_in / 2;
+	if (verbosity)
+		fprintf(stderr, "optimal_settings(freq = %d): capture_freq +=  cs->edge * dm->rate_in / 2 = %d * %d / 2 = %d\n", freq, cs->edge, dm->rate_in, capture_freq );
 	dm->output_scale = (1<<15) / (128 * dm->downsample);
 	if (dm->output_scale < 1) {
 		dm->output_scale = 1;}
@@ -874,6 +912,8 @@ static void optimal_settings(int freq, int rate)
 		dm->output_scale = 1;}
 	d->freq = (uint32_t)capture_freq;
 	d->rate = (uint32_t)capture_rate;
+	if (verbosity)
+		fprintf(stderr, "optimal_settings(freq = %d) delivers freq %.0f, rate %.0f\n", freq, (double)d->freq, (double)d->rate );
 }
 
 static void *controller_thread_fn(void *arg)
@@ -884,6 +924,8 @@ static void *controller_thread_fn(void *arg)
 	struct controller_state *s = arg;
 
 	if (s->wb_mode) {
+		if (verbosity)
+			fprintf(stderr, "wbfm: adding 16000 Hz to every intput frequency\n");
 		for (i=0; i < s->freq_len; i++) {
 			s->freqs[i] += 16000;}
 	}
@@ -896,6 +938,10 @@ static void *controller_thread_fn(void *arg)
 		verbose_offset_tuning(dongle.dev);}
 
 	/* Set the frequency */
+	if (verbosity) {
+		fprintf(stderr, "verbose_set_frequency(%.0f Hz)\n", (double)dongle.freq);
+		fprintf(stderr, "  frequency is away from parametrized one, to avoid negative impact from dc\n");
+	}
 	verbose_set_frequency(dongle.dev, dongle.freq);
 	fprintf(stderr, "Oversampling input by: %ix.\n", demod.downsample);
 	fprintf(stderr, "Oversampling output by: %ix.\n", demod.post_downsample);
@@ -903,6 +949,8 @@ static void *controller_thread_fn(void *arg)
 		1000 * 0.5 * (float)ACTUAL_BUF_LENGTH / (float)dongle.rate);
 
 	/* Set the sample rate */
+	if (verbosity)
+		fprintf(stderr, "verbose_set_sample_rate(%.0f Hz)\n", (double)dongle.rate);
 	verbose_set_sample_rate(dongle.dev, dongle.rate);
 	fprintf(stderr, "Output at %u Hz.\n", demod.rate_in/demod.post_downsample);
 
@@ -1042,12 +1090,13 @@ int main(int argc, char **argv)
 	int r, opt;
 	int dev_given = 0;
 	int custom_ppm = 0;
+	int timeConstant = 75; /* default: U.S. 75 uS */
 	dongle_init(&dongle);
 	demod_init(&demod);
 	output_init(&output);
 	controller_init(&controller);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:o:t:r:p:E:F:A:M:h")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:F:A:M:c:v:h")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1069,6 +1118,9 @@ int main(int argc, char **argv)
 			break;
 		case 'l':
 			demod.squelch_level = (int)atof(optarg);
+			break;
+		case 'L':
+			printLevels = (int)atof(optarg);
 			break;
 		case 's':
 			demod.rate_in = (uint32_t)atofs(optarg);
@@ -1121,9 +1173,9 @@ int main(int argc, char **argv)
 				demod.custom_atan = 2;}
 			break;
 		case 'M':
-			if (strcmp("fm",  optarg) == 0) {
+			if (strcmp("nbfm",  optarg) == 0 || strcmp("nfm",  optarg) == 0 || strcmp("fm",  optarg) == 0) {
 				demod.mode_demod = &fm_demod;}
-			if (strcmp("raw",  optarg) == 0) {
+			if (strcmp("raw",  optarg) == 0 || strcmp("iq",  optarg) == 0) {
 				demod.mode_demod = &raw_demod;}
 			if (strcmp("am",  optarg) == 0) {
 				demod.mode_demod = &am_demod;}
@@ -1131,7 +1183,7 @@ int main(int argc, char **argv)
 				demod.mode_demod = &usb_demod;}
 			if (strcmp("lsb", optarg) == 0) {
 				demod.mode_demod = &lsb_demod;}
-			if (strcmp("wbfm",  optarg) == 0) {
+			if (strcmp("wbfm",  optarg) == 0 || strcmp("wfm",  optarg) == 0) {
 				controller.wb_mode = 1;
 				demod.mode_demod = &fm_demod;
 				demod.rate_in = 170000;
@@ -1141,6 +1193,17 @@ int main(int argc, char **argv)
 				//demod.post_downsample = 4;
 				demod.deemph = 1;
 				demod.squelch_level = 0;}
+			break;
+		case 'c':
+			if (strcmp("us",  optarg) == 0)
+				timeConstant = 75;
+			else if (strcmp("eu", optarg) == 0)
+				timeConstant = 50;
+			else
+				timeConstant = (int)atof(optarg);
+			break;
+		case 'v':
+			verbosity = (int)atof(optarg);
 			break;
 		case 'h':
 		default:
@@ -1194,7 +1257,10 @@ int main(int argc, char **argv)
 #endif
 
 	if (demod.deemph) {
-		demod.deemph_a = (int)round(1.0/((1.0-exp(-1.0/(demod.rate_out * 75e-6)))));
+		double tc = (double)timeConstant * 1e-6;
+		demod.deemph_a = (int)round(1.0/((1.0-exp(-1.0/(demod.rate_out * tc)))));
+		if (verbosity)
+			fprintf(stderr, "using wbfm deemphasis filter with time constant %d us\n", timeConstant );
 	}
 
 	/* Set the tuner gain */
