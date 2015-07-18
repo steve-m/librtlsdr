@@ -146,7 +146,8 @@ struct demod_state
 	int      deemph, deemph_a;
 	int      now_lpr;
 	int      prev_lpr_index;
-	int      dc_block, dc_avg;
+	int      dc_block_audio, dc_avg, adc_block_const;
+	int      dc_block_raw, dc_avgI, dc_avgQ, rdc_block_const;
 	void     (*mode_demod)(struct demod_state*);
 	pthread_rwlock_t rw;
 	pthread_cond_t ready;
@@ -214,10 +215,13 @@ void usage(void)
 		"\t[-E enable_option (default: none)]\n"
 		"\t    use multiple -E to enable multiple options\n"
 		"\t    edge:   enable lower edge tuning\n"
-		"\t    dc:     enable dc blocking filter\n"
+		"\t    rdc:     enable dc blocking filter on raw I/Q data\n"
+		"\t    adc:     enable dc blocking filter on demodulated audio\n"
+		"\t    dc:      same as adc\n"
 		"\t    deemp:  enable de-emphasis filter\n"
 		"\t    direct: enable direct sampling\n"
 		"\t    offset: enable offset tuning\n"
+		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\tfilename ('-' means stdout)\n"
 		"\t    omitting the filename also uses stdout\n\n"
 		"Experimental options:\n"
@@ -623,7 +627,7 @@ void deemph_filter(struct demod_state *fm)
 	}
 }
 
-void dc_block_filter(struct demod_state *fm)
+void dc_block_audio_filter(struct demod_state *fm)
 {
 	int i, avg;
 	int64_t sum = 0;
@@ -631,13 +635,37 @@ void dc_block_filter(struct demod_state *fm)
 		sum += fm->result[i];
 	}
 	avg = sum / fm->result_len;
-	avg = (avg + fm->dc_avg * 9) / 10;
+	avg = (avg + fm->dc_avg * fm->adc_block_const) / ( fm->adc_block_const + 1 );
 	for (i=0; i < fm->result_len; i++) {
 		fm->result[i] -= avg;
 	}
 	fm->dc_avg = avg;
 }
 
+void dc_block_raw_filter(struct demod_state *fm)
+{
+	/* derived from dc_block_audio_filter,
+		running over the raw I/Q components
+	*/
+	int16_t *lp = fm->lowpassed;
+	int i, avgI, avgQ;
+	int64_t sumI = 0;
+	int64_t sumQ = 0;
+	for (i = 0; i < fm->lp_len; i += 2) {
+		sumI += lp[i];
+		sumQ += lp[i+1];
+	}
+	avgI = sumI / ( fm->lp_len / 2 );
+	avgQ = sumQ / ( fm->lp_len / 2 );
+	avgI = (avgI + fm->dc_avgI * fm->rdc_block_const) / ( fm->rdc_block_const + 1 );
+	avgQ = (avgQ + fm->dc_avgQ * fm->rdc_block_const) / ( fm->rdc_block_const + 1 );
+	for (i = 0; i < fm->lp_len; i += 2) {
+		lp[i] -= avgI;
+		lp[i+1] -= avgQ;
+	}
+	fm->dc_avgI = avgI;
+	fm->dc_avgQ = avgQ;
+}
 int mad(int16_t *samples, int len, int step)
 /* mean average deviation */
 {
@@ -789,7 +817,9 @@ void full_demod(struct demod_state *d)
 			}
 		}
 	}
-
+	if (d->dc_block_raw) {
+		dc_block_raw_filter(d);
+	}
 	d->mode_demod(d);  /* lowpassed -> result */
 	if (d->mode_demod == &raw_demod) {
 		return;
@@ -800,8 +830,8 @@ void full_demod(struct demod_state *d)
 		d->result_len = low_pass_simple(d->result, d->result_len, d->post_downsample);}
 	if (d->deemph) {
 		deemph_filter(d);}
-	if (d->dc_block) {
-		dc_block_filter(d);}
+	if (d->dc_block_audio) {
+		dc_block_audio_filter(d);}
 	if (d->rate_out2 > 0) {
 		low_pass_real(d);
 		//arbitrary_resample(d->result, d->result, d->result_len, d->result_len * d->rate_out2 / d->rate_out);
@@ -1017,8 +1047,13 @@ void demod_init(struct demod_state *s)
 	s->prev_lpr_index = 0;
 	s->deemph_a = 0;
 	s->now_lpr = 0;
-	s->dc_block = 0;
+	s->dc_block_audio = 0;
 	s->dc_avg = 0;
+	s->adc_block_const = 9;
+	s->dc_block_raw = 0;
+	s->dc_avgI = 0;
+	s->dc_avgQ = 0;
+	s->rdc_block_const = 9;
 	pthread_rwlock_init(&s->rw, NULL);
 	pthread_cond_init(&s->ready, NULL);
 	pthread_mutex_init(&s->ready_m, NULL);
@@ -1096,7 +1131,7 @@ int main(int argc, char **argv)
 	output_init(&output);
 	controller_init(&controller);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:F:A:M:c:v:h")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:v:h")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1150,14 +1185,19 @@ int main(int argc, char **argv)
 		case 'E':
 			if (strcmp("edge",  optarg) == 0) {
 				controller.edge = 1;}
-			if (strcmp("dc", optarg) == 0) {
-				demod.dc_block = 1;}
+			if (strcmp("dc", optarg) == 0 || strcmp("adc", optarg) == 0) {
+				demod.dc_block_audio = 1;}
+			if (strcmp("rdc", optarg) == 0) {
+				demod.dc_block_raw = 1;}
 			if (strcmp("deemp",  optarg) == 0) {
 				demod.deemph = 1;}
 			if (strcmp("direct",  optarg) == 0) {
 				dongle.direct_sampling = 1;}
 			if (strcmp("offset",  optarg) == 0) {
 				dongle.offset_tuning = 1;}
+			break;
+		case 'q':
+			demod.rdc_block_const = atoi(optarg);
 			break;
 		case 'F':
 			demod.downsample_passes = 1;  /* truthy placeholder */
