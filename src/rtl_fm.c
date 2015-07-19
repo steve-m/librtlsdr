@@ -109,7 +109,7 @@ struct dongle_state
 	uint32_t freq;
 	uint32_t rate;
 	int      gain;
-	uint16_t buf16[MAXIMUM_BUF_LENGTH];
+	int16_t  buf16[MAXIMUM_BUF_LENGTH];
 	uint32_t buf_len;
 	int      ppm_error;
 	int      offset_tuning;
@@ -215,7 +215,7 @@ void usage(void)
 		"\t[-E enable_option (default: none)]\n"
 		"\t    use multiple -E to enable multiple options\n"
 		"\t    edge:   enable lower edge tuning\n"
-		"\t    rdc:     enable dc blocking filter on raw I/Q data\n"
+		"\t    rdc:     enable dc blocking filter on raw I/Q data at capture rate\n"
 		"\t    adc:     enable dc blocking filter on demodulated audio\n"
 		"\t    dc:      same as adc\n"
 		"\t    deemp:  enable de-emphasis filter\n"
@@ -294,6 +294,27 @@ double log2(double n)
 	return log(n) / log(2.0);
 }
 #endif
+
+void rotate16_90(int16_t *buf, uint32_t len)
+/* 90 rotation is 1+0j, 0+1j, -1+0j, 0-1j
+   or [0, 1, -3, 2, -4, -5, 7, -6] */
+{
+	uint32_t i;
+	int16_t tmp;
+	for (i=0; i<len; i+=8) {
+		tmp = - buf[i+3];
+		buf[i+3] = buf[i+2];
+		buf[i+2] = tmp;
+
+		buf[i+4] = - buf[i+4];
+		buf[i+5] = - buf[i+5];
+
+		tmp = - buf[i+6];
+		buf[i+6] = buf[i+7];
+		buf[i+7] = tmp;
+	}
+}
+
 
 void rotate_90(unsigned char *buf, uint32_t len)
 /* 90 rotation is 1+0j, 0+1j, -1+0j, 0-1j
@@ -642,26 +663,25 @@ void dc_block_audio_filter(struct demod_state *fm)
 	fm->dc_avg = avg;
 }
 
-void dc_block_raw_filter(struct demod_state *fm)
+void dc_block_raw_filter(struct demod_state *fm, int16_t *buf, int len)
 {
 	/* derived from dc_block_audio_filter,
 		running over the raw I/Q components
 	*/
-	int16_t *lp = fm->lowpassed;
 	int i, avgI, avgQ;
 	int64_t sumI = 0;
 	int64_t sumQ = 0;
-	for (i = 0; i < fm->lp_len; i += 2) {
-		sumI += lp[i];
-		sumQ += lp[i+1];
+	for (i = 0; i < len; i += 2) {
+		sumI += buf[i];
+		sumQ += buf[i+1];
 	}
-	avgI = sumI / ( fm->lp_len / 2 );
-	avgQ = sumQ / ( fm->lp_len / 2 );
+	avgI = sumI / ( len / 2 );
+	avgQ = sumQ / ( len / 2 );
 	avgI = (avgI + fm->dc_avgI * fm->rdc_block_const) / ( fm->rdc_block_const + 1 );
 	avgQ = (avgQ + fm->dc_avgQ * fm->rdc_block_const) / ( fm->rdc_block_const + 1 );
-	for (i = 0; i < fm->lp_len; i += 2) {
-		lp[i] -= avgI;
-		lp[i+1] -= avgQ;
+	for (i = 0; i < len; i += 2) {
+		buf[i] -= avgI;
+		buf[i+1] -= avgQ;
 	}
 	fm->dc_avgI = avgI;
 	fm->dc_avgQ = avgQ;
@@ -817,9 +837,6 @@ void full_demod(struct demod_state *d)
 			}
 		}
 	}
-	if (d->dc_block_raw) {
-		dc_block_raw_filter(d);
-	}
 	d->mode_demod(d);  /* lowpassed -> result */
 	if (d->mode_demod == &raw_demod) {
 		return;
@@ -853,10 +870,19 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			buf[i] = 127;}
 		s->mute = 0;
 	}
-	if (!s->offset_tuning) {
-		rotate_90(buf, len);}
+	/* 1st: convert to 16 bit - to allow easier calculation of DC */
 	for (i=0; i<(int)len; i++) {
-		s->buf16[i] = (int16_t)buf[i] - 127;}
+		s->buf16[i] = ( (int16_t)buf[i] - 127 );
+	}
+	/* 2nd: do DC filtering BEFORE up-mixing */
+	if (d->dc_block_raw) {
+		dc_block_raw_filter(d, s->buf16, (int)len);
+	}
+	/* 3rd: up-mixing */
+	if (!s->offset_tuning) {
+		rotate16_90(s->buf16, (int)len);
+		/* rotate_90(buf, len); */
+	}
 	pthread_rwlock_wrlock(&d->rw);
 	memcpy(d->lowpassed, s->buf16, 2*len);
 	d->lp_len = len;
@@ -922,6 +948,9 @@ static void optimal_settings(int freq, int rate)
 	if (dm->downsample_passes) {
 		dm->downsample_passes = (int)log2(dm->downsample) + 1;
 		dm->downsample = 1 << dm->downsample_passes;
+	}
+	if (verbosity) {
+		fprintf(stderr, "downsample_passes = %d (= # of fifth_order() iterations), downsample = %d\n", dm->downsample_passes, dm->downsample );
 	}
 	capture_freq = freq;
 	capture_rate = dm->downsample * dm->rate_in;
