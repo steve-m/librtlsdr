@@ -8,8 +8,12 @@ them. Also, it allows a developer to use the same API
 no matter weither the dongle is local or distant.
 
 To use it, one must compile and install the library
-with CMAKE the usual way. Then, a server (called rtl_rpcd)
-must be run on the remote location.
+with CMAKE the usual way. Note that you may need to
+uninstall the existing librtlsdr, as people reported
+runtime errors due to conflicting installs.
+
+Then, a server (called rtl_rpcd) must be run on the
+remote location.
 
 In my case, the dongle is in a beagle bone black is
 at address 192.168.0.43:
