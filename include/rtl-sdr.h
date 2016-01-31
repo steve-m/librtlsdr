@@ -233,6 +233,17 @@ RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw);
 RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
 
 /*!
+ * Set LNA / Mixer / VGA Device Gain for R820T device is configured to.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param lna_gain in tenths of a dB, -30 means -3.0 dB.
+ * \param mixer_gain in tenths of a dB, -30 means -3.0 dB.
+ * \param vga_gain in tenths of a dB, -30 means -3.0 dB.
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, int vga_gain);
+
+/*!
  * Set the intermediate frequency gain for the device.
  *
  * \param dev the device handle given by rtlsdr_open()

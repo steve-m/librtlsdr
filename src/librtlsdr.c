@@ -255,12 +255,18 @@ int r820t_set_bw(void *dev, int bw) {
 }
 
 int r820t_set_gain(void *dev, int gain) {
-	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_gain(&devt->r82xx_p, 1, gain);
+  rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+  return r82xx_set_gain(&devt->r82xx_p, 1, gain, 0, 0, 0, 0);
 }
+
+int r820t_set_gain_ext(void *dev, int lna_gain, int mixer_gain, int vga_gain) {
+  rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+  return r82xx_set_gain(&devt->r82xx_p, 0, 0, 1, lna_gain, mixer_gain, vga_gain);
+}
+
 int r820t_set_gain_mode(void *dev, int manual) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_gain(&devt->r82xx_p, manual, 0);
+  return r82xx_set_gain(&devt->r82xx_p, manual, 0, 0, 0, 0, 0);
 }
 
 /* definition order must match enum rtlsdr_tuner */
@@ -1046,6 +1052,27 @@ int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
 		dev->gain = 0;
 
 	return r;
+}
+
+int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, int vga_gain)
+{
+  int r = 0;
+
+  if (!dev || !dev->tuner)
+    return -1;
+
+  if (dev->tuner->set_gain) {
+    rtlsdr_set_i2c_repeater(dev, 1);
+    r = r820t_set_gain_ext((void *)dev, lna_gain, mixer_gain, vga_gain);
+    rtlsdr_set_i2c_repeater(dev, 0);
+  }
+
+  if (!r)
+    dev->gain = lna_gain + mixer_gain + vga_gain;
+  else
+    dev->gain = 0;
+
+  return r;
 }
 
 int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
