@@ -40,3 +40,5 @@ CMakeCache.txt
 CMakeFiles
 *.cmake
 build
+
+debianize/*.deb
