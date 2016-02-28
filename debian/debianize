@@ -1,0 +1,52 @@
+#!/bin/bash
+
+PKG_NAME="librtlsdr0"
+
+REPO_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../"
+DIR="/tmp/package/${PKG_NAME}"
+USRDIR="${DIR}/usr/"
+LIBDIR="${USRDIR}/lib/x86_64-linux-gnu"
+BINDIR="${USRDIR}/bin/"
+DEBIAN="${DIR}/DEBIAN"
+INCDIR="${USRDIR}/include"
+
+rm -rf ${DIR}
+
+mkdir -p ${DIR}
+mkdir -p ${DEBIAN}
+mkdir -p ${LIBDIR}
+mkdir -p ${BINDIR}
+mkdir -p ${INCDIR}
+
+G_REV=`git rev-parse --short=8 HEAD`
+DATE=`date +"%Y%m%d%H%M%S"`
+VERSION="0.5.3-git+${DATE}.${G_REV}~$1"
+
+cat <<- EOF > ${DEBIAN}/control
+Package: ${PKG_NAME}
+Source: rtl-sdr
+Version: ${VERSION}
+Architecture: amd64
+Maintainer: Lucas Teske <lucas@teske.net.br>
+Pre-Depends: multiarch-support
+Depends: libc6 (>= 2.14), libusb-1.0-0 (>= 2:1.0.9)
+Section: libs
+Priority: extra
+Multi-Arch: same
+Homepage: http://sdr.osmocom.org/trac/wiki/rtl-sdr
+Description: Software defined radio receiver for Realtek RTL2832U (library)
+ rtl-sdr is a software defined radio (SDR) receiver software for certain
+ low-cost DVB-T/DAB(+) USB dongles based on the Realtek RTL2832U chip.
+ .
+ This package contains the shared library.
+EOF
+
+DEB_PKG="${PKG_NAME}_${VERSION}_amd64.deb"
+
+cp -rf ${REPO_DIR}/build/src/rtl_* ${BINDIR}
+cp -rf ${REPO_DIR}/build/src/lib* ${LIBDIR}
+cp -rf ${REPO_DIR}/include/*.h ${INCDIR}
+
+dpkg-deb -b ${DIR} ./${DEB_PKG}
+
+echo ${DEB_PKG}
