@@ -69,8 +69,8 @@
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 
 #define DEFAULT_BUF_LENGTH		(1 * 16384)
-#define AUTO_GAIN			-100
-#define BUFFER_DUMP			(1<<12)
+#define AUTO_GAIN				-100
+#define BUFFER_DUMP				(1<<12)
 
 #define MAXIMUM_RATE			2800000
 #define MINIMUM_RATE			1000000

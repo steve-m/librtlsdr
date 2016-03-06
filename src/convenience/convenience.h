@@ -14,6 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef __CONVENIENCE_H
+#define __CONVENIENCE_H
+
 
 /* a collection of user friendly tools */
 
@@ -140,3 +143,4 @@ int verbose_reset_buffer(rtlsdr_dev_t *dev);
 
 int verbose_device_search(char *s);
 
+#endif /*__CONVENIENCE_H*/

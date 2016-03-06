@@ -366,19 +366,19 @@ static rtlsdr_dongle_t known_devices[] = {
 #define MIN_RTL_XTAL_FREQ	(DEF_RTL_XTAL_FREQ - 1000)
 #define MAX_RTL_XTAL_FREQ	(DEF_RTL_XTAL_FREQ + 1000)
 
-#define CTRL_IN		(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_IN)
-#define CTRL_OUT	(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT)
+#define CTRL_IN			(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_IN)
+#define CTRL_OUT		(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT)
 #define CTRL_TIMEOUT	300
 #define BULK_TIMEOUT	0
 
 #define EEPROM_ADDR	0xa0
 
 enum usb_reg {
-	USB_SYSCTL		= 0x2000,
-	USB_CTRL		= 0x2010,
-	USB_STAT		= 0x2014,
-	USB_EPA_CFG		= 0x2144,
-	USB_EPA_CTL		= 0x2148,
+	USB_SYSCTL			= 0x2000,
+	USB_CTRL			= 0x2010,
+	USB_STAT			= 0x2014,
+	USB_EPA_CFG			= 0x2144,
+	USB_EPA_CTL			= 0x2148,
 	USB_EPA_MAXPKT		= 0x2158,
 	USB_EPA_MAXPKT_2	= 0x215a,
 	USB_EPA_FIFO_CFG	= 0x2160,
@@ -386,10 +386,10 @@ enum usb_reg {
 
 enum sys_reg {
 	DEMOD_CTL		= 0x3000,
-	GPO			= 0x3001,
-	GPI			= 0x3002,
+	GPO				= 0x3001,
+	GPI				= 0x3002,
 	GPOE			= 0x3003,
-	GPD			= 0x3004,
+	GPD				= 0x3004,
 	SYSINTE			= 0x3005,
 	SYSINTS			= 0x3006,
 	GP_CFG0			= 0x3007,
@@ -406,7 +406,7 @@ enum blocks {
 	SYSB			= 2,
 	TUNB			= 3,
 	ROMB			= 4,
-	IRB			= 5,
+	IRB				= 5,
 	IICB			= 6,
 };
 
@@ -1056,23 +1056,23 @@ int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
 
 int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, int vga_gain)
 {
-  int r = 0;
+	int r = 0;
 
-  if (!dev || !dev->tuner)
-    return -1;
+	if (!dev || !dev->tuner)
+		return -1;
 
-  if (dev->tuner->set_gain) {
-    rtlsdr_set_i2c_repeater(dev, 1);
-    r = r820t_set_gain_ext((void *)dev, lna_gain, mixer_gain, vga_gain);
-    rtlsdr_set_i2c_repeater(dev, 0);
-  }
+	if (dev->tuner->set_gain) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = r820t_set_gain_ext((void *)dev, lna_gain, mixer_gain, vga_gain);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	}
 
-  if (!r)
-    dev->gain = lna_gain + mixer_gain + vga_gain;
-  else
-    dev->gain = 0;
+	if (!r)
+		dev->gain = lna_gain + mixer_gain + vga_gain;
+	else
+		dev->gain = 0;
 
-  return r;
+	return r;
 }
 
 int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)

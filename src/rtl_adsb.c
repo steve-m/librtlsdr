@@ -76,7 +76,7 @@ int quality = 10;
 int allowed_errors = 5;
 FILE *file;
 int adsb_frame[14];
-#define preamble_len		16
+#define preamble_len	16
 #define long_frame		112
 #define short_frame		56
 
