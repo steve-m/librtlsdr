@@ -357,7 +357,7 @@ static void *command_worker(void *arg)
 			set_gain_by_index(dev, ntohl(cmd.param));
 			break;
     case SET_TUNER_BANDWIDTH:
-      printf("set tuner bandwidth to %i\n", ntohl(cmd.param));
+      printf("set tuner bandwidth to %i Hz\n", ntohl(cmd.param));
       rtlsdr_set_tuner_bandwidth(dev, ntohl(cmd.param));
       break;
 		default:
