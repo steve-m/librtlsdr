@@ -4,8 +4,8 @@ REPO_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../"
 
 G_REV=`git rev-parse --short=8 HEAD`
 DATE=`date +"%Y%m%d%H%M%S"`
-VERSION="0.5.3-git+${DATE}.${G_REV}~$1"
-
+#VERSION="0.5.3-git+${DATE}.${G_REV}~$1"
+VERSION=`git describe | cut -dv -f2`
 #
 # librtlsdr0
 #
@@ -113,8 +113,7 @@ EOF
 
 DEB_PKG="librtlsdr-dev_${VERSION}_amd64.deb"
 
-cp -rf ${REPO_DIR}/build/include/*.h /tmp/librtlsdr-dev/usr/include
-cat ../librtlsdr.pc | sed 's/\/usr\/local/\/usr/g' | sed 's/v0.5.3.*/${VERSION}/' > /tmp/librtlsdr-dev/usr/lib/x86_64-linux-gnu/pkgconfig/librtlsdr.pc
+cp -rf ${REPO_DIR}/include/*.h /tmp/librtlsdr-dev/usr/include
 dpkg-deb -b /tmp/librtlsdr-dev/ ./${DEB_PKG}
 
 echo ${DEB_PKG}
