@@ -94,6 +94,7 @@ void usage(void)
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
 		"\t[-b number of buffers (default: 15, set by library)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
+    "\t[-w rtlsdr device bandwidth (for R820T device)\n"
 		"\t[-d device index (default: 0)]\n"
 		"\t[-P ppm_error (default: 0)]\n");
 	exit(1);
@@ -302,59 +303,63 @@ static void *command_worker(void *arg)
 			}
 		}
 		switch(cmd.cmd) {
-		case 0x01:
+		case SET_FREQUENCY:
 			printf("set freq %d\n", ntohl(cmd.param));
 			rtlsdr_set_center_freq(dev,ntohl(cmd.param));
 			break;
-		case 0x02:
+		case SET_SAMPLE_RATE:
 			printf("set sample rate %d\n", ntohl(cmd.param));
 			rtlsdr_set_sample_rate(dev, ntohl(cmd.param));
 			break;
-		case 0x03:
+		case SET_GAIN_MODE:
 			printf("set gain mode %d\n", ntohl(cmd.param));
 			rtlsdr_set_tuner_gain_mode(dev, ntohl(cmd.param));
 			break;
-		case 0x04:
+		case SET_GAIN:
 			printf("set gain %d\n", ntohl(cmd.param));
 			rtlsdr_set_tuner_gain(dev, ntohl(cmd.param));
 			break;
-		case 0x05:
+		case SET_FREQUENCY_CORRECTION:
 			printf("set freq correction %d\n", ntohl(cmd.param));
 			rtlsdr_set_freq_correction(dev, ntohl(cmd.param));
 			break;
-		case 0x06:
+		case SET_IF_STAGE:
 			tmp = ntohl(cmd.param);
 			printf("set if stage %d gain %d\n", tmp >> 16, (short)(tmp & 0xffff));
 			rtlsdr_set_tuner_if_gain(dev, tmp >> 16, (short)(tmp & 0xffff));
 			break;
-		case 0x07:
+		case SET_TEST_MODE:
 			printf("set test mode %d\n", ntohl(cmd.param));
 			rtlsdr_set_testmode(dev, ntohl(cmd.param));
 			break;
-		case 0x08:
+		case SET_AGC_MODE:
 			printf("set agc mode %d\n", ntohl(cmd.param));
 			rtlsdr_set_agc_mode(dev, ntohl(cmd.param));
 			break;
-		case 0x09:
+		case SET_DIRECT_SAMPLING:
 			printf("set direct sampling %d\n", ntohl(cmd.param));
 			rtlsdr_set_direct_sampling(dev, ntohl(cmd.param));
 			break;
-		case 0x0a:
+		case SET_OFFSET_TUNING:
 			printf("set offset tuning %d\n", ntohl(cmd.param));
 			rtlsdr_set_offset_tuning(dev, ntohl(cmd.param));
 			break;
-		case 0x0b:
+		case SET_RTL_CRYSTAL:
 			printf("set rtl xtal %d\n", ntohl(cmd.param));
 			rtlsdr_set_xtal_freq(dev, ntohl(cmd.param), 0);
 			break;
-		case 0x0c:
+		case SET_TUNER_CRYSTAL:
 			printf("set tuner xtal %d\n", ntohl(cmd.param));
 			rtlsdr_set_xtal_freq(dev, 0, ntohl(cmd.param));
 			break;
-		case 0x0d:
+		case SET_TUNER_GAIN_BY_INDEX:
 			printf("set tuner gain by index %d\n", ntohl(cmd.param));
 			set_gain_by_index(dev, ntohl(cmd.param));
 			break;
+    case SET_TUNER_BANDWIDTH:
+      printf("set tuner bandwidth to %i\n", ntohl(cmd.param));
+      rtlsdr_set_tuner_bandwidth(dev, ntohl(cmd.param));
+      break;
 		default:
 			break;
 		}
@@ -367,7 +372,7 @@ int main(int argc, char **argv)
 	int r, opt, i;
 	char* addr = "127.0.0.1";
 	int port = 1234;
-	uint32_t frequency = 100000000, samp_rate = 2048000;
+	uint32_t frequency = 100000000, samp_rate = 2048000, bandwidth = 0;
 	struct sockaddr_in local, remote;
 	uint32_t buf_num = 0;
 	int dev_index = 0;
@@ -391,7 +396,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:w:")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -420,6 +425,9 @@ int main(int argc, char **argv)
 			break;
 		case 'P':
 			ppm_error = atoi(optarg);
+      break;
+    case 'w':
+      bandwidth = (uint32_t)atofs(optarg);
 			break;
 		default:
 			usage();
@@ -490,6 +498,14 @@ int main(int argc, char **argv)
 		else
 			fprintf(stderr, "Tuner gain set to %f dB.\n", gain/10.0);
 	}
+
+  r = rtlsdr_set_tuner_bandwidth(dev, bandwidth);
+  if (r < 0)
+    fprintf(stderr, "WARNING: Failed to set tuner bandwidth.\n");
+  else if (bandwidth != 0)
+    fprintf(stderr, "Tuner bandwidth set to %i.\n", bandwidth);
+  else
+    fprintf(stderr, "Tuner bandwidth set to automatic.\n");
 
 	/* Reset endpoint before we start reading from it (mandatory) */
 	r = rtlsdr_reset_buffer(dev);
