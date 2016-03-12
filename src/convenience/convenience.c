@@ -163,13 +163,15 @@ int verbose_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 int verbose_set_bandwidth(rtlsdr_dev_t *dev, uint32_t bandwidth)
 {
   int r;
-  r = rtlsdr_set_tuner_bandwidth(dev, bandwidth);
+  uint32_t applied_bw = 0;
+  /* r = rtlsdr_set_tuner_bandwidth(dev, bandwidth); */
+  r = rtlsdr_set_and_get_tuner_bandwidth(dev, bandwidth, &applied_bw, 1 /* =apply_bw */);
   if (r < 0) {
     fprintf(stderr, "WARNING: Failed to set bandwidth.\n");
   } else if (bandwidth > 0) {
-    fprintf(stderr, "Bandwidth set to %u Hz.\n", bandwidth);
+    fprintf(stderr, "Bandwidth set to %u Hz resulted in %u Hz.\n", bandwidth, applied_bw);
   } else {
-    fprintf(stderr, "Bandwidth set to automatic.\n");
+    fprintf(stderr, "Bandwidth set to automatic resulted in %u Hz.\n", applied_bw);
   }
   return r;
 }

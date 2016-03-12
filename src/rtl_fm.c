@@ -1348,7 +1348,21 @@ int main(int argc, char **argv)
 
 	verbose_ppm_set(dongle.dev, dongle.ppm_error);
 
-  verbose_set_bandwidth(dongle.dev, dongle.bandwidth);
+    verbose_set_bandwidth(dongle.dev, dongle.bandwidth);
+
+    if (verbosity && dongle.bandwidth)
+    {
+      int r;
+      uint32_t in_bw, out_bw, last_bw = 0;
+      for ( in_bw = 1; in_bw < 3200; ++in_bw )
+      {
+        r = rtlsdr_set_and_get_tuner_bandwidth(dongle.dev, in_bw*1000, &out_bw, 0 /* =apply_bw */);
+        if ( r == 0 && ( out_bw != last_bw || in_bw == 1 ) )
+          fprintf(stderr, "device sets bandwidth %u Hz for bw para >= %u kHz\n", out_bw, in_bw );
+        last_bw = out_bw;
+      }
+      fprintf(stderr,"\n");
+    }
 
 	if (strcmp(output.filename, "-") == 0) { /* Write samples to stdout */
 		output.file = stdout;
