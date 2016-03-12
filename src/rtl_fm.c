@@ -1056,6 +1056,7 @@ void dongle_init(struct dongle_state *s)
 	s->direct_sampling = 0;
 	s->offset_tuning = 0;
 	s->demod_target = &demod;
+  s->bandwidth = 0;
 }
 
 void demod_init(struct demod_state *s)
