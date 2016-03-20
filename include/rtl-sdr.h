@@ -26,6 +26,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <rtl-sdr_export.h>
+#include <rtl_tcp.h>
 
 typedef struct rtlsdr_dev rtlsdr_dev_t;
 
@@ -220,9 +221,14 @@ RTLSDR_API int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain);
  *
  * \param dev the device handle given by rtlsdr_open()
  * \param bw bandwidth in Hz. Zero means automatic BW selection.
+ * \param applied_bw is applied bandwidth in Hz, or 0 if unknown
+ * \param apply_bw: 1 to really apply configure the tuner chip; 0 for just returning applied_bw
  * \return 0 on success
  */
-RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw);
+RTLSDR_API int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw, uint32_t *applied_bw, int apply_bw );
+
+RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw );
+
 
 /*!
  * Get actual gain the device is configured to.

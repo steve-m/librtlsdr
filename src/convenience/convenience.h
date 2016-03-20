@@ -78,6 +78,17 @@ int verbose_set_frequency(rtlsdr_dev_t *dev, uint32_t frequency);
 int verbose_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate);
 
 /*!
+ * Set device bandwidth and report status on stderr
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param frequency in Hz
+ * \return 0 on success
+ */
+
+int verbose_set_bandwidth(rtlsdr_dev_t *dev, uint32_t bandwidth);
+
+
+/*!
  * Enable or disable the direct sampling mode and report status on stderr
  *
  * \param dev the device handle given by rtlsdr_open()

@@ -250,7 +250,7 @@ static void shadow_store(struct r82xx_priv *priv, uint8_t reg, const uint8_t *va
 }
 
 static int r82xx_write(struct r82xx_priv *priv, uint8_t reg, const uint8_t *val,
-		       unsigned int len)
+			   unsigned int len)
 {
 	int rc, size, pos = 0;
 
@@ -561,8 +561,8 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 }
 
 static int r82xx_sysfreq_sel(struct r82xx_priv *priv, uint32_t freq,
-			     enum r82xx_tuner_type type,
-			     uint32_t delsys)
+				 enum r82xx_tuner_type type,
+				 uint32_t delsys)
 {
 	int rc;
 	uint8_t mixer_top, lna_top, cp_cur, div_buf_cur, lna_vth_l, mixer_vth_l;
@@ -1083,97 +1083,97 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
   uint8_t data[4];
 
   if (extended_mode) {
-    /*
-    // LNA auto off
-    rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
-    if (rc < 0)
-      return rc;
+	/*
+	// LNA auto off
+	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
+	if (rc < 0)
+	  return rc;
 
-    // Mixer auto off
-    rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
-    if (rc < 0)
-      return rc;
+	// Mixer auto off
+	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
+	if (rc < 0)
+	  return rc;
 
-    rc = r82xx_read(priv, 0x00, data, sizeof(data));
-    if (rc < 0)
-      return rc;
-    */
+	rc = r82xx_read(priv, 0x00, data, sizeof(data));
+	if (rc < 0)
+	  return rc;
+	*/
 
-    /* Set LNA */
-    rc = r82xx_write_reg_mask(priv, 0x05, lna_gain, 0x0f);
-    if (rc < 0)
-      return rc;
+	/* Set LNA */
+	rc = r82xx_write_reg_mask(priv, 0x05, lna_gain, 0x0f);
+	if (rc < 0)
+	  return rc;
 
-    /* Set Mixer */
-    rc = r82xx_write_reg_mask(priv, 0x07, mixer_gain, 0x0f);
-    if (rc < 0)
-      return rc;
+	/* Set Mixer */
+	rc = r82xx_write_reg_mask(priv, 0x07, mixer_gain, 0x0f);
+	if (rc < 0)
+	  return rc;
 
-    /* Set VGA */
-    rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain, 0x9f);
-    if (rc < 0)
-      return rc;
+	/* Set VGA */
+	rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain, 0x9f);
+	if (rc < 0)
+	  return rc;
 
-    return 0;
+	return 0;
   }
 
   if (set_manual_gain) {
 
-    /* LNA auto off */
-    rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
-    if (rc < 0)
-      return rc;
+	/* LNA auto off */
+	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
+	if (rc < 0)
+	  return rc;
 
-     /* Mixer auto off */
-    rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
-    if (rc < 0)
-      return rc;
+	 /* Mixer auto off */
+	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
+	if (rc < 0)
+	  return rc;
 
-    rc = r82xx_read(priv, 0x00, data, sizeof(data));
-    if (rc < 0)
-      return rc;
+	rc = r82xx_read(priv, 0x00, data, sizeof(data));
+	if (rc < 0)
+	  return rc;
 
-    /* set fixed VGA gain for now (16.3 dB) */
-    rc = r82xx_write_reg_mask(priv, 0x0c, 0x08, 0x9f);
-    if (rc < 0)
-      return rc;
+	/* set fixed VGA gain for now (16.3 dB) */
+	rc = r82xx_write_reg_mask(priv, 0x0c, 0x08, 0x9f);
+	if (rc < 0)
+	  return rc;
 
-    for (i = 0; i < 15; i++) {
-      if (total_gain >= gain)
-        break;
+	for (i = 0; i < 15; i++) {
+	  if (total_gain >= gain)
+		break;
 
-      total_gain += r82xx_lna_gain_steps[++lna_index];
+	  total_gain += r82xx_lna_gain_steps[++lna_index];
 
-      if (total_gain >= gain)
-        break;
+	  if (total_gain >= gain)
+		break;
 
-      total_gain += r82xx_mixer_gain_steps[++mix_index];
-    }
+	  total_gain += r82xx_mixer_gain_steps[++mix_index];
+	}
 
-    /* set LNA gain */
-    rc = r82xx_write_reg_mask(priv, 0x05, lna_index, 0x0f);
-    if (rc < 0)
-      return rc;
+	/* set LNA gain */
+	rc = r82xx_write_reg_mask(priv, 0x05, lna_index, 0x0f);
+	if (rc < 0)
+	  return rc;
 
-    /* set Mixer gain */
-    rc = r82xx_write_reg_mask(priv, 0x07, mix_index, 0x0f);
-    if (rc < 0)
-      return rc;
+	/* set Mixer gain */
+	rc = r82xx_write_reg_mask(priv, 0x07, mix_index, 0x0f);
+	if (rc < 0)
+	  return rc;
   } else {
-    /* LNA */
-    rc = r82xx_write_reg_mask(priv, 0x05, 0, 0x10);
-    if (rc < 0)
-      return rc;
+	/* LNA */
+	rc = r82xx_write_reg_mask(priv, 0x05, 0, 0x10);
+	if (rc < 0)
+	  return rc;
 
-    /* Mixer */
-    rc = r82xx_write_reg_mask(priv, 0x07, 0x10, 0x10);
-    if (rc < 0)
-      return rc;
+	/* Mixer */
+	rc = r82xx_write_reg_mask(priv, 0x07, 0x10, 0x10);
+	if (rc < 0)
+	  return rc;
 
-    /* set fixed VGA gain for now (26.5 dB) */
-    rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f);
-    if (rc < 0)
-      return rc;
+	/* set fixed VGA gain for now (26.5 dB) */
+	rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f);
+	if (rc < 0)
+	  return rc;
   }
 
   return 0;
@@ -1187,7 +1187,7 @@ static const int r82xx_if_low_pass_bw_table[] = {
 
 #define FILT_HP_BW1 350000
 #define FILT_HP_BW2 380000
-int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
+int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t * applied_bw, int apply)
 {
 	int rc;
 	unsigned int i;
@@ -1197,27 +1197,35 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
 
 	if (bw > 7000000) {
 		// BW: 8 MHz
+		*applied_bw = 8000000;
 		reg_0a = 0x10;
 		reg_0b = 0x0b;
-		priv->int_freq = 4570000;
+		if (apply)
+			priv->int_freq = 4570000;
 	} else if (bw > 6000000) {
 		// BW: 7 MHz
+		*applied_bw = 7000000;
 		reg_0a = 0x10;
 		reg_0b = 0x2a;
-		priv->int_freq = 4570000;
+		if (apply)
+			priv->int_freq = 4570000;
 	} else if (bw > r82xx_if_low_pass_bw_table[0] + FILT_HP_BW1 + FILT_HP_BW2) {
 		// BW: 6 MHz
+		*applied_bw = 6000000;
 		reg_0a = 0x10;
 		reg_0b = 0x6b;
-		priv->int_freq = 3570000;
+		if (apply)
+			priv->int_freq = 3570000;
 	} else {
 		reg_0a = 0x00;
 		reg_0b = 0x80;
-		priv->int_freq = 2300000;
+		if (apply)
+			priv->int_freq = 2300000;
 
 		if (bw > r82xx_if_low_pass_bw_table[0] + FILT_HP_BW1) {
 			bw -= FILT_HP_BW2;
-			priv->int_freq += FILT_HP_BW2;
+			if (apply)
+				priv->int_freq += FILT_HP_BW2;
 			real_bw += FILT_HP_BW2;
 		} else {
 			reg_0b |= 0x20;
@@ -1225,7 +1233,8 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
 
 		if (bw > r82xx_if_low_pass_bw_table[0]) {
 			bw -= FILT_HP_BW1;
-			priv->int_freq += FILT_HP_BW1;
+			if (apply)
+				priv->int_freq += FILT_HP_BW1;
 			real_bw += FILT_HP_BW1;
 		} else {
 			reg_0b |= 0x40;
@@ -1240,8 +1249,14 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
 		reg_0b |= 15 - i;
 		real_bw += r82xx_if_low_pass_bw_table[i];
 
-		priv->int_freq -= real_bw / 2;
+		*applied_bw = real_bw;
+
+		if (apply)
+			priv->int_freq -= real_bw / 2;
 	}
+
+	if (!apply)
+		return 0;
 
 	rc = r82xx_write_reg_mask(priv, 0x0a, reg_0a, 0x10);
 	if (rc < 0)
@@ -1277,7 +1292,7 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 	air_cable1_in = (freq > MHZ(345)) ? 0x00 : 0x60;
 
 	if ((priv->cfg->rafael_chip == CHIP_R828D) &&
-	    (air_cable1_in != priv->input)) {
+		(air_cable1_in != priv->input)) {
 		priv->input = air_cable1_in;
 		rc = r82xx_write_reg_mask(priv, 0x05, air_cable1_in, 0x60);
 	}

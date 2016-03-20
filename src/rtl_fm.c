@@ -30,23 +30,23 @@
  * (no many-to-many locks)
  *
  * todo:
- *       sanity checks
- *       scale squelch to other input parameters
- *       test all the demodulations
- *       pad output on hop
- *       frequency ranges could be stored better
- *       scaled AM demod amplification
- *       auto-hop after time limit
- *       peak detector to tune onto stronger signals
- *       fifo for active hop frequency
- *       clips
- *       noise squelch
- *       merge stereo patch
- *       merge soft agc patch
- *       merge udp patch
- *       testmode to detect overruns
- *       watchdog to reset bad dongle
- *       fix oversampling
+ *	   sanity checks
+ *	   scale squelch to other input parameters
+ *	   test all the demodulations
+ *	   pad output on hop
+ *	   frequency ranges could be stored better
+ *	   scaled AM demod amplification
+ *	   auto-hop after time limit
+ *	   peak detector to tune onto stronger signals
+ *	   fifo for active hop frequency
+ *	   clips
+ *	   noise squelch
+ *	   merge stereo patch
+ *	   merge soft agc patch
+ *	   merge udp patch
+ *	   testmode to detect overruns
+ *	   watchdog to reset bad dongle
+ *	   fix oversampling
  */
 
 #include <errno.h>
@@ -102,53 +102,54 @@ static double levelSum = 0.0;
 
 struct dongle_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
 	rtlsdr_dev_t *dev;
-	int      dev_index;
+	int	  dev_index;
 	uint32_t freq;
 	uint32_t rate;
-	int      gain;
+  uint32_t bandwidth;
+	int	  gain;
 	int16_t  buf16[MAXIMUM_BUF_LENGTH];
 	uint32_t buf_len;
-	int      ppm_error;
-	int      offset_tuning;
-	int      direct_sampling;
-	int      mute;
+	int	  ppm_error;
+	int	  offset_tuning;
+	int	  direct_sampling;
+	int	  mute;
 	struct demod_state *demod_target;
 };
 
 struct demod_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
 	int16_t  lowpassed[MAXIMUM_BUF_LENGTH];
-	int      lp_len;
+	int	  lp_len;
 	int16_t  lp_i_hist[10][6];
 	int16_t  lp_q_hist[10][6];
 	int16_t  result[MAXIMUM_BUF_LENGTH];
 	int16_t  droop_i_hist[9];
 	int16_t  droop_q_hist[9];
-	int      result_len;
-	int      rate_in;
-	int      rate_out;
-	int      rate_out2;
-	int      now_r, now_j;
-	int      pre_r, pre_j;
-	int      prev_index;
-	int      downsample;    /* min 1, max 256 */
-	int      post_downsample;
-	int      output_scale;
-	int      squelch_level, conseq_squelch, squelch_hits, terminate_on_squelch;
-	int      downsample_passes;
-	int      comp_fir_size;
-	int      custom_atan;
-	int      deemph, deemph_a;
-	int      now_lpr;
-	int      prev_lpr_index;
-	int      dc_block_audio, dc_avg, adc_block_const;
-	int      dc_block_raw, dc_avgI, dc_avgQ, rdc_block_const;
-	void     (*mode_demod)(struct demod_state*);
+	int	  result_len;
+	int	  rate_in;
+	int	  rate_out;
+	int	  rate_out2;
+	int	  now_r, now_j;
+	int	  pre_r, pre_j;
+	int	  prev_index;
+	int	  downsample;	/* min 1, max 256 */
+	int	  post_downsample;
+	int	  output_scale;
+	int	  squelch_level, conseq_squelch, squelch_hits, terminate_on_squelch;
+	int	  downsample_passes;
+	int	  comp_fir_size;
+	int	  custom_atan;
+	int	  deemph, deemph_a;
+	int	  now_lpr;
+	int	  prev_lpr_index;
+	int	  dc_block_audio, dc_avg, adc_block_const;
+	int	  dc_block_raw, dc_avgI, dc_avgQ, rdc_block_const;
+	void	 (*mode_demod)(struct demod_state*);
 	pthread_rwlock_t rw;
 	pthread_cond_t ready;
 	pthread_mutex_t ready_m;
@@ -157,13 +158,13 @@ struct demod_state
 
 struct output_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
-	FILE     *file;
-	char     *filename;
+	FILE	 *file;
+	char	 *filename;
 	int16_t  result[MAXIMUM_BUF_LENGTH];
-	int      result_len;
-	int      rate;
+	int	  result_len;
+	int	  rate;
 	pthread_rwlock_t rw;
 	pthread_cond_t ready;
 	pthread_mutex_t ready_m;
@@ -171,13 +172,13 @@ struct output_state
 
 struct controller_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
 	uint32_t freqs[FREQUENCIES_LIMIT];
-	int      freq_len;
-	int      freq_now;
-	int      edge;
-	int      wb_mode;
+	int	  freq_len;
+	int	  freq_now;
+	int	  edge;
+	int	  wb_mode;
 	pthread_cond_t hop;
 	pthread_mutex_t hop_m;
 };
@@ -194,43 +195,44 @@ void usage(void)
 		"rtl_fm, a simple narrow band FM demodulator for RTL2832 based DVB-T receivers\n\n"
 		"Use:\trtl_fm -f freq [-options] [filename]\n"
 		"\t-f frequency_to_tune_to [Hz]\n"
-		"\t    use multiple -f for scanning (requires squelch)\n"
-		"\t    ranges supported, -f 118M:137M:25k\n"
+		"\t	use multiple -f for scanning (requires squelch)\n"
+		"\t	ranges supported, -f 118M:137M:25k\n"
 		"\t[-v verbosity (default: 0)]\n"
 		"\t[-M modulation (default: fm)]\n"
-		"\t    fm or nbfm or nfm, wbfm or wfm, raw or iq, am, usb, lsb\n"
-		"\t    wbfm == -M fm -s 170k -o 4 -A fast -r 32k -l 0 -E deemp\n"
-		"\t    raw mode outputs 2x16 bit IQ pairs\n"
+		"\t	fm or nbfm or nfm, wbfm or wfm, raw or iq, am, usb, lsb\n"
+		"\t	wbfm == -M fm -s 170k -o 4 -A fast -r 32k -l 0 -E deemp\n"
+		"\t	raw mode outputs 2x16 bit IQ pairs\n"
 		"\t[-s sample_rate (default: 24k)]\n"
 		"\t[-d device_index (default: 0)]\n"
-		"\t[-g tuner_gain (default: automatic)]\n"
+	"\t[-g tuner_gain (default: automatic)]\n"
+	"\t[-w tuner_bandwidth (default: automatic)]\n"
 		"\t[-l squelch_level (default: 0/off)]\n"
 		"\t[-L N  prints levels every N calculations]\n"
-		"\t    output are comma separated values (csv):\n"
-		"\t    mean since last output, max since last output, overall max, squelch\n"
+		"\t	output are comma separated values (csv):\n"
+		"\t	mean since last output, max since last output, overall max, squelch\n"
 		"\t[-c de-emphasis_time_constant in us for wbfm. 'us' or 'eu' for 75/50 us (default: us)]\n"
-		//"\t    for fm squelch is inverted\n"
+		//"\t	for fm squelch is inverted\n"
 		"\t[-o oversampling (default: 1, 4 recommended)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
 		"\t[-E enable_option (default: none)]\n"
-		"\t    use multiple -E to enable multiple options\n"
-		"\t    edge:   enable lower edge tuning\n"
-		"\t    rdc:     enable dc blocking filter on raw I/Q data at capture rate\n"
-		"\t    adc:     enable dc blocking filter on demodulated audio\n"
-		"\t    dc:      same as adc\n"
-		"\t    deemp:  enable de-emphasis filter\n"
-		"\t    direct: enable direct sampling\n"
-		"\t    offset: enable offset tuning\n"
+		"\t	use multiple -E to enable multiple options\n"
+		"\t	edge:   enable lower edge tuning\n"
+		"\t	rdc:	 enable dc blocking filter on raw I/Q data at capture rate\n"
+		"\t	adc:	 enable dc blocking filter on demodulated audio\n"
+		"\t	dc:	  same as adc\n"
+		"\t	deemp:  enable de-emphasis filter\n"
+		"\t	direct: enable direct sampling\n"
+		"\t	offset: enable offset tuning\n"
 		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\tfilename ('-' means stdout)\n"
-		"\t    omitting the filename also uses stdout\n\n"
+		"\t	omitting the filename also uses stdout\n\n"
 		"Experimental options:\n"
 		"\t[-r resample_rate (default: none / same as -s)]\n"
 		"\t[-t squelch_delay (default: 10)]\n"
-		"\t    +values will mute/scan, -values will exit\n"
+		"\t	+values will mute/scan, -values will exit\n"
 		"\t[-F fir_size (default: off)]\n"
-		"\t    enables low-leakage downsample filter\n"
-		"\t    size can be 0 or 9.  0 has bad roll off\n"
+		"\t	enables low-leakage downsample filter\n"
+		"\t	size can be 0 or 9.  0 has bad roll off\n"
 		"\t[-A std/fast/lut choose atan math (default: std)]\n"
 		//"\t[-C clip_path (default: off)\n"
 		//"\t (create time stamped raw clips, requires squelch)\n"
@@ -240,7 +242,7 @@ void usage(void)
 		"\n"
 		"Produces signed 16 bit ints, use Sox or aplay to hear them.\n"
 		"\trtl_fm ... | play -t raw -r 24k -es -b 16 -c 1 -V1 -\n"
-		"\t           | aplay -r 24k -f S16_LE -t raw -c 1\n"
+		"\t		   | aplay -r 24k -f S16_LE -t raw -c 1\n"
 		"\t  -M wbfm  | play -r 32k ... \n"
 		"\t  -s 22050 | multimon -t raw /dev/stdin\n\n");
 	exit(1);
@@ -439,7 +441,7 @@ void generic_fir(int16_t *data, int length, int *fir, int16_t *hist)
 		sum += (hist[1] + hist[7]) * fir[2];
 		sum += (hist[2] + hist[6]) * fir[3];
 		sum += (hist[3] + hist[5]) * fir[4];
-		sum +=            hist[4]  * fir[5];
+		sum +=			hist[4]  * fir[5];
 		data[d] = sum >> 15 ;
 		hist[0] = hist[1];
 		hist[1] = hist[2];
@@ -1054,6 +1056,7 @@ void dongle_init(struct dongle_state *s)
 	s->direct_sampling = 0;
 	s->offset_tuning = 0;
 	s->demod_target = &demod;
+	s->bandwidth = 0;
 }
 
 void demod_init(struct demod_state *s)
@@ -1067,10 +1070,10 @@ void demod_init(struct demod_state *s)
 	s->downsample_passes = 0;
 	s->comp_fir_size = 0;
 	s->prev_index = 0;
-	s->post_downsample = 1;  // once this works, default = 4
+	s->post_downsample = 1;	// once this works, default = 4
 	s->custom_atan = 0;
 	s->deemph = 0;
-	s->rate_out2 = -1;  // flag for disabled
+	s->rate_out2 = -1;	// flag for disabled
 	s->mode_demod = &fm_demod;
 	s->pre_j = s->pre_r = s->now_r = s->now_j = 0;
 	s->prev_lpr_index = 0;
@@ -1160,7 +1163,7 @@ int main(int argc, char **argv)
 	output_init(&output);
 	controller_init(&controller);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:v:h")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:v:h:w:")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1274,6 +1277,9 @@ int main(int argc, char **argv)
 		case 'v':
 			verbosity = (int)atof(optarg);
 			break;
+	case 'w':
+		dongle.bandwidth = (uint32_t)atofs(optarg);
+		break;
 		case 'h':
 		default:
 			usage();
@@ -1341,6 +1347,24 @@ int main(int argc, char **argv)
 	}
 
 	verbose_ppm_set(dongle.dev, dongle.ppm_error);
+
+ 	verbose_set_bandwidth(dongle.dev, dongle.bandwidth);
+
+	verbose_set_bandwidth(dongle.dev, dongle.bandwidth);
+
+	if (verbosity && dongle.bandwidth)
+	{
+	  int r;
+	  uint32_t in_bw, out_bw, last_bw = 0;
+	  for ( in_bw = 1; in_bw < 3200; ++in_bw )
+	  {
+		r = rtlsdr_set_and_get_tuner_bandwidth(dongle.dev, in_bw*1000, &out_bw, 0 /* =apply_bw */);
+		if ( r == 0 && ( out_bw != last_bw || in_bw == 1 ) )
+		  fprintf(stderr, "device sets bandwidth %u Hz for bw para >= %u kHz\n", out_bw, in_bw );
+		last_bw = out_bw;
+	  }
+	  fprintf(stderr,"\n");
+	}
 
 	if (strcmp(output.filename, "-") == 0) { /* Write samples to stdout */
 		output.file = stdout;
