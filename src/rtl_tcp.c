@@ -94,7 +94,7 @@ void usage(void)
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
 		"\t[-b number of buffers (default: 15, set by library)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
-    "\t[-w rtlsdr device bandwidth (for R820T device)\n"
+    "\t[-w rtlsdr device bandwidth [Hz] (for R820T device)\n"
 		"\t[-d device index (default: 0)]\n"
 		"\t[-P ppm_error (default: 0)]\n");
 	exit(1);
