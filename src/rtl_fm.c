@@ -217,9 +217,11 @@ void usage(void)
 		"\t[-E enable_option (default: none)]\n"
 		"\t	use multiple -E to enable multiple options\n"
 		"\t	edge:   enable lower edge tuning\n"
-		"\t	rdc:	 enable dc blocking filter on raw I/Q data at capture rate\n"
-		"\t	adc:	 enable dc blocking filter on demodulated audio\n"
-		"\t	dc:	  same as adc\n"
+		"\t	rdc:    enable dc blocking filter on raw I/Q data at capture rate\n"
+		"\t	adc:    enable dc blocking filter on demodulated audio\n"
+		"\t	dc:     same as adc\n"
+		"\t	rtlagc: enable rtl2832's digital agc (default: off)\n"
+		"\t	agc:    same as rtlagc\n"
 		"\t	deemp:  enable de-emphasis filter\n"
 		"\t	direct: enable direct sampling (bypasses tuner, uses rtl2832 xtal)\n"
 		"\t	offset: enable offset tuning (only e4000 tuner)\n"
@@ -1159,6 +1161,7 @@ int main(int argc, char **argv)
 	int dev_given = 0;
 	int custom_ppm = 0;
 	int timeConstant = 75; /* default: U.S. 75 uS */
+	int rtlagc = 0;
 	dongle_init(&dongle);
 	demod_init(&demod);
 	output_init(&output);
@@ -1228,6 +1231,8 @@ int main(int argc, char **argv)
 				dongle.direct_sampling = 1;}
 			if (strcmp("offset",  optarg) == 0) {
 				dongle.offset_tuning = 1;}
+			if (strcmp("rtlagc", optarg) == 0 || strcmp("agc", optarg) == 0) {
+				rtlagc = 1;}
 			break;
 		case 'q':
 			demod.rdc_block_const = atoi(optarg);
@@ -1348,6 +1353,8 @@ int main(int argc, char **argv)
 		dongle.gain = nearest_gain(dongle.dev, dongle.gain);
 		verbose_gain_set(dongle.dev, dongle.gain);
 	}
+
+	rtlsdr_set_agc_mode(dongle.dev, rtlagc);
 
 	verbose_ppm_set(dongle.dev, dongle.ppm_error);
 
