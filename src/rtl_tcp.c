@@ -78,6 +78,8 @@ typedef struct { /* structure size must be multiple of 2 bytes */
 
 static rtlsdr_dev_t *dev = NULL;
 
+static int verbosity = 0;
+static uint32_t bandwidth = 0;
 static int global_numq = 0;
 static struct llist *ll_buffers = 0;
 static int llbuf_num = 500;
@@ -94,9 +96,10 @@ void usage(void)
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
 		"\t[-b number of buffers (default: 15, set by library)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
-    "\t[-w rtlsdr device bandwidth [Hz] (for R820T device)\n"
+		"\t[-w rtlsdr device bandwidth [Hz] (for R820T device)]\n"
 		"\t[-d device index (default: 0)]\n"
-		"\t[-P ppm_error (default: 0)]\n");
+		"\t[-P ppm_error (default: 0)]\n"
+		"\t[-v increase verbosity (default: 0)]\n");
 	exit(1);
 }
 
@@ -203,7 +206,7 @@ static void *tcp_worker(void *arg)
 
 		pthread_mutex_lock(&ll_mutex);
 		gettimeofday(&tp, NULL);
-		ts.tv_sec  = tp.tv_sec+5;
+		ts.tv_sec  = tp.tv_sec+1;
 		ts.tv_nsec = tp.tv_usec * 1000;
 		r = pthread_cond_timedwait(&cond, &ll_mutex, &ts);
 		if(r == ETIMEDOUT) {
@@ -257,6 +260,8 @@ static int set_gain_by_index(rtlsdr_dev_t *_dev, unsigned int index)
 		count = rtlsdr_get_tuner_gains(_dev, gains);
 
 		res = rtlsdr_set_tuner_gain(_dev, gains[index]);
+		if (verbosity)
+			fprintf(stderr, "set tuner gain to %.1f dB\n", gains[index] / 10.0);
 
 		free(gains);
 	}
@@ -310,6 +315,7 @@ static void *command_worker(void *arg)
 		case SET_SAMPLE_RATE:
 			printf("set sample rate %d\n", ntohl(cmd.param));
 			rtlsdr_set_sample_rate(dev, ntohl(cmd.param));
+			/*verbose_set_bandwidth(dev, bandwidth);*/
 			break;
 		case SET_GAIN_MODE:
 			printf("set gain mode %d\n", ntohl(cmd.param));
@@ -356,10 +362,11 @@ static void *command_worker(void *arg)
 			printf("set tuner gain by index %d\n", ntohl(cmd.param));
 			set_gain_by_index(dev, ntohl(cmd.param));
 			break;
-    case SET_TUNER_BANDWIDTH:
-      printf("set tuner bandwidth to %i Hz\n", ntohl(cmd.param));
-      rtlsdr_set_tuner_bandwidth(dev, ntohl(cmd.param));
-      break;
+		case SET_TUNER_BANDWIDTH:
+			bandwidth = ntohl(cmd.param);
+			printf("set tuner bandwidth to %i Hz\n", bandwidth);
+			verbose_set_bandwidth(dev, bandwidth);
+			break;
 		default:
 			break;
 		}
@@ -372,7 +379,7 @@ int main(int argc, char **argv)
 	int r, opt, i;
 	char* addr = "127.0.0.1";
 	int port = 1234;
-	uint32_t frequency = 100000000, samp_rate = 2048000, bandwidth = 0;
+	uint32_t frequency = 100000000, samp_rate = 2048000;
 	struct sockaddr_in local, remote;
 	uint32_t buf_num = 0;
 	int dev_index = 0;
@@ -389,6 +396,7 @@ int main(int argc, char **argv)
 	fd_set readfds;
 	u_long blockmode = 1;
 	dongle_info_t dongle_info;
+	int gains[100];
 #ifdef _WIN32
 	WSADATA wsd;
 	i = WSAStartup(MAKEWORD(2,2), &wsd);
@@ -396,7 +404,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:w:")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:w:v")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -425,9 +433,12 @@ int main(int argc, char **argv)
 			break;
 		case 'P':
 			ppm_error = atoi(optarg);
-      break;
-    case 'w':
-      bandwidth = (uint32_t)atofs(optarg);
+			break;
+		case 'w':
+			bandwidth = (uint32_t)atofs(optarg);
+			break;
+		case 'v':
+			++verbosity;
 			break;
 		default:
 			usage();
@@ -437,6 +448,9 @@ int main(int argc, char **argv)
 
 	if (argc < optind)
 		usage();
+
+	if (verbosity)
+		fprintf(stderr, "verbosity set to %d\n", verbosity);
 
 	if (!dev_given) {
 		dev_index = verbose_device_search("0");
@@ -499,13 +513,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Tuner gain set to %f dB.\n", gain/10.0);
 	}
 
-  r = rtlsdr_set_tuner_bandwidth(dev, bandwidth);
-  if (r < 0)
-    fprintf(stderr, "WARNING: Failed to set tuner bandwidth.\n");
-  else if (bandwidth != 0)
-    fprintf(stderr, "Tuner bandwidth set to %i.\n", bandwidth);
-  else
-    fprintf(stderr, "Tuner bandwidth set to automatic.\n");
+	verbose_set_bandwidth(dev, bandwidth);
 
 	/* Reset endpoint before we start reading from it (mandatory) */
 	r = rtlsdr_reset_buffer(dev);
@@ -571,9 +579,16 @@ int main(int argc, char **argv)
 		if (r >= 0)
 			dongle_info.tuner_type = htonl(r);
 
-		r = rtlsdr_get_tuner_gains(dev, NULL);
+		r = rtlsdr_get_tuner_gains(dev, gains);
 		if (r >= 0)
 			dongle_info.tuner_gain_count = htonl(r);
+		if (verbosity)
+		{
+			fprintf(stderr, "Supported gain values (%d): ", r);
+			for (i = 0; i < r; i++)
+				fprintf(stderr, "%.1f ", gains[i] / 10.0);
+			fprintf(stderr, "\n");
+		}
 
 		r = send(s, (const char *)&dongle_info, sizeof(dongle_info), 0);
 		if (sizeof(dongle_info) != r)

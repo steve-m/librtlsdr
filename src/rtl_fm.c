@@ -108,7 +108,7 @@ struct dongle_state
 	int	  dev_index;
 	uint32_t freq;
 	uint32_t rate;
-  uint32_t bandwidth;
+	uint32_t bandwidth;
 	int	  gain;
 	int16_t  buf16[MAXIMUM_BUF_LENGTH];
 	uint32_t buf_len;
@@ -197,15 +197,15 @@ void usage(void)
 		"\t-f frequency_to_tune_to [Hz]\n"
 		"\t	use multiple -f for scanning (requires squelch)\n"
 		"\t	ranges supported, -f 118M:137M:25k\n"
-		"\t[-v verbosity (default: 0)]\n"
+		"\t[-v increase verbosity (default: 0)]\n"
 		"\t[-M modulation (default: fm)]\n"
 		"\t	fm or nbfm or nfm, wbfm or wfm, raw or iq, am, usb, lsb\n"
 		"\t	wbfm == -M fm -s 170k -o 4 -A fast -r 32k -l 0 -E deemp\n"
 		"\t	raw mode outputs 2x16 bit IQ pairs\n"
 		"\t[-s sample_rate (default: 24k)]\n"
 		"\t[-d device_index (default: 0)]\n"
-	"\t[-g tuner_gain (default: automatic)]\n"
-	"\t[-w tuner_bandwidth (default: automatic. enables offset tuning)]\n"
+		"\t[-g tuner_gain (default: automatic)]\n"
+		"\t[-w tuner_bandwidth (default: automatic. enables offset tuning)]\n"
 		"\t[-l squelch_level (default: 0/off)]\n"
 		"\t[-L N  prints levels every N calculations]\n"
 		"\t	output are comma separated values (csv):\n"
@@ -1167,7 +1167,7 @@ int main(int argc, char **argv)
 	output_init(&output);
 	controller_init(&controller);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:v:h:w:")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:v")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1281,19 +1281,23 @@ int main(int argc, char **argv)
 				timeConstant = (int)atof(optarg);
 			break;
 		case 'v':
-			verbosity = (int)atof(optarg);
+			++verbosity;
 			break;
-	case 'w':
-		dongle.bandwidth = (uint32_t)atofs(optarg);
-		if (dongle.bandwidth)
-			dongle.offset_tuning = 1;		/* automatically switch offset tuning, when using bandwidth filter */
-		break;
+		case 'w':
+			dongle.bandwidth = (uint32_t)atofs(optarg);
+			if (dongle.bandwidth)
+				dongle.offset_tuning = 1;		/* automatically switch offset tuning, when using bandwidth filter */
+			break;
 		case 'h':
+		case '?':
 		default:
 			usage();
 			break;
 		}
 	}
+
+	if (verbosity)
+		fprintf(stderr, "verbosity set to %d\n", verbosity);
 
 	/* quadruple sample_rate to limit to Δθ to ±π/2 */
 	demod.rate_in *= demod.post_downsample;
