@@ -143,6 +143,13 @@ RTLSDR_API int rtlsdr_write_eeprom(rtlsdr_dev_t *dev, uint8_t *data,
 RTLSDR_API int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data,
 				  uint8_t offset, uint16_t len);
 
+/*!
+ * Set the frequency the device is tuned to.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param frequency in Hz
+ * \return 0 on error, frequency in Hz otherwise
+ */
 RTLSDR_API int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq);
 
 /*!

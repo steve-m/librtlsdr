@@ -108,7 +108,7 @@ struct dongle_state
 	int	  dev_index;
 	uint32_t freq;
 	uint32_t rate;
-  uint32_t bandwidth;
+	uint32_t bandwidth;
 	int	  gain;
 	int16_t  buf16[MAXIMUM_BUF_LENGTH];
 	uint32_t buf_len;
@@ -197,15 +197,15 @@ void usage(void)
 		"\t-f frequency_to_tune_to [Hz]\n"
 		"\t	use multiple -f for scanning (requires squelch)\n"
 		"\t	ranges supported, -f 118M:137M:25k\n"
-		"\t[-v verbosity (default: 0)]\n"
+		"\t[-v increase verbosity (default: 0)]\n"
 		"\t[-M modulation (default: fm)]\n"
 		"\t	fm or nbfm or nfm, wbfm or wfm, raw or iq, am, usb, lsb\n"
 		"\t	wbfm == -M fm -s 170k -o 4 -A fast -r 32k -l 0 -E deemp\n"
 		"\t	raw mode outputs 2x16 bit IQ pairs\n"
 		"\t[-s sample_rate (default: 24k)]\n"
 		"\t[-d device_index (default: 0)]\n"
-	"\t[-g tuner_gain (default: automatic)]\n"
-	"\t[-w tuner_bandwidth (default: automatic)]\n"
+		"\t[-g tuner_gain (default: automatic)]\n"
+		"\t[-w tuner_bandwidth (default: automatic. enables offset tuning)]\n"
 		"\t[-l squelch_level (default: 0/off)]\n"
 		"\t[-L N  prints levels every N calculations]\n"
 		"\t	output are comma separated values (csv):\n"
@@ -217,12 +217,14 @@ void usage(void)
 		"\t[-E enable_option (default: none)]\n"
 		"\t	use multiple -E to enable multiple options\n"
 		"\t	edge:   enable lower edge tuning\n"
-		"\t	rdc:	 enable dc blocking filter on raw I/Q data at capture rate\n"
-		"\t	adc:	 enable dc blocking filter on demodulated audio\n"
-		"\t	dc:	  same as adc\n"
+		"\t	rdc:    enable dc blocking filter on raw I/Q data at capture rate\n"
+		"\t	adc:    enable dc blocking filter on demodulated audio\n"
+		"\t	dc:     same as adc\n"
+		"\t	rtlagc: enable rtl2832's digital agc (default: off)\n"
+		"\t	agc:    same as rtlagc\n"
 		"\t	deemp:  enable de-emphasis filter\n"
-		"\t	direct: enable direct sampling\n"
-		"\t	offset: enable offset tuning\n"
+		"\t	direct: enable direct sampling (bypasses tuner, uses rtl2832 xtal)\n"
+		"\t	offset: enable offset tuning (only e4000 tuner)\n"
 		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\tfilename ('-' means stdout)\n"
 		"\t	omitting the filename also uses stdout\n\n"
@@ -986,7 +988,7 @@ static void *controller_thread_fn(void *arg)
 
 	if (s->wb_mode) {
 		if (verbosity)
-			fprintf(stderr, "wbfm: adding 16000 Hz to every intput frequency\n");
+			fprintf(stderr, "wbfm: adding 16000 Hz to every input frequency\n");
 		for (i=0; i < s->freq_len; i++) {
 			s->freqs[i] += 16000;}
 	}
@@ -1001,7 +1003,8 @@ static void *controller_thread_fn(void *arg)
 	/* Set the frequency */
 	if (verbosity) {
 		fprintf(stderr, "verbose_set_frequency(%.0f Hz)\n", (double)dongle.freq);
-		fprintf(stderr, "  frequency is away from parametrized one, to avoid negative impact from dc\n");
+		if (!dongle.offset_tuning)
+			fprintf(stderr, "  frequency is away from parametrized one, to avoid negative impact from dc\n");
 	}
 	verbose_set_frequency(dongle.dev, dongle.freq);
 	fprintf(stderr, "Oversampling input by: %ix.\n", demod.downsample);
@@ -1158,12 +1161,13 @@ int main(int argc, char **argv)
 	int dev_given = 0;
 	int custom_ppm = 0;
 	int timeConstant = 75; /* default: U.S. 75 uS */
+	int rtlagc = 0;
 	dongle_init(&dongle);
 	demod_init(&demod);
 	output_init(&output);
 	controller_init(&controller);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:v:h:w:")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:v")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1227,6 +1231,8 @@ int main(int argc, char **argv)
 				dongle.direct_sampling = 1;}
 			if (strcmp("offset",  optarg) == 0) {
 				dongle.offset_tuning = 1;}
+			if (strcmp("rtlagc", optarg) == 0 || strcmp("agc", optarg) == 0) {
+				rtlagc = 1;}
 			break;
 		case 'q':
 			demod.rdc_block_const = atoi(optarg);
@@ -1275,17 +1281,23 @@ int main(int argc, char **argv)
 				timeConstant = (int)atof(optarg);
 			break;
 		case 'v':
-			verbosity = (int)atof(optarg);
+			++verbosity;
 			break;
-	case 'w':
-		dongle.bandwidth = (uint32_t)atofs(optarg);
-		break;
+		case 'w':
+			dongle.bandwidth = (uint32_t)atofs(optarg);
+			if (dongle.bandwidth)
+				dongle.offset_tuning = 1;		/* automatically switch offset tuning, when using bandwidth filter */
+			break;
 		case 'h':
+		case '?':
 		default:
 			usage();
 			break;
 		}
 	}
+
+	if (verbosity)
+		fprintf(stderr, "verbosity set to %d\n", verbosity);
 
 	/* quadruple sample_rate to limit to Δθ to ±π/2 */
 	demod.rate_in *= demod.post_downsample;
@@ -1346,24 +1358,25 @@ int main(int argc, char **argv)
 		verbose_gain_set(dongle.dev, dongle.gain);
 	}
 
+	rtlsdr_set_agc_mode(dongle.dev, rtlagc);
+
 	verbose_ppm_set(dongle.dev, dongle.ppm_error);
 
  	verbose_set_bandwidth(dongle.dev, dongle.bandwidth);
 
-	verbose_set_bandwidth(dongle.dev, dongle.bandwidth);
-
 	if (verbosity && dongle.bandwidth)
 	{
-	  int r;
-	  uint32_t in_bw, out_bw, last_bw = 0;
-	  for ( in_bw = 1; in_bw < 3200; ++in_bw )
-	  {
-		r = rtlsdr_set_and_get_tuner_bandwidth(dongle.dev, in_bw*1000, &out_bw, 0 /* =apply_bw */);
-		if ( r == 0 && ( out_bw != last_bw || in_bw == 1 ) )
-		  fprintf(stderr, "device sets bandwidth %u Hz for bw para >= %u kHz\n", out_bw, in_bw );
-		last_bw = out_bw;
-	  }
-	  fprintf(stderr,"\n");
+		int r;
+		uint32_t in_bw, out_bw, last_bw = 0;
+		fprintf(stderr, "Supported bandwidth values in kHz:\n");
+		for ( in_bw = 1; in_bw < 3200; ++in_bw )
+		{
+			r = rtlsdr_set_and_get_tuner_bandwidth(dongle.dev, in_bw*1000, &out_bw, 0 /* =apply_bw */);
+			if ( r == 0 && out_bw != 0 && ( out_bw != last_bw || in_bw == 1 ) )
+				fprintf(stderr, "%s%.1f", (in_bw==1 ? "" : ", "), out_bw/1000.0 );
+			last_bw = out_bw;
+		}
+		fprintf(stderr,"\n");
 	}
 
 	if (strcmp(output.filename, "-") == 0) { /* Write samples to stdout */
