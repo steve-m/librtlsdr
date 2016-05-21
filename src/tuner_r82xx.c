@@ -1004,6 +1004,7 @@ static const int r82xx_mixer_gain_steps[]  = {
 	0, 5, 10, 10, 19, 9, 10, 25, 17, 10, 8, 16, 13, 6, 3, -8
 };
 
+
 int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
 {
 	int rc;
@@ -1072,6 +1073,92 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
 
 	return 0;
 }
+
+int r82xx_set_lna_gain(struct r82xx_priv *priv, int gain)
+{
+	int rc;
+
+	int i, total_gain = 0;
+	uint8_t lna_index = 0;
+	uint8_t data[4];
+
+	/* LNA auto off */
+	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
+	if (rc < 0)
+		return rc;
+
+	for (i = 0; i < 15; i++) {
+		if (total_gain >= gain)
+			break;
+
+		total_gain += r82xx_lna_gain_steps[++lna_index];
+
+	}
+
+	/* set LNA gain */
+	rc = r82xx_write_reg_mask(priv, 0x05, lna_index, 0x0f);
+	if (rc < 0)
+		return rc;
+
+	return 0;
+}
+
+int r82xx_set_mixer_gain(struct r82xx_priv *priv, int gain)
+{
+	int rc;
+
+	int i, total_gain = 0;
+	uint8_t mix_index = 0;
+	uint8_t data[4];
+
+	/* Mixer auto off */
+	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
+	if (rc < 0)
+		return rc;
+
+	rc = r82xx_read(priv, 0x00, data, sizeof(data));
+	if (rc < 0)
+		return rc;
+
+	for (i = 0; i < 15; i++) {
+		if (total_gain >= gain)
+			break;
+
+		total_gain += r82xx_mixer_gain_steps[++mix_index];
+	}
+
+	/* set Mixer gain */
+	rc = r82xx_write_reg_mask(priv, 0x07, mix_index, 0x0f);
+	if (rc < 0)
+		return rc;
+
+	return 0;
+}
+
+
+int r82xx_set_vga_gain(struct r82xx_priv *priv, int gain)
+{
+	int rc;
+
+	int i, total_gain = 0;
+	uint8_t vga_index = 0;
+	uint8_t data[4];
+
+	for (i = 0; i < 15; i++) {
+		if (total_gain >= gain)
+			break;
+
+		total_gain += r82xx_vga_gain_steps[++vga_index];
+	}
+
+	/* set VGA gain */
+	rc = r82xx_write_reg_mask(priv, 0x0c, vga_index, 0x9f);
+	if (rc < 0)
+		return rc;
+
+	return 0;
+}
+
 
 /* Bandwidth contribution by low-pass filter. */
 static const int r82xx_if_low_pass_bw_table[] = {
