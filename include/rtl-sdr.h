@@ -221,6 +221,7 @@ RTLSDR_API int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains);
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain);
+RTLSDR_API int rtlsdr_set_specific_gain(rtlsdr_dev_t *dev, int gain, enum gain_types gain_type);
 RTLSDR_API int rtlsdr_set_lna_gain(rtlsdr_dev_t *dev, int gain);
 RTLSDR_API int rtlsdr_set_mixer_gain(rtlsdr_dev_t *dev, int gain);
 RTLSDR_API int rtlsdr_set_vga_gain(rtlsdr_dev_t *dev, int gain);

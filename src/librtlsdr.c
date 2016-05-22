@@ -257,10 +257,20 @@ int r820t_set_bw(void *dev, int bw) {
 	return rtlsdr_set_center_freq(devt, devt->freq);
 }
 
+/*
+ * r820t_set_gain sets vga gain to 16 and then 
+ * increments lna and mixer gains until the sum 
+ * is greater than or equal to the desired gain.
+ */
 int r820t_set_gain(void *dev, int gain) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_gain(&devt->r82xx_p, 1, gain);
 }
+
+/*
+ * The following three functions allow for setting
+ * the lna, mixer and vga gains independently.
+ */
 int r820t_set_lna_gain(void *dev, int gain) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_lna_gain(&devt->r82xx_p, gain);
@@ -273,21 +283,8 @@ int r820t_set_vga_gain(void *dev, int gain) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_vga_gain(&devt->r82xx_p, gain);
 }
-/*
-//REMOVETHIS
-int * r820t_get_lna_gains(void *dev) {
-	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_get_lna_gains(&devt->r82xx_p);
-}
-int * r820t_get_mixer_gains(void *dev) {
-	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_get_mixer_gains(&devt->r82xx_p);
-}
-int * r820t_get_vga_gains(void *dev) {
-	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_get_vga_gains(&devt->r82xx_p);
-}
-*/
+
+
 int r820t_set_gain_mode(void *dev, int manual) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_gain(&devt->r82xx_p, manual, 0);
@@ -1003,6 +1000,15 @@ int rtlsdr_get_vga_gains(rtlsdr_dev_t *dev, int *gains)
 {
 	return rtlsdr_get_specific_gains(dev,gains,vga);
 }
+
+/*
+ * rtlsdr_get_specific_gains is essentially a copy of 
+ * rtlsdr_get_tuner_gains but for getting the individual
+ * lna, mixer and vga gains (currently hard coded below).
+ * I don't like the double switch, but it was quick and 
+ * allows for expansion to support other tuners so it 
+ * will do for now.
+ */
 int rtlsdr_get_specific_gains(rtlsdr_dev_t *dev, int *gains,enum gain_types gain_type)
 {
 	const int r82xx_lna_gains[]   = { 0, 9, 22, 62, 100, 113, 144, 166, 192, 223, 249, 263, 282, 287, 322, 335 };
@@ -1047,6 +1053,7 @@ int rtlsdr_get_specific_gains(rtlsdr_dev_t *dev, int *gains,enum gain_types gain
 		return len / sizeof(int);
 	}
 }
+
 int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains)
 {
 	/* all gain values are expressed in tenths of a dB */
@@ -1121,23 +1128,7 @@ int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw)
 
 int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
 {
-	int r = 0;
-
-	if (!dev || !dev->tuner)
-		return -1;
-
-	if (dev->tuner->set_gain) {
-		rtlsdr_set_i2c_repeater(dev, 1);
-		r = dev->tuner->set_gain((void *)dev, gain);
-		rtlsdr_set_i2c_repeater(dev, 0);
-	}
-
-	if (!r)
-		dev->gain = gain;
-	else
-		dev->gain = 0;
-
-	return r;
+	return rtlsdr_set_specific_gain(dev,gain,total);
 }
 
 int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
@@ -1148,58 +1139,55 @@ int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
 	return dev->gain;
 }
 
+/*
+ * rtlsdr_set_lna_gain, rtlsdr_set_mixer_gain and rtlsdr_set_vga_gain
+ * all call rtlsdr_set_specific_gain.  I've also rolled 
+ * rtlsdr_set_tuner_gain (above) into this as it's using the same code.
+ */
 int rtlsdr_set_lna_gain(rtlsdr_dev_t *dev, int gain)
 {
-	int r = 0;
-
-	if (!dev || !dev->tuner)
-		return -1;
-
-	if (dev->tuner->set_lna_gain) {
-		rtlsdr_set_i2c_repeater(dev, 1);
-		r = dev->tuner->set_lna_gain((void *)dev, gain);
-		rtlsdr_set_i2c_repeater(dev, 0);
-	}
-
-	if (!r)
-		dev->gain = gain;
-	else
-		dev->gain = 0;
-
-	return r;
+	return rtlsdr_set_specific_gain(dev,gain,lna);
 }
-
 int rtlsdr_set_mixer_gain(rtlsdr_dev_t *dev, int gain)
 {
-	int r = 0;
-
-	if (!dev || !dev->tuner)
-		return -1;
-
-	if (dev->tuner->set_mixer_gain) {
-		rtlsdr_set_i2c_repeater(dev, 1);
-		r = dev->tuner->set_mixer_gain((void *)dev, gain);
-		rtlsdr_set_i2c_repeater(dev, 0);
-	}
-
-	if (!r)
-		dev->gain = gain;
-	else
-		dev->gain = 0;
-
-	return r;
+	return rtlsdr_set_specific_gain(dev,gain,mixer);
 }
-
 int rtlsdr_set_vga_gain(rtlsdr_dev_t *dev, int gain)
 {
+	return rtlsdr_set_specific_gain(dev,gain,vga);
+}
+
+int rtlsdr_set_specific_gain(rtlsdr_dev_t *dev, int gain, enum gain_types gain_type)
+{
 	int r = 0;
+	
+	int (*ptr_set_gain)(void *, int gain /* tenth dB */) = NULL;
 
 	if (!dev || !dev->tuner)
 		return -1;
 
-	if (dev->tuner->set_vga_gain) {
+	switch(gain_type)
+	{
+		case lna:
+			if (dev->tuner->set_lna_gain) 
+				ptr_set_gain = (dev->tuner->set_lna_gain);
+			break;
+		case mixer:
+			if (dev->tuner->set_mixer_gain) 
+				ptr_set_gain = (dev->tuner->set_mixer_gain);
+			break;
+		case vga:
+			if (dev->tuner->set_vga_gain) 
+				ptr_set_gain = (dev->tuner->set_vga_gain);
+			break;
+		default:
+			if(dev->tuner->set_gain)
+				ptr_set_gain = (dev->tuner->set_gain);
+	}
+
+	if (ptr_set_gain) {
 		rtlsdr_set_i2c_repeater(dev, 1);
-		r = dev->tuner->set_vga_gain((void *)dev, gain);
+		r = ptr_set_gain((void *)dev, gain);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 
@@ -1210,7 +1198,6 @@ int rtlsdr_set_vga_gain(rtlsdr_dev_t *dev, int gain)
 
 	return r;
 }
-
 
 int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain)
 {
