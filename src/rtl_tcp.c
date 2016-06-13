@@ -95,6 +95,7 @@ void usage(void)
 		"\t[-g gain in dB (default: 0 for auto)]\n"
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
 		"\t[-b number of buffers (default: 15, set by library)]\n"
+		"\t[-l length of single buffer in units of 512 samples (default: 64 was 256)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
 		"\t[-w rtlsdr tuner bandwidth [Hz] (for R820T and E4000 tuners)]\n"
 		"\t[-d device index (default: 0)]\n"
@@ -178,10 +179,13 @@ void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 
 			cur->next = rpt;
 
-			if (num_queued > global_numq)
-				printf("ll+, now %d\n", num_queued);
-			else if (num_queued < global_numq)
-				printf("ll-, now %d\n", num_queued);
+			if ( verbosity )
+			{
+				if (num_queued > global_numq)
+					printf("ll+, now %d\n", num_queued);
+				else if (num_queued < global_numq)
+					printf("ll-, now %d\n", num_queued);
+			}
 
 			global_numq = num_queued;
 		}
@@ -382,6 +386,16 @@ int main(int argc, char **argv)
 	uint32_t frequency = 100000000, samp_rate = 2048000;
 	struct sockaddr_in local, remote;
 	uint32_t buf_num = 0;
+	/* buf_len:
+	 * -> 256 -> 262 ms @ 250 kS  or  20.48 ms @ 3.2 MS (internal default)
+	 * -> 128 -> 131 ms @ 250 kS  or  10.24 ms @ 3.2 MS
+	 * ->  64 ->  65 ms @ 250 kS  or   5.12 ms @ 3.2 MS (new default)
+	 *
+	 * usual soundcard as reference:
+	 *   512 samples @ 48 kHz ~= 10.6 ms
+	 *   512 samples @  8 kHz  = 64 ms
+	 */
+	uint32_t buf_len = 64;
 	int dev_index = 0;
 	int dev_given = 0;
 	int gain = 0;
@@ -404,7 +418,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:w:v")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:l:n:d:P:w:v")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -427,6 +441,9 @@ int main(int argc, char **argv)
 			break;
 		case 'b':
 			buf_num = atoi(optarg);
+			break;
+		case 'l':
+			buf_len = 512 * atoi(optarg);
 			break;
 		case 'n':
 			llbuf_num = atoi(optarg);
@@ -600,7 +617,7 @@ int main(int argc, char **argv)
 		r = pthread_create(&command_thread, &attr, command_worker, NULL);
 		pthread_attr_destroy(&attr);
 
-		r = rtlsdr_read_async(dev, rtlsdr_callback, NULL, buf_num, 0);
+		r = rtlsdr_read_async(dev, rtlsdr_callback, NULL, buf_num, buf_len);
 
 		pthread_join(tcp_worker_thread, &status);
 		pthread_join(command_thread, &status);
