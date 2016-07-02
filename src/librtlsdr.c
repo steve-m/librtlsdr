@@ -392,6 +392,51 @@ enum sys_reg {
 	SYSINTS_1		= 0x300a,
 	DEMOD_CTL_1		= 0x300b,
 	IR_SUSPEND		= 0x300c,
+
+	/* IrDA registers */
+	SYS_IRRC_PSR		= 0x3020, /* IR protocol selection */
+	SYS_IRRC_PER		= 0x3024, /* IR protocol extension */
+	SYS_IRRC_SF		= 0x3028, /* IR sampling frequency */
+	SYS_IRRC_DPIR		= 0x302C, /* IR data package interval */
+	SYS_IRRC_CR		= 0x3030, /* IR control */
+	SYS_IRRC_RP		= 0x3034, /* IR read port */
+	SYS_IRRC_SR		= 0x3038, /* IR status */
+	/* I2C master registers */
+	SYS_I2CCR		= 0x3040, /* I2C clock */
+	SYS_I2CMCR		= 0x3044, /* I2C master control */
+	SYS_I2CMSTR		= 0x3048, /* I2C master SCL timing */
+	SYS_I2CMSR		= 0x304C, /* I2C master status */
+	SYS_I2CMFR		= 0x3050, /* I2C master FIFO */
+
+	/*
+	 * IR registers
+	 */
+	IR_RX_BUF		= 0xFC00,
+	IR_RX_IE		= 0xFD00,
+	IR_RX_IF		= 0xFD01,
+	IR_RX_CTRL		= 0xFD02,
+	IR_RX_CFG		= 0xFD03,
+	IR_MAX_DURATION0	= 0xFD04,
+	IR_MAX_DURATION1	= 0xFD05,
+	IR_IDLE_LEN0		= 0xFD06,
+	IR_IDLE_LEN1		= 0xFD07,
+	IR_GLITCH_LEN		= 0xFD08,
+	IR_RX_BUF_CTRL		= 0xFD09,
+	IR_RX_BUF_DATA		= 0xFD0A,
+	IR_RX_BC		= 0xFD0B,
+	IR_RX_CLK		= 0xFD0C,
+	IR_RX_C_COUNT_L		= 0xFD0D,
+	IR_RX_C_COUNT_H		= 0xFD0E,
+	IR_SUSPEND_CTRL		= 0xFD10,
+	IR_ERR_TOL_CTRL		= 0xFD11,
+	IR_UNIT_LEN		= 0xFD12,
+	IR_ERR_TOL_LEN		= 0xFD13,
+	IR_MAX_H_TOL_LEN	= 0xFD14,
+	IR_MAX_L_TOL_LEN	= 0xFD15,
+	IR_MASK_CTRL		= 0xFD16,
+	IR_MASK_DATA		= 0xFD17,
+	IR_RES_MASK_ADDR	= 0xFD18,
+	IR_RES_MASK_T_LEN	= 0xFD19,
 };
 
 enum blocks {
