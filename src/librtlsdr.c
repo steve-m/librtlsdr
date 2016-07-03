@@ -2033,8 +2033,7 @@ static int rtl28xxu_rd_reg(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t *va
 	return rtl28xxu_rd_regs(d, block, reg, val, 1);
 }
 
-// TODO: rename rtlsdr_write_reg_mask?
-static int rtl28xxu_wr_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t val,
+static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t val,
 		uint8_t mask)
 {
 	int ret;
@@ -2087,7 +2086,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 		};
 
 		for (i = 0; i < ARRAY_SIZE(init_tab); i++) {
-			ret = rtl28xxu_wr_reg_mask(d, init_tab[i].block, init_tab[i].reg,
+			ret = rtlsdr_write_reg_mask(d, init_tab[i].block, init_tab[i].reg,
 					init_tab[i].val, init_tab[i].mask);
 			if (ret < 0) {
 				printf("write %d reg %d %.4x %.2x %.2x failed\n", i, init_tab[i].block,
@@ -2118,7 +2117,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 
 	/* let hw receive new code */
 	for (i = 0; i < ARRAY_SIZE(refresh_tab); i++) {
-		ret = rtl28xxu_wr_reg_mask(d, refresh_tab[i].block, refresh_tab[i].reg,
+		ret = rtlsdr_write_reg_mask(d, refresh_tab[i].block, refresh_tab[i].reg,
 				refresh_tab[i].val, refresh_tab[i].mask);
 		if (ret < 0)
 			goto err;
