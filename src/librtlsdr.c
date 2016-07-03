@@ -2063,7 +2063,7 @@ static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8
 
 int rtlsdr_ir_query(rtlsdr_dev_t *d)
 {
-	int ret, i, len;
+	int ret = -1, i, len;
 	uint8_t buf[128];
 	static const struct rtl28xxu_reg_val_mask refresh_tab[] = {
 		{IRB, IR_RX_IF,			   0x03, 0xff},
@@ -2110,15 +2110,22 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
 
 	if (buf[0] != 0x83) {
+
+		if (buf[0] == 0) {
+			// no IR signal, graceful exit
+			ret = 0;
+			goto exit;
+		}
+
 		fprintf(stderr, "read IR_RX_IF unexpected: %.2x\n", buf[0]);
-		// if 0, no IR TODO: gracefully return
+		// TODO: what is 0x81?
 		goto exit;
 	}
 
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_BC, 1);
 
 	len = buf[0];
-	fprintf(stderr, "read IR_RX_BC len=%d\n", len);
+	//fprintf(stderr, "read IR_RX_BC len=%d\n", len);
 
 	if (len > sizeof(buf)) {
 		fprintf(stderr, "read IR_RX_BC too large for buffer %lu\n", sizeof(buf));
@@ -2138,24 +2145,20 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 			goto err;
 	}
 
-	/* pass data to Kernel IR decoder */
-	//TODO init_ir_raw_event(&ev);
-
-	printf("IR: \n");
+	//printf("IR: \n");
 	for (i = 0; i < len; i++) {
 		//ev.pulse = buf[i] >> 7;
 		//ev.duration = 50800 * (buf[i] & 0x7f);
 
-		printf("pulse %d, duration %d\n", buf[i] >> 7, buf[i] & 0x7f);
-		//TODO
-		//ir_raw_event_store_with_filter(d->rc_dev, &ev);
-	}
+		// TODO: return this data from this function
+		int pulse = buf[i] >> 7;
+		int duration = buf[i] & 0x7f;
+		//printf("pulse %d, duration %d\n", pulse, duration);
 
-	/* 'flush' ir_raw_event_store_with_filter() */
-	/*TODO
-	ir_raw_event_set_idle(d->rc_dev, true);
-	ir_raw_event_handle(d->rc_dev);
-	*/
+		for (int j = 0; j < duration; ++j) printf("%d", pulse);
+	}
+	printf("\n");
+
 exit:
 	return ret;
 err:

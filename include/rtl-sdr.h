@@ -381,6 +381,10 @@ RTLSDR_API int rtlsdr_read_async(rtlsdr_dev_t *dev,
 RTLSDR_API int rtlsdr_cancel_async(rtlsdr_dev_t *dev);
 
 /*!
+ * Read from the remote control (RC) infrared (IR) sensor
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \return 0 if no signal
  */
 RTLSDR_API int rtlsdr_ir_query(rtlsdr_dev_t *dev);
 

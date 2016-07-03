@@ -45,7 +45,6 @@
 #endif
 
 #include <math.h>
-#include <pthread.h>
 #include <libusb.h>
 
 #include "rtl-sdr.h"
@@ -57,7 +56,6 @@ struct dongle_state
 {
 	int      exit_flag;
     int      rc_active;
-	pthread_t thread;
 	rtlsdr_dev_t *dev;
 	int      dev_index;
 };
@@ -74,7 +72,10 @@ void usage(void)
 	fprintf(stderr,
 		"rtl_ir\n\n"
 		"Use:\trtl_ir [-options]\n"
-		"\t[-d device_index (default: 0)]\n");
+		"\t[-d device_index (default: 0)]\n"
+		"\t[-w wait_usec]\tDelay to wait before each iteration (10000)\n"
+		"\t[-c max_count]\tMaximum number of loop iterations (0)\n"
+		);
 	exit(1);
 }
 
@@ -99,14 +100,6 @@ static void sighandler(int signum)
 }
 #endif
 
-static void *dongle_thread_fn(void *arg)
-{
-	struct dongle_state *s = arg;
-    printf("TODO\n");
-	//rtlsdr_read_async(s->dev, rtlsdr_callback, s, 0, s->buf_len);
-	return 0;
-}
-
 
 int main(int argc, char **argv) {
 #ifndef _WIN32
@@ -114,13 +107,21 @@ int main(int argc, char **argv) {
 #endif
 	int r, opt;
 	int dev_given = 0;
+	unsigned int wait_usec = 100000;
+	int max_count = 0, iteration_count = 0;
 	dongle_init(&dongle);
 
-	while ((opt = getopt(argc, argv, "d:h")) != -1) {
+	while ((opt = getopt(argc, argv, "d:c:w:h")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
 			dev_given = 1;
+			break;
+		case 'w':
+			wait_usec = atoi(optarg);
+			break;
+		case 'c':
+			max_count = atoi(optarg);
 			break;
 		case 'h':
 		default:
@@ -152,14 +153,15 @@ int main(int argc, char **argv) {
 
 	verbose_reset_buffer(dongle.dev);
 
-	usleep(100000);
-
-	printf("rtlsdr_ir_query=%d\n", rtlsdr_ir_query(dongle.dev));
-
-	pthread_create(&dongle.thread, NULL, dongle_thread_fn, (void *)(&dongle));
-
 	while (!do_exit) {
-		usleep(100000);
+        usleep(wait_usec);
+
+        r = rtlsdr_ir_query(dongle.dev);
+        if (r < 0) {
+            fprintf(stderr, "rtlsdr_ir_query failed: %d\n", r);
+        }
+
+        if (max_count != 0 && ++iteration_count >= max_count) do_exit = 1;
 	}
 
 	if (do_exit) {
@@ -168,7 +170,6 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "\nLibrary error %d, exiting...\n", r);}
 
 	rtlsdr_cancel_async(dongle.dev);
-	pthread_join(dongle.thread, NULL);
 
 	rtlsdr_close(dongle.dev);
 	return r >= 0 ? r : -r;
