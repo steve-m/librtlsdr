@@ -109,10 +109,13 @@ int main(int argc, char **argv) {
 	struct sigaction sigact;
 #endif
 	int r, opt;
+	int i, j;
 	int dev_given = 0;
 	unsigned int wait_usec = 100000;
 	int max_count = 0, iteration_count = 0;
 	int output_binary = 0, output_text = 0, output_packed = 0;
+	uint8_t buf[128] = { 0 };
+
 	dongle_init(&dongle);
 
 	while ((opt = getopt(argc, argv, "d:c:w:btxh")) != -1) {
@@ -169,8 +172,6 @@ int main(int argc, char **argv) {
 	if (!output_binary && !output_text && !output_packed)
 		output_binary = 1;
 
-	uint8_t buf[128] = { 0 };
-
 	while (!do_exit) {
 		usleep(wait_usec);
 
@@ -179,7 +180,7 @@ int main(int argc, char **argv) {
 			fprintf(stderr, "rtlsdr_ir_query failed: %d\n", r);
 		}
 
-		for (int i = 0; i < r; i++) {
+		for (i = 0; i < r; i++) {
 			int pulse = buf[i] >> 7;
 			int duration = buf[i] & 0x7f;
 
@@ -188,7 +189,7 @@ int main(int argc, char **argv) {
 			}
 
 			if (output_binary) {
-				for (int j = 0; j < duration; ++j) {
+				for (j = 0; j < duration; ++j) {
 					printf("%d", pulse);
 				}
 			}

@@ -523,9 +523,9 @@ uint16_t rtlsdr_read_reg(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_
 {
 	int r;
 	unsigned char data[2];
+	uint16_t reg;
 	uint16_t index = (block << 8);
 	if (block == IRB) index = (SYSB << 8) | 0x01;
-	uint16_t reg;
 
 	r = libusb_control_transfer(dev->devh, CTRL_IN, 0, addr, index, data, len, CTRL_TIMEOUT);
 
@@ -2040,7 +2040,8 @@ static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8
 
 int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
 {
-	int ret = -1, i, len;
+	int ret = -1;
+	size_t i, len;
 	static const struct rtl28xxu_reg_val_mask refresh_tab[] = {
 		{IRB, IR_RX_IF,			   0x03, 0xff},
 		{IRB, IR_RX_BUF_CTRL,		 0x80, 0xff},
@@ -2109,7 +2110,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
 	//fprintf(stderr, "read IR_RX_BC len=%d\n", len);
 
 	if (len > buf_len) {
-		fprintf(stderr, "read IR_RX_BC too large for buffer, %d > %lu\n", len, buf_len);
+		//fprintf(stderr, "read IR_RX_BC too large for buffer, %lu > %lu\n", buf_len, buf_len);
 		goto exit;
 	}
 

@@ -381,7 +381,7 @@ void *ir_thread_fn(void *arg)
 	struct sockaddr_in local, remote;
 	socklen_t rlen;
 	uint8_t buf[128];
-	int ret = 0;
+	int ret = 0, len;
 
 	struct ir_thread_data *data = (struct ir_thread_data *)arg;
 
@@ -419,7 +419,7 @@ void *ir_thread_fn(void *arg)
 			break;
 		    }
 
-		    int len = ret;
+		    len = ret;
 
 		    ret = send(irsocket, buf, len, 0);
 		    if (ret != len){
