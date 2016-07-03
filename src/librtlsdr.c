@@ -2086,7 +2086,12 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
 
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
 
-	if (buf[0] != 0x83) {
+	if (buf[0] != 0x83 // usual
+            // also observed - with lengths 1, 5, 0.. unknown, sometimes occurs at edges
+            // pass through anyway in case this data is useful
+            && buf[0] != 0x82
+            && buf[0] != 0x81
+            ) {
 
 		if (buf[0] == 0) {
 			// no IR signal, graceful exit
@@ -2095,7 +2100,6 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
 		}
 
 		fprintf(stderr, "read IR_RX_IF unexpected: %.2x\n", buf[0]);
-		// TODO: what is 0x81? and 0x82? sometimes occurs at edges
 		goto exit;
 	}
 
