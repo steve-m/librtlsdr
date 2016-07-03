@@ -2004,6 +2004,19 @@ struct rtl28xxu_reg_val_mask {
 	uint8_t mask;
 };
 
+static int rtlsdr_read_regs(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_t *data, uint8_t len)
+{
+	int r;
+	uint16_t index = (block << 8);
+	if (block == IRB) index = (SYSB << 8) | 0x01;
+
+	r = libusb_control_transfer(dev->devh, CTRL_IN, 0, addr, index, data, len, CTRL_TIMEOUT);
+
+	if (r < 0)
+		fprintf(stderr, "%s failed with %d\n", __FUNCTION__, r);
+
+	return r;
+}
 
 static int rtl28xxu_rd_regs(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t *val, int len)
 {
@@ -2084,7 +2097,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 			ret = rtlsdr_write_reg_mask(d, init_tab[i].block, init_tab[i].reg,
 					init_tab[i].val, init_tab[i].mask);
 			if (ret < 0) {
-				printf("write %d reg %d %.4x %.2x %.2x failed\n", i, init_tab[i].block,
+				fprintf(stderr, "write %d reg %d %.4x %.2x %.2x failed\n", i, init_tab[i].block,
 						init_tab[i].reg, init_tab[i].val, init_tab[i].mask);
 				goto err;
 			}
@@ -2096,18 +2109,25 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
 
-	if (buf[0] != 0x83)
+	if (buf[0] != 0x83) {
+		fprintf(stderr, "read IR_RX_IF unexpected: %.2x\n", buf[0]);
+		// if 0, no IR TODO: gracefully return
 		goto exit;
+	}
 
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_BC, 1);
 
 	len = buf[0];
-	printf("len=%d\n", len);
+	fprintf(stderr, "read IR_RX_BC len=%d\n", len);
+
+	if (len > sizeof(buf)) {
+		fprintf(stderr, "read IR_RX_BC too large for buffer %lu\n", sizeof(buf));
+		goto exit;
+	}
 
 	/* read raw code from hw */
-	//TODO: read regs? can rtlsdr_read_reg handle len>2?
-	ret = rtl28xxu_rd_regs(d, IRB, IR_RX_BUF, buf, len);
-	if (ret)
+	ret = rtlsdr_read_regs(d, IRB, IR_RX_BUF, buf, len);
+	if (ret < 0)
 		goto err;
 
 	/* let hw receive new code */
@@ -2126,7 +2146,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 		//ev.pulse = buf[i] >> 7;
 		//ev.duration = 50800 * (buf[i] & 0x7f);
 
-		printf("pulse %d, duration %d\n", buf[i] >> 7, 50800 * (buf[i] & 0x7f));
+		printf("pulse %d, duration %d\n", buf[i] >> 7, buf[i] & 0x7f);
 		//TODO
 		//ir_raw_event_store_with_filter(d->rc_dev, &ev);
 	}
