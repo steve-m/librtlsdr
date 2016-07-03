@@ -89,6 +89,8 @@ void usage(void)
 	printf("rtl_tcp, an I/Q spectrum server for RTL2832 based DVB-T receivers\n\n"
 		"Usage:\t[-a listen address]\n"
 		"\t[-p listen port (default: 1234)]\n"
+		"\t[-I infrared sensor listen port (default: 0=none)]\n"
+		"\t[-w infrared sensor query wait interval usec (default: 10000)]\n"
 		"\t[-f frequency to tune to [Hz]]\n"
 		"\t[-g gain (default: 0 for auto)]\n"
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
@@ -362,11 +364,86 @@ static void *command_worker(void *arg)
 	}
 }
 
+struct ir_thread_data
+{
+	rtlsdr_dev_t *dev;
+	SOCKET port;
+	int wait;
+	char *addr;
+};
+
+void *ir_thread_fn(void *arg)
+{
+	int r = 1;
+	struct linger ling = {1,0};
+	SOCKET listensocket;
+	SOCKET irsocket;
+	struct sockaddr_in local, remote;
+	socklen_t rlen;
+	uint8_t buf[128];
+	int ret = 0;
+
+	struct ir_thread_data *data = (struct ir_thread_data *)arg;
+
+	rtlsdr_dev_t *dev = data->dev;
+	int port = data->port;
+	int wait = data->wait;
+	char *addr = data->addr;
+
+
+	memset(&local,0,sizeof(local));
+	local.sin_family = AF_INET;
+	local.sin_port = htons(port);
+	local.sin_addr.s_addr = inet_addr(addr);
+
+	listensocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	r = 1;
+	setsockopt(listensocket, SOL_SOCKET, SO_REUSEADDR, (char *)&r, sizeof(int));
+	setsockopt(listensocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
+	bind(listensocket,(struct sockaddr *)&local,sizeof(local));
+
+
+	while(1) {
+		printf("listening on IR port %d...\n", port);
+		listen(listensocket,1);
+
+		irsocket = accept(listensocket,(struct sockaddr *)&remote, &rlen);
+		setsockopt(irsocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
+
+		printf("IR client accepted!\n");
+
+		while(1) {
+		    ret = rtlsdr_ir_query(dev, buf, sizeof(buf));
+		    if (ret < 0) {
+			printf("rtlsdr_ir_query error %d\n", ret);
+			break;
+		    }
+
+		    int len = ret;
+
+		    ret = send(irsocket, buf, len, 0);
+		    if (ret != len){
+			printf("incomplete write to ir client: %d != %d\n", ret,len);
+			break;
+		    }
+
+		    usleep(wait);
+		}
+
+		closesocket(irsocket);
+	}
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	int r, opt, i;
 	char* addr = "127.0.0.1";
 	int port = 1234;
+	int port_ir = 0;
+	int wait_ir = 10000;
+	pthread_t thread_ir;
 	uint32_t frequency = 100000000, samp_rate = 2048000;
 	struct sockaddr_in local, remote;
 	uint32_t buf_num = 0;
@@ -391,7 +468,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:I:w:f:g:s:b:n:d:P:")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -411,6 +488,12 @@ int main(int argc, char **argv)
 			break;
 		case 'p':
 			port = atoi(optarg);
+			break;
+		case 'I':
+			port_ir = atoi(optarg);
+			break;
+		case 'w':
+			wait_ir = atoi(optarg);
 			break;
 		case 'b':
 			buf_num = atoi(optarg);
@@ -501,6 +584,13 @@ int main(int argc, char **argv)
 	pthread_mutex_init(&exit_cond_lock, NULL);
 	pthread_cond_init(&cond, NULL);
 	pthread_cond_init(&exit_cond, NULL);
+
+	if (port_ir) {
+		struct ir_thread_data data = {.dev = dev, .port = port_ir, .wait = wait_ir, .addr = addr};
+
+		pthread_create(&thread_ir, NULL, &ir_thread_fn, (void *)(&data));
+	}
+
 
 	memset(&local,0,sizeof(local));
 	local.sin_family = AF_INET;
@@ -594,6 +684,7 @@ int main(int argc, char **argv)
 out:
 	rtlsdr_close(dev);
 	closesocket(listensocket);
+	//if (port_ir) pthread_join(thread_ir, &status);
 	closesocket(s);
 #ifdef _WIN32
 	WSACleanup();
