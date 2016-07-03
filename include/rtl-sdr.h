@@ -380,6 +380,10 @@ RTLSDR_API int rtlsdr_read_async(rtlsdr_dev_t *dev,
  */
 RTLSDR_API int rtlsdr_cancel_async(rtlsdr_dev_t *dev);
 
+/*!
+ */
+RTLSDR_API int rtlsdr_ir_query(rtlsdr_dev_t *dev);
+
 #ifdef __cplusplus
 }
 #endif

@@ -153,6 +153,9 @@ int main(int argc, char **argv) {
 	verbose_reset_buffer(dongle.dev);
 
 	usleep(100000);
+
+	printf("rtlsdr_ir_query=%d\n", rtlsdr_ir_query(dongle.dev));
+
 	pthread_create(&dongle.thread, NULL, dongle_thread_fn, (void *)(&dongle));
 
 	while (!do_exit) {

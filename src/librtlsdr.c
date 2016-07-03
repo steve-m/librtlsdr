@@ -2054,7 +2054,7 @@ static int rtl28xxu_wr_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-static int rtl2832u_rc_query(rtlsdr_dev_t *d)
+int rtlsdr_ir_query(rtlsdr_dev_t *d)
 {
 	int ret, i, len;
 	uint8_t buf[128];
@@ -2066,6 +2066,7 @@ static int rtl2832u_rc_query(rtlsdr_dev_t *d)
 
 	/* init remote controller */
 	if (!d->rc_active) {
+		printf("initializing remote controller\n");
 		static const struct rtl28xxu_reg_val_mask init_tab[] = {
 			{USBB, DEMOD_CTL,			 0x00, 0x04},
 			{USBB, DEMOD_CTL,			 0x00, 0x08},
@@ -2088,11 +2089,15 @@ static int rtl2832u_rc_query(rtlsdr_dev_t *d)
 		for (i = 0; i < ARRAY_SIZE(init_tab); i++) {
 			ret = rtl28xxu_wr_reg_mask(d, init_tab[i].block, init_tab[i].reg,
 					init_tab[i].val, init_tab[i].mask);
-			if (ret)
+			if (ret < 0) {
+				printf("write %d reg %d %.4x %.2x %.2x failed\n", i, init_tab[i].block,
+						init_tab[i].reg, init_tab[i].val, init_tab[i].mask);
 				goto err;
+			}
 		}
 
 		d->rc_active = 1;
+		printf("rc active\n");
 	}
 
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
@@ -2115,7 +2120,7 @@ static int rtl2832u_rc_query(rtlsdr_dev_t *d)
 	for (i = 0; i < ARRAY_SIZE(refresh_tab); i++) {
 		ret = rtl28xxu_wr_reg_mask(d, refresh_tab[i].block, refresh_tab[i].reg,
 				refresh_tab[i].val, refresh_tab[i].mask);
-		if (ret)
+		if (ret < 0)
 			goto err;
 	}
 
@@ -2140,7 +2145,7 @@ static int rtl2832u_rc_query(rtlsdr_dev_t *d)
 exit:
 	return ret;
 err:
-	//dev_dbg(&d->intf->dev, "failed=%d\n", ret);
+	printf("failed=%d\n", ret);
 	return ret;
 }
 
