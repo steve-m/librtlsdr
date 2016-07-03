@@ -1094,16 +1094,46 @@ static int do_rpcd(rpcd_t* rpcd)
   return 0;
 }
 
+void usage(void)
+{
+  fprintf(stderr,
+    "rtl_rpcd, a Remote Procedure Call server for RTL-SDR dongles\n\n"
+    "Use:\trtl_rpcd [-options]\n"
+    "\t[-a address]\tAddress to listen on (default: 0.0.0.0 for all), or RTLSDR_RPC_SERV_ADDR\n"
+    "\t[-p port]\tPort number to listen on (default: 40000), or RTLSDR_RPC_SERV_PORT\n"
+    "\t[-h]\t\tHelp\n"
+    "\n"
+    "On the remote client, set RTLSDR_RPC_IS_ENABLED and matching address/port\n"
+  );
+  exit(1);
+}
+
 int main(int ac, char** av)
 {
   rpcd_t rpcd;
-  const char* addr;
-  const char* port;
+  const char* addr = NULL;
+  const char* port = NULL;
 
-  addr = getenv("RTLSDR_RPC_SERV_ADDR");
+  int opt;
+
+  while ((opt = getopt(ac, av, "a:p:h")) != -1) {
+    switch (opt) {
+    case 'a':
+        addr = optarg;
+        break;
+    case 'p':
+        port = optarg;
+        break;
+    case 'h':
+    default:
+        usage();
+    }
+  }
+
+  if (addr == NULL) addr = getenv("RTLSDR_RPC_SERV_ADDR");
   if (addr == NULL) addr = "0.0.0.0";
 
-  port = getenv("RTLSDR_RPC_SERV_PORT");
+  if (port == NULL) port = getenv("RTLSDR_RPC_SERV_PORT");
   if (port == NULL) port = "40000";
 
   if (init_rpcd(&rpcd, addr, port)) return -1;
