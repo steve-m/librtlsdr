@@ -124,6 +124,7 @@ struct rtlsdr_dev {
 	int dev_lost;
 	int driver_active;
 	unsigned int xfer_errors;
+	int rc_active;
 };
 
 void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
@@ -1975,3 +1976,171 @@ int rtlsdr_i2c_read_fn(void *dev, uint8_t addr, uint8_t *buf, int len)
 
 	return -1;
 }
+
+
+/* Infrared (IR) sensor support
+ * based on Linux dvb_usb_rtl28xxu drivers/media/usb/dvb-usb-v2/rtl28xxu.h
+ * Copyright (C) 2009 Antti Palosaari <crope@iki.fi>
+ * Copyright (C) 2011 Antti Palosaari <crope@iki.fi>
+ * Copyright (C) 2012 Thomas Mair <thomas.mair86@googlemail.com>
+ */
+
+struct rtl28xxu_req {
+	uint16_t value;
+	uint16_t index;
+	uint16_t size;
+	uint8_t *data;
+};
+
+struct rtl28xxu_reg_val {
+	uint16_t reg;
+	uint8_t val;
+};
+
+struct rtl28xxu_reg_val_mask {
+	int block;
+	uint16_t reg;
+	uint8_t val;
+	uint8_t mask;
+};
+
+
+static int rtl28xxu_rd_regs(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t *val, int len)
+{
+	/* TODO
+	struct rtl28xxu_req req;
+
+	if (reg < 0x3000)
+		req.index = CMD_USB_RD;
+	else if (reg < 0x4000)
+		req.index = CMD_SYS_RD;
+	else
+		req.index = CMD_IR_RD;
+
+	req.value = reg;
+	req.size = len;
+	req.data = val;
+
+	return rtl28xxu_ctrl_msg(d, &req);
+	*/
+
+	// TODO
+	//uint16_t ret = rtlsdr_read_reg(d, block, reg, len);
+}
+
+static int rtl28xxu_rd_reg(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t *val)
+{
+	return rtl28xxu_rd_regs(d, block, reg, val, 1);
+}
+
+// TODO: rename rtlsdr_write_reg_mask?
+static int rtl28xxu_wr_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t val,
+		uint8_t mask)
+{
+	int ret;
+	uint8_t tmp;
+
+	/* no need for read if whole reg is written */
+	if (mask != 0xff) {
+		tmp = rtlsdr_read_reg(d, block, reg, 1);
+
+		val &= mask;
+		tmp &= ~mask;
+		val |= tmp;
+	}
+
+	return rtlsdr_write_reg(d, block, reg, (uint16_t)val, 1);
+}
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+static int rtl2832u_rc_query(rtlsdr_dev_t *d)
+{
+	int ret, i, len;
+	uint8_t buf[128];
+	static const struct rtl28xxu_reg_val_mask refresh_tab[] = {
+		{IRB, IR_RX_IF,			   0x03, 0xff},
+		{IRB, IR_RX_BUF_CTRL,		 0x80, 0xff},
+		{IRB, IR_RX_CTRL,			 0x80, 0xff},
+	};
+
+	/* init remote controller */
+	if (!d->rc_active) {
+		static const struct rtl28xxu_reg_val_mask init_tab[] = {
+			{USBB, DEMOD_CTL,			 0x00, 0x04},
+			{USBB, DEMOD_CTL,			 0x00, 0x08},
+			{USBB, USB_CTRL,			  0x20, 0x20},
+			{USBB, GPD,				   0x00, 0x08},
+			{USBB, GPOE,				  0x08, 0x08},
+			{USBB, GPO,				   0x08, 0x08},
+			{IRB, IR_MAX_DURATION0,	   0xd0, 0xff},
+			{IRB, IR_MAX_DURATION1,	   0x07, 0xff},
+			{IRB, IR_IDLE_LEN0,		   0xc0, 0xff},
+			{IRB, IR_IDLE_LEN1,		   0x00, 0xff},
+			{IRB, IR_GLITCH_LEN,		  0x03, 0xff},
+			{IRB, IR_RX_CLK,			  0x09, 0xff},
+			{IRB, IR_RX_CFG,			  0x1c, 0xff},
+			{IRB, IR_MAX_H_TOL_LEN,	   0x1e, 0xff},
+			{IRB, IR_MAX_L_TOL_LEN,	   0x1e, 0xff},
+			{IRB, IR_RX_CTRL,			 0x80, 0xff},
+		};
+
+		for (i = 0; i < ARRAY_SIZE(init_tab); i++) {
+			ret = rtl28xxu_wr_reg_mask(d, init_tab[i].block, init_tab[i].reg,
+					init_tab[i].val, init_tab[i].mask);
+			if (ret)
+				goto err;
+		}
+
+		d->rc_active = 1;
+	}
+
+	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
+
+	if (buf[0] != 0x83)
+		goto exit;
+
+	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_BC, 1);
+
+	len = buf[0];
+	printf("len=%d\n", len);
+
+	/* read raw code from hw */
+	//TODO: read regs? can rtlsdr_read_reg handle len>2?
+	ret = rtl28xxu_rd_regs(d, IRB, IR_RX_BUF, buf, len);
+	if (ret)
+		goto err;
+
+	/* let hw receive new code */
+	for (i = 0; i < ARRAY_SIZE(refresh_tab); i++) {
+		ret = rtl28xxu_wr_reg_mask(d, refresh_tab[i].block, refresh_tab[i].reg,
+				refresh_tab[i].val, refresh_tab[i].mask);
+		if (ret)
+			goto err;
+	}
+
+	/* pass data to Kernel IR decoder */
+	//TODO init_ir_raw_event(&ev);
+
+	printf("IR: \n");
+	for (i = 0; i < len; i++) {
+		//ev.pulse = buf[i] >> 7;
+		//ev.duration = 50800 * (buf[i] & 0x7f);
+
+		printf("pulse %d, duration %d\n", buf[i] >> 7, 50800 * (buf[i] & 0x7f));
+		//TODO
+		//ir_raw_event_store_with_filter(d->rc_dev, &ev);
+	}
+
+	/* 'flush' ir_raw_event_store_with_filter() */
+	/*TODO
+	ir_raw_event_set_idle(d->rc_dev, true);
+	ir_raw_event_handle(d->rc_dev);
+	*/
+exit:
+	return ret;
+err:
+	//dev_dbg(&d->intf->dev, "failed=%d\n", ret);
+	return ret;
+}
+
