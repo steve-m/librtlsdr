@@ -454,7 +454,6 @@ int rtlsdr_read_array(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_t *
 {
 	int r;
 	uint16_t index = (block << 8);
-
 	if (block == IRB) index = (SYSB << 8) | 0x01;
 
 	r = libusb_control_transfer(dev->devh, CTRL_IN, 0, addr, index, array, len, CTRL_TIMEOUT);
@@ -469,7 +468,6 @@ int rtlsdr_write_array(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_t 
 {
 	int r;
 	uint16_t index = (block << 8) | 0x10;
-
 	if (block == IRB) index = (SYSB << 8) | 0x11;
 
 	r = libusb_control_transfer(dev->devh, CTRL_OUT, 0, addr, index, array, len, CTRL_TIMEOUT);
@@ -526,6 +524,7 @@ uint16_t rtlsdr_read_reg(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_
 	int r;
 	unsigned char data[2];
 	uint16_t index = (block << 8);
+	if (block == IRB) index = (SYSB << 8) | 0x01;
 	uint16_t reg;
 
 	r = libusb_control_transfer(dev->devh, CTRL_IN, 0, addr, index, data, len, CTRL_TIMEOUT);
@@ -544,6 +543,7 @@ int rtlsdr_write_reg(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint16_t v
 	unsigned char data[2];
 
 	uint16_t index = (block << 8) | 0x10;
+	if (block == IRB) index = (SYSB << 8) | 0x11;
 
 	if (len == 1)
 		data[0] = val & 0xff;
@@ -2026,11 +2026,6 @@ static int rtl28xxu_rd_regs(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t *v
 
 	// TODO
 	//uint16_t ret = rtlsdr_read_reg(d, block, reg, len);
-}
-
-static int rtl28xxu_rd_reg(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t *val)
-{
-	return rtl28xxu_rd_regs(d, block, reg, val, 1);
 }
 
 static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t val,
