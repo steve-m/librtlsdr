@@ -198,6 +198,7 @@ int main(int argc, char **argv) {
 			}
 		}
 		if (r != 0) printf("\n");
+		fflush(stdout);
 
 		if (max_count != 0 && ++iteration_count >= max_count) do_exit = 1;
 	}
