@@ -26,6 +26,7 @@ extern "C" {
 
 #include <stdint.h>
 #include <rtl-sdr_export.h>
+#include <rtl_tcp.h>
 
 typedef struct rtlsdr_dev rtlsdr_dev_t;
 
@@ -142,6 +143,13 @@ RTLSDR_API int rtlsdr_write_eeprom(rtlsdr_dev_t *dev, uint8_t *data,
 RTLSDR_API int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data,
 				  uint8_t offset, uint16_t len);
 
+/*!
+ * Set the frequency the device is tuned to.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param frequency in Hz
+ * \return 0 on error, frequency in Hz otherwise
+ */
 RTLSDR_API int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq);
 
 /*!
@@ -220,9 +228,14 @@ RTLSDR_API int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain);
  *
  * \param dev the device handle given by rtlsdr_open()
  * \param bw bandwidth in Hz. Zero means automatic BW selection.
+ * \param applied_bw is applied bandwidth in Hz, or 0 if unknown
+ * \param apply_bw: 1 to really apply configure the tuner chip; 0 for just returning applied_bw
  * \return 0 on success
  */
-RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw);
+RTLSDR_API int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw, uint32_t *applied_bw, int apply_bw );
+
+RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw );
+
 
 /*!
  * Get actual gain the device is configured to.
@@ -231,6 +244,17 @@ RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw);
  * \return 0 on error, gain in tenths of a dB, 115 means 11.5 dB.
  */
 RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
+
+/*!
+ * Set LNA / Mixer / VGA Device Gain for R820T device is configured to.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param lna_gain in tenths of a dB, -30 means -3.0 dB.
+ * \param mixer_gain in tenths of a dB, -30 means -3.0 dB.
+ * \param vga_gain in tenths of a dB, -30 means -3.0 dB.
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, int vga_gain);
 
 /*!
  * Set the intermediate frequency gain for the device.

@@ -14,6 +14,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef __CONVENIENCE_H
+#define __CONVENIENCE_H
+
 
 /* a collection of user friendly tools */
 
@@ -73,6 +76,17 @@ int verbose_set_frequency(rtlsdr_dev_t *dev, uint32_t frequency);
  */
 
 int verbose_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate);
+
+/*!
+ * Set device bandwidth and report status on stderr
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param frequency in Hz
+ * \return 0 on success
+ */
+
+int verbose_set_bandwidth(rtlsdr_dev_t *dev, uint32_t bandwidth);
+
 
 /*!
  * Enable or disable the direct sampling mode and report status on stderr
@@ -140,3 +154,4 @@ int verbose_reset_buffer(rtlsdr_dev_t *dev);
 
 int verbose_device_search(char *s);
 
+#endif /*__CONVENIENCE_H*/
