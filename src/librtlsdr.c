@@ -2018,29 +2018,6 @@ static int rtlsdr_read_regs(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uin
 	return r;
 }
 
-static int rtl28xxu_rd_regs(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t *val, int len)
-{
-	/* TODO
-	struct rtl28xxu_req req;
-
-	if (reg < 0x3000)
-		req.index = CMD_USB_RD;
-	else if (reg < 0x4000)
-		req.index = CMD_SYS_RD;
-	else
-		req.index = CMD_IR_RD;
-
-	req.value = reg;
-	req.size = len;
-	req.data = val;
-
-	return rtl28xxu_ctrl_msg(d, &req);
-	*/
-
-	// TODO
-	//uint16_t ret = rtlsdr_read_reg(d, block, reg, len);
-}
-
 static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t val,
 		uint8_t mask)
 {
@@ -2061,10 +2038,9 @@ static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-int rtlsdr_ir_query(rtlsdr_dev_t *d)
+int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
 {
 	int ret = -1, i, len;
-	uint8_t buf[128];
 	static const struct rtl28xxu_reg_val_mask refresh_tab[] = {
 		{IRB, IR_RX_IF,			   0x03, 0xff},
 		{IRB, IR_RX_BUF_CTRL,		 0x80, 0xff},
@@ -2073,7 +2049,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 
 	/* init remote controller */
 	if (!d->rc_active) {
-		printf("initializing remote controller\n");
+		//fprintf(stderr, "initializing remote controller\n");
 		static const struct rtl28xxu_reg_val_mask init_tab[] = {
 			{USBB, DEMOD_CTL,			 0x00, 0x04},
 			{USBB, DEMOD_CTL,			 0x00, 0x08},
@@ -2104,8 +2080,9 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 		}
 
 		d->rc_active = 1;
-		printf("rc active\n");
+		//fprintf(stderr, "rc active\n");
 	}
+	// TODO: option to ir disable
 
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
 
@@ -2118,7 +2095,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 		}
 
 		fprintf(stderr, "read IR_RX_IF unexpected: %.2x\n", buf[0]);
-		// TODO: what is 0x81?
+		// TODO: what is 0x81? and 0x82? sometimes occurs at edges
 		goto exit;
 	}
 
@@ -2127,8 +2104,8 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 	len = buf[0];
 	//fprintf(stderr, "read IR_RX_BC len=%d\n", len);
 
-	if (len > sizeof(buf)) {
-		fprintf(stderr, "read IR_RX_BC too large for buffer %lu\n", sizeof(buf));
+	if (len > buf_len) {
+		fprintf(stderr, "read IR_RX_BC too large for buffer, %d > %lu\n", len, buf_len);
 		goto exit;
 	}
 
@@ -2145,19 +2122,8 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d)
 			goto err;
 	}
 
-	//printf("IR: \n");
-	for (i = 0; i < len; i++) {
-		//ev.pulse = buf[i] >> 7;
-		//ev.duration = 50800 * (buf[i] & 0x7f);
-
-		// TODO: return this data from this function
-		int pulse = buf[i] >> 7;
-		int duration = buf[i] & 0x7f;
-		//printf("pulse %d, duration %d\n", pulse, duration);
-
-		for (int j = 0; j < duration; ++j) printf("%d", pulse);
-	}
-	printf("\n");
+	// On success return length
+	ret = len;
 
 exit:
 	return ret;
@@ -2165,4 +2131,3 @@ err:
 	printf("failed=%d\n", ret);
 	return ret;
 }
-

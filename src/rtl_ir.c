@@ -55,7 +55,6 @@ static volatile int do_exit = 0;
 struct dongle_state
 {
 	int      exit_flag;
-    int      rc_active;
 	rtlsdr_dev_t *dev;
 	int      dev_index;
 };
@@ -75,6 +74,10 @@ void usage(void)
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-w wait_usec]\tDelay to wait before each iteration (10000)\n"
 		"\t[-c max_count]\tMaximum number of loop iterations (0)\n"
+		"\t[-b]\tDisplay output in binary (default), pulse=1, space=0; each 20 usec\n"
+		"\t[-t]\tDisplay output in text format\n"
+		"\t[-x]\tDisplay output in raw packed bytes, MSB=pulse/space, 7LSB=duration*20 usec\n"
+		"\t[-h\t]Help\n"
 		);
 	exit(1);
 }
@@ -109,9 +112,10 @@ int main(int argc, char **argv) {
 	int dev_given = 0;
 	unsigned int wait_usec = 100000;
 	int max_count = 0, iteration_count = 0;
+	int output_binary = 0, output_text = 0, output_packed = 0;
 	dongle_init(&dongle);
 
-	while ((opt = getopt(argc, argv, "d:c:w:h")) != -1) {
+	while ((opt = getopt(argc, argv, "d:c:w:btxh")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -122,6 +126,15 @@ int main(int argc, char **argv) {
 			break;
 		case 'c':
 			max_count = atoi(optarg);
+			break;
+		case 'b':
+			output_binary = 1;
+			break;
+		case 't':
+			output_text = 1;
+			break;
+		case 'x':
+			output_packed = 1;
 			break;
 		case 'h':
 		default:
@@ -153,15 +166,40 @@ int main(int argc, char **argv) {
 
 	verbose_reset_buffer(dongle.dev);
 
+	if (!output_binary && !output_text && !output_packed)
+		output_binary = 1;
+
+	uint8_t buf[128] = { 0 };
+
 	while (!do_exit) {
-        usleep(wait_usec);
+		usleep(wait_usec);
 
-        r = rtlsdr_ir_query(dongle.dev);
-        if (r < 0) {
-            fprintf(stderr, "rtlsdr_ir_query failed: %d\n", r);
-        }
+		r = rtlsdr_ir_query(dongle.dev, buf, sizeof(buf));
+		if (r < 0) {
+			fprintf(stderr, "rtlsdr_ir_query failed: %d\n", r);
+		}
 
-        if (max_count != 0 && ++iteration_count >= max_count) do_exit = 1;
+		for (int i = 0; i < r; i++) {
+			int pulse = buf[i] >> 7;
+			int duration = buf[i] & 0x7f;
+
+			if (output_text) {
+				printf("pulse %d, duration %d usec\n", pulse, duration * 20);
+			}
+
+			if (output_binary) {
+				for (int j = 0; j < duration; ++j) {
+					printf("%d", pulse);
+				}
+			}
+
+			if (output_packed) {
+				putchar(buf[i]);
+			}
+		}
+		if (r != 0) printf("\n");
+
+		if (max_count != 0 && ++iteration_count >= max_count) do_exit = 1;
 	}
 
 	if (do_exit) {
@@ -174,5 +212,5 @@ int main(int argc, char **argv) {
 	rtlsdr_close(dongle.dev);
 	return r >= 0 ? r : -r;
 
-    return 0;
+	return 0;
 }
