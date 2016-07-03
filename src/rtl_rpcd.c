@@ -11,8 +11,10 @@
 #include <sys/socket.h>
 #include <sys/fcntl.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <pthread.h>
 #include <rtl-sdr.h>
 #include "rtlsdr_rpc_msg.h"
 
@@ -48,6 +50,9 @@ typedef struct
   unsigned int async_replied;
   uint8_t async_id;
 
+  int port_ir;
+  const char *addr_ir;
+  int wait_ir;
 } rpcd_t;
 
 static int resolve_ip_addr
@@ -1101,12 +1106,87 @@ void usage(void)
     "Use:\trtl_rpcd [-options]\n"
     "\t[-a address]\tAddress to listen on (default: 0.0.0.0 for all), or RTLSDR_RPC_SERV_ADDR\n"
     "\t[-p port]\tPort number to listen on (default: 40000), or RTLSDR_RPC_SERV_PORT\n"
+    "\t[-I port_ir]\tinfrared sensor listen port (default: 0=none)\n"
+    "\t[-w wait_ir]\tinfrared sensor query wait interval usec (default: 10000)\n"
     "\t[-h]\t\tHelp\n"
     "\n"
     "On the remote client, set RTLSDR_RPC_IS_ENABLED and matching address/port\n"
   );
   exit(1);
 }
+
+void *ir_thread_fn(void *arg)
+{
+  int r = 1;
+  struct linger ling = {1,0};
+  int listensocket;
+  int irsocket;
+  struct sockaddr_in local, remote;
+  socklen_t rlen;
+  uint8_t buf[128];
+  int ret = 0, len;
+
+  rpcd_t *rpcd = (rpcd_t *)arg;
+
+  rtlsdr_dev_t *dev = rpcd->dev;
+  const char *addr = rpcd->addr_ir;
+  int port = rpcd->port_ir;
+  int wait = rpcd->wait_ir;
+
+
+  memset(&local,0,sizeof(local));
+  local.sin_family = AF_INET;
+  local.sin_port = htons(port);
+  local.sin_addr.s_addr = inet_addr(addr);
+
+  listensocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  r = 1;
+  setsockopt(listensocket, SOL_SOCKET, SO_REUSEADDR, (char *)&r, sizeof(int));
+  setsockopt(listensocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
+  bind(listensocket,(struct sockaddr *)&local,sizeof(local));
+
+
+  while(1) {
+    printf("listening on IR port %d...\n", port);
+    listen(listensocket,1);
+
+    irsocket = accept(listensocket,(struct sockaddr *)&remote, &rlen);
+    setsockopt(irsocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
+
+    printf("IR client accepted!\n");
+
+    while(1) {
+      dev = rpcd->dev;
+      if (!dev) {
+        printf("no device available yet\n");
+        // Keep waiting until RPC connects and opens device
+        usleep(1000000);
+        continue;
+      }
+
+      ret = rtlsdr_ir_query(dev, buf, sizeof(buf));
+      if (ret < 0) {
+        printf("rtlsdr_ir_query error %d\n", ret);
+        break;
+      }
+
+        len = ret;
+
+        ret = send(irsocket, buf, len, 0);
+        if (ret != len){
+          printf("incomplete write to ir client: %d != %d\n", ret,len);
+          break;
+        }
+
+        usleep(wait);
+    }
+
+    close(irsocket);
+  }
+
+  return 0;
+}
+
 
 int main(int ac, char** av)
 {
@@ -1115,14 +1195,22 @@ int main(int ac, char** av)
   const char* port = NULL;
 
   int opt;
+  int port_ir = 0, wait_ir = 10000;
+  pthread_t thread_ir;
 
-  while ((opt = getopt(ac, av, "a:p:h")) != -1) {
+  while ((opt = getopt(ac, av, "a:p:I:w:h")) != -1) {
     switch (opt) {
     case 'a':
         addr = optarg;
         break;
     case 'p':
         port = optarg;
+        break;
+    case 'I':
+        port_ir = atoi(optarg);
+        break;
+    case 'w':
+        wait_ir = atoi(optarg);
         break;
     case 'h':
     default:
@@ -1137,6 +1225,13 @@ int main(int ac, char** av)
   if (port == NULL) port = "40000";
 
   if (init_rpcd(&rpcd, addr, port)) return -1;
+  if (port_ir) {
+    rpcd.port_ir = port_ir;
+    rpcd.addr_ir = addr;
+    rpcd.wait_ir = wait_ir;
+    pthread_create(&thread_ir, NULL, &ir_thread_fn, (void *)(&rpcd));
+  }
+
   do_rpcd(&rpcd);
   fini_rpcd(&rpcd);
 
