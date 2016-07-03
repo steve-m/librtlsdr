@@ -44,10 +44,7 @@ fc2580_fci_result_type fc2580_i2c_read(void *pTuner, unsigned char reg, unsigned
 	return FC2580_FCI_SUCCESS;
 }
 
-int
-fc2580_Initialize(
-	void *pTuner
-	)
+int fc2580_Initialize(void *pTuner)
 {
 	int AgcMode;
 	unsigned int CrystalFreqKhz;
@@ -70,11 +67,7 @@ error_status_initialize_tuner:
 	return FUNCTION_ERROR;
 }
 
-int
-fc2580_SetRfFreqHz(
-	void *pTuner,
-	unsigned long RfFreqHz
-	)
+int fc2580_SetRfFreqHz(void *pTuner, unsigned long RfFreqHz)
 {
 	unsigned int RfFreqKhz;
 	unsigned int CrystalFreqKhz;
@@ -99,11 +92,7 @@ error_status_set_tuner_rf_frequency:
 @brief   Set FC2580 tuner bandwidth mode.
 
 */
-int
-fc2580_SetBandwidthMode(
-	void *pTuner,
-	int BandwidthMode
-	)
+int fc2580_SetBandwidthMode(void *pTuner, int BandwidthMode)
 {
 	unsigned int CrystalFreqKhz;
 
@@ -143,7 +132,7 @@ void fc2580_wait_msec(void *pTuner, int a)
 	2 : Voltage Control Mode
 
 ==============================================================================*/
-fc2580_fci_result_type fc2580_set_init( void *pTuner, int ifagc_mode, unsigned int freq_xtal )
+fc2580_fci_result_type fc2580_set_init(void *pTuner, int ifagc_mode, unsigned int freq_xtal)
 {
 	fc2580_fci_result_type result = FC2580_FCI_SUCCESS;
 
@@ -192,14 +181,14 @@ fc2580_fci_result_type fc2580_set_init( void *pTuner, int ifagc_mode, unsigned i
 	ex) 2.6GHz = 2600000
 
 ==============================================================================*/
-fc2580_fci_result_type fc2580_set_freq( void *pTuner, unsigned int f_lo, unsigned int freq_xtal )
+fc2580_fci_result_type fc2580_set_freq(void *pTuner, unsigned int f_lo, unsigned int freq_xtal)
 {
 	unsigned int f_diff, f_diff_shifted, n_val, k_val;
 	unsigned int f_vco, r_val, f_comp;
 	unsigned char pre_shift_bits = 4;// number of preshift to prevent overflow in shifting f_diff to f_diff_shifted
 	unsigned char data_0x18;
 	unsigned char data_0x02 = (USE_EXT_CLK<<5)|0x0E;
-	
+
 	fc2580_band_type band = ( f_lo > 1000000 )? FC2580_L_BAND : ( f_lo > 400000 )? FC2580_UHF_BAND : FC2580_VHF_BAND;
 
 	fc2580_fci_result_type result = FC2580_FCI_SUCCESS;
@@ -208,19 +197,19 @@ fc2580_fci_result_type fc2580_set_freq( void *pTuner, unsigned int f_lo, unsigne
 	r_val = ( f_vco >= 2*76*freq_xtal )? 1 : ( f_vco >= 76*freq_xtal )? 2 : 4;
 	f_comp = freq_xtal/r_val;
 	n_val =	( f_vco / 2 ) / f_comp;
-	
+
 	f_diff = f_vco - 2* f_comp * n_val;
 	f_diff_shifted = f_diff << ( 20 - pre_shift_bits );
 	k_val = f_diff_shifted / ( ( 2* f_comp ) >> pre_shift_bits );
-	
+
 	if( f_diff_shifted - k_val * ( ( 2* f_comp ) >> pre_shift_bits ) >= ( f_comp >> pre_shift_bits ) )
 	k_val = k_val + 1;
-	
+
 	if( f_vco >= BORDER_FREQ )	//Select VCO Band
 		data_0x02 = data_0x02 | 0x08;	//0x02[3] = 1;
 	else
 		data_0x02 = data_0x02 & 0xF7;	//0x02[3] = 0;
-	
+
 //	if( band != curr_band ) {
 		switch(band)
 		{
@@ -237,7 +226,7 @@ fc2580_fci_result_type fc2580_set_freq( void *pTuner, unsigned int f_lo, unsigne
 
 				if( f_lo < 538000 )
 					result &= fc2580_i2c_write(pTuner, 0x5F, 0x13);
-				else					
+				else
 					result &= fc2580_i2c_write(pTuner, 0x5F, 0x15);
 
 				if( f_lo < 538000 )
@@ -345,7 +334,7 @@ fc2580_fci_result_type fc2580_set_freq( void *pTuner, unsigned int f_lo, unsigne
 	//A command about UHF LNA Load Cap
 	if( band == FC2580_UHF_BAND )
 		result &= fc2580_i2c_write(pTuner, 0x2D, ( f_lo <= (unsigned int)794000 )? 0x9F : 0x8F );	//LNA_OUT_CAP
-	
+
 
 	return result;
 }
@@ -366,10 +355,10 @@ fc2580_fci_result_type fc2580_set_freq( void *pTuner, unsigned int f_lo, unsigne
 	6 : 6MHz   (Bandwidth 6MHz)
 	7 : 6.8MHz (Bandwidth 7MHz)
 	8 : 7.8MHz (Bandwidth 8MHz)
-	
+
 
 ==============================================================================*/
-fc2580_fci_result_type fc2580_set_filter( void *pTuner, unsigned char filter_bw, unsigned int freq_xtal )
+fc2580_fci_result_type fc2580_set_filter(void *pTuner, unsigned char filter_bw, unsigned int freq_xtal)
 {
 	unsigned char	cal_mon = 0, i;
 	fc2580_fci_result_type result = FC2580_FCI_SUCCESS;
@@ -403,7 +392,7 @@ fc2580_fci_result_type fc2580_set_filter( void *pTuner, unsigned char filter_bw,
 		result &= fc2580_i2c_write(pTuner, 0x2E, 0x09);
 	}
 
-	
+
 	for(i=0; i<5; i++)
 	{
 		fc2580_wait_msec(pTuner, 5);//wait 5ms
@@ -426,7 +415,7 @@ fc2580_fci_result_type fc2580_set_filter( void *pTuner, unsigned char filter_bw,
        fc2580 RSSI function
 
   This function is a generic function which returns fc2580's
-  
+
   current RSSI value.
 
   <input parameter>
@@ -438,7 +427,7 @@ fc2580_fci_result_type fc2580_set_filter( void *pTuner, unsigned char filter_bw,
 
 ==============================================================================*/
 //int fc2580_get_rssi(void) {
-//	
+//
 //	unsigned char s_lna, s_rfvga, s_cfs, s_ifvga;
 //	int ofs_lna, ofs_rfvga, ofs_csf, ofs_ifvga, rssi;
 //
@@ -446,9 +435,9 @@ fc2580_fci_result_type fc2580_set_filter( void *pTuner, unsigned char filter_bw,
 //	fc2580_i2c_read(0x72, &s_rfvga );
 //	fc2580_i2c_read(0x73, &s_cfs );
 //	fc2580_i2c_read(0x74, &s_ifvga );
-//	
 //
-//	ofs_lna = 
+//
+//	ofs_lna =
 //			(curr_band==FC2580_UHF_BAND)?
 //				(s_lna==0)? 0 :
 //				(s_lna==1)? -6 :
@@ -470,18 +459,18 @@ fc2580_fci_result_type fc2580_set_filter( void *pTuner, unsigned char filter_bw,
 //	ofs_ifvga = s_ifvga/4;
 //
 //	return rssi = ofs_lna+ofs_rfvga+ofs_csf+ofs_ifvga+OFS_RSSI;
-//				
+//
 //}
 
 /*==============================================================================
        fc2580 Xtal frequency Setting
 
-  This function is a generic function which sets 
-  
+  This function is a generic function which sets
+
   the frequency of xtal.
-  
+
   <input parameter>
-  
+
   frequency
   	frequency value of internal(external) Xtal(clock) in kHz unit.
 

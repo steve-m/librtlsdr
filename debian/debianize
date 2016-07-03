@@ -1,0 +1,119 @@
+#!/bin/bash
+
+REPO_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )/../"
+
+G_REV=`git rev-parse --short=8 HEAD`
+DATE=`date +"%Y%m%d%H%M%S"`
+#VERSION="0.5.3-git+${DATE}.${G_REV}~$1"
+VERSION=`git describe | cut -dv -f2`
+#
+# librtlsdr0
+#
+
+rm -fr /tmp/librtlsdr0/
+mkdir -p /tmp/librtlsdr0/
+mkdir -p /tmp/librtlsdr0/usr/lib/x86_64-linux-gnu/
+mkdir -p /tmp/librtlsdr0/DEBIAN
+
+cat <<- EOF > /tmp/librtlsdr0/DEBIAN/control
+Package: librtlsdr0
+Source: rtl-sdr
+Version: ${VERSION}
+Architecture: amd64
+Maintainer: Lucas Teske <lucas@teske.net.br>
+Pre-Depends: multiarch-support
+Depends: libc6 (>= 2.14), libusb-1.0-0 (>= 2:1.0.9)
+Section: libs
+Priority: extra
+Multi-Arch: same
+Homepage: http://sdr.osmocom.org/trac/wiki/rtl-sdr
+Description: Software defined radio receiver for Realtek RTL2832U (library)
+ rtl-sdr is a software defined radio (SDR) receiver software for certain
+ low-cost DVB-T/DAB(+) USB dongles based on the Realtek RTL2832U chip.
+ .
+ This package contains the shared library.
+EOF
+
+DEB_PKG="librtlsdr0_${VERSION}_amd64.deb"
+
+cp -rf ${REPO_DIR}/build/src/lib*so* /tmp/librtlsdr0/usr/lib/x86_64-linux-gnu/
+dpkg-deb -b /tmp/librtlsdr0/ ./${DEB_PKG}
+
+echo ${DEB_PKG}
+
+#
+# rtl-sdr
+#
+
+rm -fr /tmp/rtl-sdr/
+mkdir -p /tmp/rtl-sdr/
+mkdir -p /tmp/rtl-sdr/usr/bin/
+mkdir -p /tmp/rtl-sdr/DEBIAN
+
+cat <<- EOF > /tmp/rtl-sdr/DEBIAN/control
+Package: rtl-sdr
+Version: ${VERSION}
+Architecture: amd64
+Maintainer: Lucas Teske <lucas@teske.net.br>
+Depends: librtlsdr0 (= ${VERSION}), libc6 (>= 2.15)
+Section: libs
+Priority: extra
+Homepage: http://sdr.osmocom.org/trac/wiki/rtl-sdr
+Description: Software defined radio receiver for Realtek RTL2832U (tools)
+ rtl-sdr is a software defined radio (SDR) receiver software for certain
+ low-cost DVB-T/DAB(+) USB dongles based on the Realtek RTL2832U chip.
+ .
+ This package contains a set of command line utilities:
+  * rtl_adsb: a simple ADS-B decoder for RTL2832 based DVB-T receivers
+  * rtl_eeprom: an EEPROM programming tool for RTL2832 based DVB-T receivers
+  * rtl_fm: a narrow band FM demodulator for RTL2832 based DVB-T receivers
+  * rtl_sdr: an I/Q recorder for RTL2832 based DVB-T receivers
+  * rtl_tcp: an I/Q spectrum server for RTL2832 based DVB-T receivers
+  * rtl_test: a benchmark tool for RTL2832 based DVB-T receivers
+
+
+EOF
+
+DEB_PKG="rtl-sdr_${VERSION}_amd64.deb"
+
+cp -rf ${REPO_DIR}/build/src/rtl_* /tmp/rtl-sdr/usr/bin/
+dpkg-deb -b /tmp/rtl-sdr/ ./${DEB_PKG}
+
+echo ${DEB_PKG}
+
+
+#
+# librtlsdr-dev
+#
+
+rm -fr /tmp/librtlsdr-dev/
+mkdir -p /tmp/librtlsdr-dev/
+mkdir -p /tmp/librtlsdr-dev/usr/include
+mkdir -p /tmp/librtlsdr-dev/usr/lib/x86_64-linux-gnu/pkgconfig
+mkdir -p /tmp/librtlsdr-dev/DEBIAN
+
+cat <<- EOF > /tmp/librtlsdr-dev/DEBIAN/control
+Package: librtlsdr-dev
+Source: rtl-sdr
+Version: ${VERSION}
+Architecture: amd64
+Maintainer: Lucas Teske <lucas@teske.net.br>
+Pre-Depends: multiarch-support
+Depends: librtlsdr0 (= ${VERSION})
+Section: libdevel
+Priority: extra
+Homepage: http://sdr.osmocom.org/trac/wiki/rtl-sdr
+Description: Software defined radio receiver for Realtek RTL2832U (development files)
+ rtl-sdr is a software defined radio (SDR) receiver software for certain
+ low-cost DVB-T/DAB(+) USB dongles based on the Realtek RTL2832U chip.
+ .
+ This package contains development files.
+
+EOF
+
+DEB_PKG="librtlsdr-dev_${VERSION}_amd64.deb"
+
+cp -rf ${REPO_DIR}/include/*.h /tmp/librtlsdr-dev/usr/include
+dpkg-deb -b /tmp/librtlsdr-dev/ ./${DEB_PKG}
+
+echo ${DEB_PKG}

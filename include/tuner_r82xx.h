@@ -35,11 +35,11 @@
 #define R82XX_IF_FREQ		3570000
 
 #define REG_SHADOW_START	5
-#define NUM_REGS		30
-#define NUM_IMR			5
-#define IMR_TRIAL		9
+#define NUM_REGS			30
+#define NUM_IMR				5
+#define IMR_TRIAL			9
 
-#define VER_NUM			49
+#define VER_NUM				49
 
 enum r82xx_chip {
 	CHIP_R820T,
@@ -75,23 +75,21 @@ struct r82xx_config {
 struct r82xx_priv {
 	struct r82xx_config		*cfg;
 
-	uint8_t				regs[NUM_REGS];
-	uint8_t				buf[NUM_REGS + 1];
+	uint8_t						regs[NUM_REGS];
+	uint8_t						buf[NUM_REGS + 1];
 	enum r82xx_xtal_cap_value	xtal_cap_sel;
-	uint16_t			pll;	/* kHz */
-	uint32_t			int_freq;
-	uint8_t				fil_cal_code;
-	uint8_t				input;
-	int				has_lock;
-	int				init_done;
+	uint16_t					pll;	/* kHz */
+	uint32_t					int_freq;
+	uint8_t						fil_cal_code;
+	uint8_t						input;
+	int							has_lock;
+	int							init_done;
 
 	/* Store current mode */
-	uint32_t			delsys;
-	enum r82xx_tuner_type		type;
-
-	uint32_t			bw;	/* in MHz */
-
-	void *rtl_dev;
+	uint32_t				delsys;
+	enum r82xx_tuner_type	type;
+	uint32_t				bw;	/* in MHz */
+	void 					*rtl_dev;
 };
 
 struct r82xx_freq_range {
@@ -114,7 +112,9 @@ enum r82xx_delivery_system {
 int r82xx_standby(struct r82xx_priv *priv);
 int r82xx_init(struct r82xx_priv *priv);
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq);
-int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain);
-int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate);
+//int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain);
+int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain, int extended_mode, int lna_gain, int mixer_gain, int vga_gain);
+
+int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate, uint32_t * applied_bw, int apply);
 
 #endif

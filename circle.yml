@@ -1,8 +1,0 @@
-dependencies:
-  pre:
-    - sudo apt-get update; sudo apt-get install libusb-1.0-0-dev; 
-  override:
-    - cd ~/; git clone https://github.com/librtlsdr/librtlsdr.git; cd librtlsdr; mkdir build; cd build; cmake ../; make; sudo make install; sudo ldconfig;
-test:
-  override:
-    - echo "----- done -----";

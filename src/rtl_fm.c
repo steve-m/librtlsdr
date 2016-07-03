@@ -4,6 +4,7 @@
  * Copyright (C) 2012 by Hoernchen <la@tfc-server.de>
  * Copyright (C) 2012 by Kyle Keen <keenerd@gmail.com>
  * Copyright (C) 2013 by Elias Oenal <EliasOenal@gmail.com>
+ * Copyright (C) 2015 by Hayati Ayguen <h_ayguen@web.de>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,23 +30,23 @@
  * (no many-to-many locks)
  *
  * todo:
- *       sanity checks
- *       scale squelch to other input parameters
- *       test all the demodulations
- *       pad output on hop
- *       frequency ranges could be stored better
- *       scaled AM demod amplification
- *       auto-hop after time limit
- *       peak detector to tune onto stronger signals
- *       fifo for active hop frequency
- *       clips
- *       noise squelch
- *       merge stereo patch
- *       merge soft agc patch
- *       merge udp patch
- *       testmode to detect overruns
- *       watchdog to reset bad dongle
- *       fix oversampling
+ *	   sanity checks
+ *	   scale squelch to other input parameters
+ *	   test all the demodulations
+ *	   pad output on hop
+ *	   frequency ranges could be stored better
+ *	   scaled AM demod amplification
+ *	   auto-hop after time limit
+ *	   peak detector to tune onto stronger signals
+ *	   fifo for active hop frequency
+ *	   clips
+ *	   noise squelch
+ *	   merge stereo patch
+ *	   merge soft agc patch
+ *	   merge udp patch
+ *	   testmode to detect overruns
+ *	   watchdog to reset bad dongle
+ *	   fix oversampling
  */
 
 #include <errno.h>
@@ -62,7 +63,7 @@
 #include <io.h>
 #include "getopt/getopt.h"
 #define usleep(x) Sleep(x/1000)
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && (_MSC_VER < 1800)
 #define round(x) (x > 0.0 ? floor(x + 0.5): ceil(x - 0.5))
 #endif
 #define _USE_MATH_DEFINES
@@ -79,8 +80,8 @@
 #define DEFAULT_BUF_LENGTH		(1 * 16384)
 #define MAXIMUM_OVERSAMPLE		16
 #define MAXIMUM_BUF_LENGTH		(MAXIMUM_OVERSAMPLE * DEFAULT_BUF_LENGTH)
-#define AUTO_GAIN			-100
-#define BUFFER_DUMP			4096
+#define AUTO_GAIN				-100
+#define BUFFER_DUMP				4096
 
 #define FREQUENCIES_LIMIT		1000
 
@@ -92,54 +93,63 @@ static int *atan_lut = NULL;
 static int atan_lut_size = 131072; /* 512 KB */
 static int atan_lut_coef = 8;
 
+static int verbosity = 0;
+static int printLevels = 0;
+static int printLevelNo = 1;
+static int levelMax = 0;
+static int levelMaxMax = 0;
+static double levelSum = 0.0;
+
 struct dongle_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
 	rtlsdr_dev_t *dev;
-	int      dev_index;
+	int	  dev_index;
 	uint32_t freq;
 	uint32_t rate;
-	int      gain;
-	uint16_t buf16[MAXIMUM_BUF_LENGTH];
+	uint32_t bandwidth;
+	int	  gain;
+	int16_t  buf16[MAXIMUM_BUF_LENGTH];
 	uint32_t buf_len;
-	int      ppm_error;
-	int      offset_tuning;
-	int      direct_sampling;
-	int      mute;
+	int	  ppm_error;
+	int	  offset_tuning;
+	int	  direct_sampling;
+	int	  mute;
 	struct demod_state *demod_target;
 };
 
 struct demod_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
 	int16_t  lowpassed[MAXIMUM_BUF_LENGTH];
-	int      lp_len;
+	int	  lp_len;
 	int16_t  lp_i_hist[10][6];
 	int16_t  lp_q_hist[10][6];
 	int16_t  result[MAXIMUM_BUF_LENGTH];
 	int16_t  droop_i_hist[9];
 	int16_t  droop_q_hist[9];
-	int      result_len;
-	int      rate_in;
-	int      rate_out;
-	int      rate_out2;
-	int      now_r, now_j;
-	int      pre_r, pre_j;
-	int      prev_index;
-	int      downsample;    /* min 1, max 256 */
-	int      post_downsample;
-	int      output_scale;
-	int      squelch_level, conseq_squelch, squelch_hits, terminate_on_squelch;
-	int      downsample_passes;
-	int      comp_fir_size;
-	int      custom_atan;
-	int      deemph, deemph_a;
-	int      now_lpr;
-	int      prev_lpr_index;
-	int      dc_block, dc_avg;
-	void     (*mode_demod)(struct demod_state*);
+	int	  result_len;
+	int	  rate_in;
+	int	  rate_out;
+	int	  rate_out2;
+	int	  now_r, now_j;
+	int	  pre_r, pre_j;
+	int	  prev_index;
+	int	  downsample;	/* min 1, max 256 */
+	int	  post_downsample;
+	int	  output_scale;
+	int	  squelch_level, conseq_squelch, squelch_hits, terminate_on_squelch;
+	int	  downsample_passes;
+	int	  comp_fir_size;
+	int	  custom_atan;
+	int	  deemph, deemph_a;
+	int	  now_lpr;
+	int	  prev_lpr_index;
+	int	  dc_block_audio, dc_avg, adc_block_const;
+	int	  dc_block_raw, dc_avgI, dc_avgQ, rdc_block_const;
+	void	 (*mode_demod)(struct demod_state*);
 	pthread_rwlock_t rw;
 	pthread_cond_t ready;
 	pthread_mutex_t ready_m;
@@ -148,13 +158,13 @@ struct demod_state
 
 struct output_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
-	FILE     *file;
-	char     *filename;
+	FILE	 *file;
+	char	 *filename;
 	int16_t  result[MAXIMUM_BUF_LENGTH];
-	int      result_len;
-	int      rate;
+	int	  result_len;
+	int	  rate;
 	pthread_rwlock_t rw;
 	pthread_cond_t ready;
 	pthread_mutex_t ready_m;
@@ -162,13 +172,13 @@ struct output_state
 
 struct controller_state
 {
-	int      exit_flag;
+	int	  exit_flag;
 	pthread_t thread;
 	uint32_t freqs[FREQUENCIES_LIMIT];
-	int      freq_len;
-	int      freq_now;
-	int      edge;
-	int      wb_mode;
+	int	  freq_len;
+	int	  freq_now;
+	int	  edge;
+	int	  wb_mode;
 	pthread_cond_t hop;
 	pthread_mutex_t hop_m;
 };
@@ -185,35 +195,46 @@ void usage(void)
 		"rtl_fm, a simple narrow band FM demodulator for RTL2832 based DVB-T receivers\n\n"
 		"Use:\trtl_fm -f freq [-options] [filename]\n"
 		"\t-f frequency_to_tune_to [Hz]\n"
-		"\t    use multiple -f for scanning (requires squelch)\n"
-		"\t    ranges supported, -f 118M:137M:25k\n"
+		"\t	use multiple -f for scanning (requires squelch)\n"
+		"\t	ranges supported, -f 118M:137M:25k\n"
+		"\t[-v increase verbosity (default: 0)]\n"
 		"\t[-M modulation (default: fm)]\n"
-		"\t    fm, wbfm, raw, am, usb, lsb\n"
-		"\t    wbfm == -M fm -s 170k -o 4 -A fast -r 32k -l 0 -E deemp\n"
-		"\t    raw mode outputs 2x16 bit IQ pairs\n"
+		"\t	fm or nbfm or nfm, wbfm or wfm, raw or iq, am, usb, lsb\n"
+		"\t	wbfm == -M fm -s 170k -o 4 -A fast -r 32k -l 0 -E deemp\n"
+		"\t	raw mode outputs 2x16 bit IQ pairs\n"
 		"\t[-s sample_rate (default: 24k)]\n"
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-g tuner_gain (default: automatic)]\n"
+		"\t[-w tuner_bandwidth (default: automatic. enables offset tuning)]\n"
 		"\t[-l squelch_level (default: 0/off)]\n"
-		//"\t    for fm squelch is inverted\n"
-		//"\t[-o oversampling (default: 1, 4 recommended)]\n"
+		"\t[-L N  prints levels every N calculations]\n"
+		"\t	output are comma separated values (csv):\n"
+		"\t	mean since last output, max since last output, overall max, squelch\n"
+		"\t[-c de-emphasis_time_constant in us for wbfm. 'us' or 'eu' for 75/50 us (default: us)]\n"
+		//"\t	for fm squelch is inverted\n"
+		"\t[-o oversampling (default: 1, 4 recommended)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
 		"\t[-E enable_option (default: none)]\n"
-		"\t    use multiple -E to enable multiple options\n"
-		"\t    edge:   enable lower edge tuning\n"
-		"\t    dc:     enable dc blocking filter\n"
-		"\t    deemp:  enable de-emphasis filter\n"
-		"\t    direct: enable direct sampling\n"
-		"\t    offset: enable offset tuning\n"
+		"\t	use multiple -E to enable multiple options\n"
+		"\t	edge:   enable lower edge tuning\n"
+		"\t	rdc:    enable dc blocking filter on raw I/Q data at capture rate\n"
+		"\t	adc:    enable dc blocking filter on demodulated audio\n"
+		"\t	dc:     same as adc\n"
+		"\t	rtlagc: enable rtl2832's digital agc (default: off)\n"
+		"\t	agc:    same as rtlagc\n"
+		"\t	deemp:  enable de-emphasis filter\n"
+		"\t	direct: enable direct sampling (bypasses tuner, uses rtl2832 xtal)\n"
+		"\t	offset: enable offset tuning (only e4000 tuner)\n"
+		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\tfilename ('-' means stdout)\n"
-		"\t    omitting the filename also uses stdout\n\n"
+		"\t	omitting the filename also uses stdout\n\n"
 		"Experimental options:\n"
 		"\t[-r resample_rate (default: none / same as -s)]\n"
 		"\t[-t squelch_delay (default: 10)]\n"
-		"\t    +values will mute/scan, -values will exit\n"
+		"\t	+values will mute/scan, -values will exit\n"
 		"\t[-F fir_size (default: off)]\n"
-		"\t    enables low-leakage downsample filter\n"
-		"\t    size can be 0 or 9.  0 has bad roll off\n"
+		"\t	enables low-leakage downsample filter\n"
+		"\t	size can be 0 or 9.  0 has bad roll off\n"
 		"\t[-A std/fast/lut choose atan math (default: std)]\n"
 		//"\t[-C clip_path (default: off)\n"
 		//"\t (create time stamped raw clips, requires squelch)\n"
@@ -223,7 +244,7 @@ void usage(void)
 		"\n"
 		"Produces signed 16 bit ints, use Sox or aplay to hear them.\n"
 		"\trtl_fm ... | play -t raw -r 24k -es -b 16 -c 1 -V1 -\n"
-		"\t           | aplay -r 24k -f S16_LE -t raw -c 1\n"
+		"\t		   | aplay -r 24k -f S16_LE -t raw -c 1\n"
 		"\t  -M wbfm  | play -r 32k ... \n"
 		"\t  -s 22050 | multimon -t raw /dev/stdin\n\n");
 	exit(1);
@@ -271,12 +292,33 @@ int cic_9_tables[][10] = {
 	{9, -199, -362, 5303, -25505, 77489, -25505, 5303, -362, -199},
 };
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && (_MSC_VER < 1800)
 double log2(double n)
 {
 	return log(n) / log(2.0);
 }
 #endif
+
+void rotate16_90(int16_t *buf, uint32_t len)
+/* 90 rotation is 1+0j, 0+1j, -1+0j, 0-1j
+   or [0, 1, -3, 2, -4, -5, 7, -6] */
+{
+	uint32_t i;
+	int16_t tmp;
+	for (i=0; i<len; i+=8) {
+		tmp = - buf[i+3];
+		buf[i+3] = buf[i+2];
+		buf[i+2] = tmp;
+
+		buf[i+4] = - buf[i+4];
+		buf[i+5] = - buf[i+5];
+
+		tmp = - buf[i+6];
+		buf[i+6] = buf[i+7];
+		buf[i+7] = tmp;
+	}
+}
+
 
 void rotate_90(unsigned char *buf, uint32_t len)
 /* 90 rotation is 1+0j, 0+1j, -1+0j, 0-1j
@@ -401,7 +443,7 @@ void generic_fir(int16_t *data, int length, int *fir, int16_t *hist)
 		sum += (hist[1] + hist[7]) * fir[2];
 		sum += (hist[2] + hist[6]) * fir[3];
 		sum += (hist[3] + hist[5]) * fir[4];
-		sum +=            hist[4]  * fir[5];
+		sum +=			hist[4]  * fir[5];
 		data[d] = sum >> 15 ;
 		hist[0] = hist[1];
 		hist[1] = hist[2];
@@ -610,7 +652,7 @@ void deemph_filter(struct demod_state *fm)
 	}
 }
 
-void dc_block_filter(struct demod_state *fm)
+void dc_block_audio_filter(struct demod_state *fm)
 {
 	int i, avg;
 	int64_t sum = 0;
@@ -618,13 +660,36 @@ void dc_block_filter(struct demod_state *fm)
 		sum += fm->result[i];
 	}
 	avg = sum / fm->result_len;
-	avg = (avg + fm->dc_avg * 9) / 10;
+	avg = (avg + fm->dc_avg * fm->adc_block_const) / ( fm->adc_block_const + 1 );
 	for (i=0; i < fm->result_len; i++) {
 		fm->result[i] -= avg;
 	}
 	fm->dc_avg = avg;
 }
 
+void dc_block_raw_filter(struct demod_state *fm, int16_t *buf, int len)
+{
+	/* derived from dc_block_audio_filter,
+		running over the raw I/Q components
+	*/
+	int i, avgI, avgQ;
+	int64_t sumI = 0;
+	int64_t sumQ = 0;
+	for (i = 0; i < len; i += 2) {
+		sumI += buf[i];
+		sumQ += buf[i+1];
+	}
+	avgI = sumI / ( len / 2 );
+	avgQ = sumQ / ( len / 2 );
+	avgI = (avgI + fm->dc_avgI * fm->rdc_block_const) / ( fm->rdc_block_const + 1 );
+	avgQ = (avgQ + fm->dc_avgQ * fm->rdc_block_const) / ( fm->rdc_block_const + 1 );
+	for (i = 0; i < len; i += 2) {
+		buf[i] -= avgI;
+		buf[i+1] -= avgQ;
+	}
+	fm->dc_avgI = avgI;
+	fm->dc_avgQ = avgQ;
+}
 int mad(int16_t *samples, int len, int step)
 /* mean average deviation */
 {
@@ -759,6 +824,23 @@ void full_demod(struct demod_state *d)
 		} else {
 			d->squelch_hits = 0;}
 	}
+
+	if (printLevels) {
+		if (!sr)
+			sr = rms(d->lowpassed, d->lp_len, 1);
+		--printLevelNo;
+		if (printLevels) {
+			levelSum += sr;
+			if (levelMax < sr)		levelMax = sr;
+			if (levelMaxMax < sr)	levelMaxMax = sr;
+			if  (!printLevelNo) {
+				printLevelNo = printLevels;
+				fprintf(stderr, "%f, %d, %d, %d\n", (levelSum / printLevels), levelMax, levelMaxMax, d->squelch_level );
+				levelMax = 0;
+				levelSum = 0;
+			}
+		}
+	}
 	d->mode_demod(d);  /* lowpassed -> result */
 	if (d->mode_demod == &raw_demod) {
 		return;
@@ -769,8 +851,8 @@ void full_demod(struct demod_state *d)
 		d->result_len = low_pass_simple(d->result, d->result_len, d->post_downsample);}
 	if (d->deemph) {
 		deemph_filter(d);}
-	if (d->dc_block) {
-		dc_block_filter(d);}
+	if (d->dc_block_audio) {
+		dc_block_audio_filter(d);}
 	if (d->rate_out2 > 0) {
 		low_pass_real(d);
 		//arbitrary_resample(d->result, d->result, d->result_len, d->result_len * d->rate_out2 / d->rate_out);
@@ -792,10 +874,19 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			buf[i] = 127;}
 		s->mute = 0;
 	}
-	if (!s->offset_tuning) {
-		rotate_90(buf, len);}
+	/* 1st: convert to 16 bit - to allow easier calculation of DC */
 	for (i=0; i<(int)len; i++) {
-		s->buf16[i] = (int16_t)buf[i] - 127;}
+		s->buf16[i] = ( (int16_t)buf[i] - 127 );
+	}
+	/* 2nd: do DC filtering BEFORE up-mixing */
+	if (d->dc_block_raw) {
+		dc_block_raw_filter(d, s->buf16, (int)len);
+	}
+	/* 3rd: up-mixing */
+	if (!s->offset_tuning) {
+		rotate16_90(s->buf16, (int)len);
+		/* rotate_90(buf, len); */
+	}
 	pthread_rwlock_wrlock(&d->rw);
 	memcpy(d->lowpassed, s->buf16, 2*len);
 	d->lp_len = len;
@@ -862,11 +953,21 @@ static void optimal_settings(int freq, int rate)
 		dm->downsample_passes = (int)log2(dm->downsample) + 1;
 		dm->downsample = 1 << dm->downsample_passes;
 	}
+	if (verbosity) {
+		fprintf(stderr, "downsample_passes = %d (= # of fifth_order() iterations), downsample = %d\n", dm->downsample_passes, dm->downsample );
+	}
 	capture_freq = freq;
 	capture_rate = dm->downsample * dm->rate_in;
+	if (verbosity)
+		fprintf(stderr, "capture_rate = dm->downsample * dm->rate_in = %d * %d = %d\n", dm->downsample, dm->rate_in, capture_rate );
 	if (!d->offset_tuning) {
-		capture_freq = freq + capture_rate/4;}
+		capture_freq = freq + capture_rate/4;
+		if (verbosity)
+			fprintf(stderr, "optimal_settings(freq = %d): capture_freq = freq + capture_rate/4 = %d\n", freq, capture_freq );
+	}
 	capture_freq += cs->edge * dm->rate_in / 2;
+	if (verbosity)
+		fprintf(stderr, "optimal_settings(freq = %d): capture_freq +=  cs->edge * dm->rate_in / 2 = %d * %d / 2 = %d\n", freq, cs->edge, dm->rate_in, capture_freq );
 	dm->output_scale = (1<<15) / (128 * dm->downsample);
 	if (dm->output_scale < 1) {
 		dm->output_scale = 1;}
@@ -874,6 +975,8 @@ static void optimal_settings(int freq, int rate)
 		dm->output_scale = 1;}
 	d->freq = (uint32_t)capture_freq;
 	d->rate = (uint32_t)capture_rate;
+	if (verbosity)
+		fprintf(stderr, "optimal_settings(freq = %d) delivers freq %.0f, rate %.0f\n", freq, (double)d->freq, (double)d->rate );
 }
 
 static void *controller_thread_fn(void *arg)
@@ -884,6 +987,8 @@ static void *controller_thread_fn(void *arg)
 	struct controller_state *s = arg;
 
 	if (s->wb_mode) {
+		if (verbosity)
+			fprintf(stderr, "wbfm: adding 16000 Hz to every input frequency\n");
 		for (i=0; i < s->freq_len; i++) {
 			s->freqs[i] += 16000;}
 	}
@@ -896,6 +1001,11 @@ static void *controller_thread_fn(void *arg)
 		verbose_offset_tuning(dongle.dev);}
 
 	/* Set the frequency */
+	if (verbosity) {
+		fprintf(stderr, "verbose_set_frequency(%.0f Hz)\n", (double)dongle.freq);
+		if (!dongle.offset_tuning)
+			fprintf(stderr, "  frequency is away from parametrized one, to avoid negative impact from dc\n");
+	}
 	verbose_set_frequency(dongle.dev, dongle.freq);
 	fprintf(stderr, "Oversampling input by: %ix.\n", demod.downsample);
 	fprintf(stderr, "Oversampling output by: %ix.\n", demod.post_downsample);
@@ -903,6 +1013,8 @@ static void *controller_thread_fn(void *arg)
 		1000 * 0.5 * (float)ACTUAL_BUF_LENGTH / (float)dongle.rate);
 
 	/* Set the sample rate */
+	if (verbosity)
+		fprintf(stderr, "verbose_set_sample_rate(%.0f Hz)\n", (double)dongle.rate);
 	verbose_set_sample_rate(dongle.dev, dongle.rate);
 	fprintf(stderr, "Output at %u Hz.\n", demod.rate_in/demod.post_downsample);
 
@@ -947,6 +1059,7 @@ void dongle_init(struct dongle_state *s)
 	s->direct_sampling = 0;
 	s->offset_tuning = 0;
 	s->demod_target = &demod;
+	s->bandwidth = 0;
 }
 
 void demod_init(struct demod_state *s)
@@ -960,17 +1073,22 @@ void demod_init(struct demod_state *s)
 	s->downsample_passes = 0;
 	s->comp_fir_size = 0;
 	s->prev_index = 0;
-	s->post_downsample = 1;  // once this works, default = 4
+	s->post_downsample = 1;	// once this works, default = 4
 	s->custom_atan = 0;
 	s->deemph = 0;
-	s->rate_out2 = -1;  // flag for disabled
+	s->rate_out2 = -1;	// flag for disabled
 	s->mode_demod = &fm_demod;
 	s->pre_j = s->pre_r = s->now_r = s->now_j = 0;
 	s->prev_lpr_index = 0;
 	s->deemph_a = 0;
 	s->now_lpr = 0;
-	s->dc_block = 0;
+	s->dc_block_audio = 0;
 	s->dc_avg = 0;
+	s->adc_block_const = 9;
+	s->dc_block_raw = 0;
+	s->dc_avgI = 0;
+	s->dc_avgQ = 0;
+	s->rdc_block_const = 9;
 	pthread_rwlock_init(&s->rw, NULL);
 	pthread_cond_init(&s->ready, NULL);
 	pthread_mutex_init(&s->ready_m, NULL);
@@ -1042,12 +1160,14 @@ int main(int argc, char **argv)
 	int r, opt;
 	int dev_given = 0;
 	int custom_ppm = 0;
+	int timeConstant = 75; /* default: U.S. 75 uS */
+	int rtlagc = 0;
 	dongle_init(&dongle);
 	demod_init(&demod);
 	output_init(&output);
 	controller_init(&controller);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:o:t:r:p:E:F:A:M:h")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:v")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1069,6 +1189,9 @@ int main(int argc, char **argv)
 			break;
 		case 'l':
 			demod.squelch_level = (int)atof(optarg);
+			break;
+		case 'L':
+			printLevels = (int)atof(optarg);
 			break;
 		case 's':
 			demod.rate_in = (uint32_t)atofs(optarg);
@@ -1098,14 +1221,21 @@ int main(int argc, char **argv)
 		case 'E':
 			if (strcmp("edge",  optarg) == 0) {
 				controller.edge = 1;}
-			if (strcmp("dc", optarg) == 0) {
-				demod.dc_block = 1;}
+			if (strcmp("dc", optarg) == 0 || strcmp("adc", optarg) == 0) {
+				demod.dc_block_audio = 1;}
+			if (strcmp("rdc", optarg) == 0) {
+				demod.dc_block_raw = 1;}
 			if (strcmp("deemp",  optarg) == 0) {
 				demod.deemph = 1;}
 			if (strcmp("direct",  optarg) == 0) {
 				dongle.direct_sampling = 1;}
 			if (strcmp("offset",  optarg) == 0) {
 				dongle.offset_tuning = 1;}
+			if (strcmp("rtlagc", optarg) == 0 || strcmp("agc", optarg) == 0) {
+				rtlagc = 1;}
+			break;
+		case 'q':
+			demod.rdc_block_const = atoi(optarg);
 			break;
 		case 'F':
 			demod.downsample_passes = 1;  /* truthy placeholder */
@@ -1121,9 +1251,9 @@ int main(int argc, char **argv)
 				demod.custom_atan = 2;}
 			break;
 		case 'M':
-			if (strcmp("fm",  optarg) == 0) {
+			if (strcmp("nbfm",  optarg) == 0 || strcmp("nfm",  optarg) == 0 || strcmp("fm",  optarg) == 0) {
 				demod.mode_demod = &fm_demod;}
-			if (strcmp("raw",  optarg) == 0) {
+			if (strcmp("raw",  optarg) == 0 || strcmp("iq",  optarg) == 0) {
 				demod.mode_demod = &raw_demod;}
 			if (strcmp("am",  optarg) == 0) {
 				demod.mode_demod = &am_demod;}
@@ -1131,7 +1261,7 @@ int main(int argc, char **argv)
 				demod.mode_demod = &usb_demod;}
 			if (strcmp("lsb", optarg) == 0) {
 				demod.mode_demod = &lsb_demod;}
-			if (strcmp("wbfm",  optarg) == 0) {
+			if (strcmp("wbfm",  optarg) == 0 || strcmp("wfm",  optarg) == 0) {
 				controller.wb_mode = 1;
 				demod.mode_demod = &fm_demod;
 				demod.rate_in = 170000;
@@ -1142,12 +1272,32 @@ int main(int argc, char **argv)
 				demod.deemph = 1;
 				demod.squelch_level = 0;}
 			break;
+		case 'c':
+			if (strcmp("us",  optarg) == 0)
+				timeConstant = 75;
+			else if (strcmp("eu", optarg) == 0)
+				timeConstant = 50;
+			else
+				timeConstant = (int)atof(optarg);
+			break;
+		case 'v':
+			++verbosity;
+			break;
+		case 'w':
+			dongle.bandwidth = (uint32_t)atofs(optarg);
+			if (dongle.bandwidth)
+				dongle.offset_tuning = 1;		/* automatically switch offset tuning, when using bandwidth filter */
+			break;
 		case 'h':
+		case '?':
 		default:
 			usage();
 			break;
 		}
 	}
+
+	if (verbosity)
+		fprintf(stderr, "verbosity set to %d\n", verbosity);
 
 	/* quadruple sample_rate to limit to Δθ to ±π/2 */
 	demod.rate_in *= demod.post_downsample;
@@ -1194,7 +1344,10 @@ int main(int argc, char **argv)
 #endif
 
 	if (demod.deemph) {
-		demod.deemph_a = (int)round(1.0/((1.0-exp(-1.0/(demod.rate_out * 75e-6)))));
+		double tc = (double)timeConstant * 1e-6;
+		demod.deemph_a = (int)round(1.0/((1.0-exp(-1.0/(demod.rate_out * tc)))));
+		if (verbosity)
+			fprintf(stderr, "using wbfm deemphasis filter with time constant %d us\n", timeConstant );
 	}
 
 	/* Set the tuner gain */
@@ -1205,7 +1358,26 @@ int main(int argc, char **argv)
 		verbose_gain_set(dongle.dev, dongle.gain);
 	}
 
+	rtlsdr_set_agc_mode(dongle.dev, rtlagc);
+
 	verbose_ppm_set(dongle.dev, dongle.ppm_error);
+
+ 	verbose_set_bandwidth(dongle.dev, dongle.bandwidth);
+
+	if (verbosity && dongle.bandwidth)
+	{
+		int r;
+		uint32_t in_bw, out_bw, last_bw = 0;
+		fprintf(stderr, "Supported bandwidth values in kHz:\n");
+		for ( in_bw = 1; in_bw < 3200; ++in_bw )
+		{
+			r = rtlsdr_set_and_get_tuner_bandwidth(dongle.dev, in_bw*1000, &out_bw, 0 /* =apply_bw */);
+			if ( r == 0 && out_bw != 0 && ( out_bw != last_bw || in_bw == 1 ) )
+				fprintf(stderr, "%s%.1f", (in_bw==1 ? "" : ", "), out_bw/1000.0 );
+			last_bw = out_bw;
+		}
+		fprintf(stderr,"\n");
+	}
 
 	if (strcmp(output.filename, "-") == 0) { /* Write samples to stdout */
 		output.file = stdout;

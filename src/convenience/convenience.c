@@ -160,6 +160,25 @@ int verbose_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 	return r;
 }
 
+int verbose_set_bandwidth(rtlsdr_dev_t *dev, uint32_t bandwidth)
+{
+	int r;
+	uint32_t applied_bw = 0;
+	/* r = rtlsdr_set_tuner_bandwidth(dev, bandwidth); */
+	r = rtlsdr_set_and_get_tuner_bandwidth(dev, bandwidth, &applied_bw, 1 /* =apply_bw */);
+	if (r < 0) {
+		fprintf(stderr, "WARNING: Failed to set bandwidth.\n");
+	} else if (bandwidth > 0) {
+		if (applied_bw)
+			fprintf(stderr, "Bandwidth parameter %u Hz resulted in %u Hz.\n", bandwidth, applied_bw);
+		else
+			fprintf(stderr, "Set bandwidth parameter %u Hz.\n", bandwidth);
+	} else {
+		fprintf(stderr, "Bandwidth set to automatic resulted in %u Hz.\n", applied_bw);
+	}
+	return r;
+}
+
 int verbose_direct_sampling(rtlsdr_dev_t *dev, int on)
 {
 	int r;
@@ -182,7 +201,12 @@ int verbose_offset_tuning(rtlsdr_dev_t *dev)
 	int r;
 	r = rtlsdr_set_offset_tuning(dev, 1);
 	if (r != 0) {
-		fprintf(stderr, "WARNING: Failed to set offset tuning.\n");
+		if ( r == -2 )
+			fprintf(stderr, "WARNING: Failed to set offset tuning: tuner doesn't support offset tuning!\n");
+		else if ( r == -3 )
+			fprintf(stderr, "WARNING: Failed to set offset tuning: direct sampling not combinable with offset tuning!\n");
+		else
+			fprintf(stderr, "WARNING: Failed to set offset tuning.\n");
 	} else {
 		fprintf(stderr, "Offset tuning mode enabled.\n");
 	}
