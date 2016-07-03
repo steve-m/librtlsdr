@@ -2088,20 +2088,16 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
 	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
 
 	if (buf[0] != 0x83) {
-		if (buf[0] == 0) {
-			// no IR signal, graceful exit
-			ret = 0;
-			goto exit;
+		if (buf[0] == 0 || // no IR signal
+			// also observed: 0x82, 0x81 - with lengths 1, 5, 0.. unknown, sometimes occurs at edges
+			// "IR not ready"? causes a -7 timeout if we read
+			buf[0] == 0x82 || buf[0] == 0x81) {
+			// graceful exit
+		} else {
+			fprintf(stderr, "read IR_RX_IF unexpected: %.2x\n", buf[0]);
 		}
 
-		// also observed: 0x82, 0x81 - with lengths 1, 5, 0.. unknown, sometimes occurs at edges
-		// "IR not ready"? causes a -7 timeout if we read
-		if (buf[0] == 0x82 || buf[0] == 0x81) {
-			ret = 0;
-			goto exit;
-		}
-
-		fprintf(stderr, "read IR_RX_IF unexpected: %.2x\n", buf[0]);
+		ret = 0;
 		goto exit;
 	}
 
