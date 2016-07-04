@@ -1125,6 +1125,8 @@ void *ir_thread_fn(void *arg)
   socklen_t rlen;
   uint8_t buf[128];
   int ret = 0, len;
+  struct timeval tv;
+  fd_set writefds, errorfds;
 
   rpcd_t *rpcd = (rpcd_t *)arg;
 
@@ -1170,15 +1172,35 @@ void *ir_thread_fn(void *arg)
         break;
       }
 
-        len = ret;
+      len = ret;
 
+      FD_ZERO(&writefds);
+      FD_SET(irsocket, &writefds);
+
+      FD_ZERO(&errorfds);
+      FD_SET(irsocket, &errorfds);
+
+      tv.tv_sec = 1;
+      tv.tv_usec = 0;
+      select(irsocket+1, NULL, &writefds, &errorfds, &tv);
+
+      if (FD_ISSET(irsocket, &errorfds)) {
+        printf("error condition from irsocket, breaking\n");
+        break;
+      }
+
+      if (FD_ISSET(irsocket, &writefds)) {
         ret = send(irsocket, buf, len, 0);
         if (ret != len){
           printf("incomplete write to ir client: %d != %d\n", ret,len);
           break;
         }
+      } else {
+        printf("irsocket not ready to write, breaking\n");
+        break;
+      }
 
-        usleep(wait);
+      usleep(wait);
     }
 
     close(irsocket);
