@@ -124,6 +124,7 @@ struct rtlsdr_dev {
 	int dev_lost;
 	int driver_active;
 	unsigned int xfer_errors;
+	int rc_active;
 };
 
 void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
@@ -407,6 +408,51 @@ enum sys_reg {
 	SYSINTS_1		= 0x300a,
 	DEMOD_CTL_1		= 0x300b,
 	IR_SUSPEND		= 0x300c,
+
+	/* IrDA registers */
+	SYS_IRRC_PSR		= 0x3020, /* IR protocol selection */
+	SYS_IRRC_PER		= 0x3024, /* IR protocol extension */
+	SYS_IRRC_SF		= 0x3028, /* IR sampling frequency */
+	SYS_IRRC_DPIR		= 0x302C, /* IR data package interval */
+	SYS_IRRC_CR		= 0x3030, /* IR control */
+	SYS_IRRC_RP		= 0x3034, /* IR read port */
+	SYS_IRRC_SR		= 0x3038, /* IR status */
+	/* I2C master registers */
+	SYS_I2CCR		= 0x3040, /* I2C clock */
+	SYS_I2CMCR		= 0x3044, /* I2C master control */
+	SYS_I2CMSTR		= 0x3048, /* I2C master SCL timing */
+	SYS_I2CMSR		= 0x304C, /* I2C master status */
+	SYS_I2CMFR		= 0x3050, /* I2C master FIFO */
+
+	/*
+	 * IR registers
+	 */
+	IR_RX_BUF		= 0xFC00,
+	IR_RX_IE		= 0xFD00,
+	IR_RX_IF		= 0xFD01,
+	IR_RX_CTRL		= 0xFD02,
+	IR_RX_CFG		= 0xFD03,
+	IR_MAX_DURATION0	= 0xFD04,
+	IR_MAX_DURATION1	= 0xFD05,
+	IR_IDLE_LEN0		= 0xFD06,
+	IR_IDLE_LEN1		= 0xFD07,
+	IR_GLITCH_LEN		= 0xFD08,
+	IR_RX_BUF_CTRL		= 0xFD09,
+	IR_RX_BUF_DATA		= 0xFD0A,
+	IR_RX_BC		= 0xFD0B,
+	IR_RX_CLK		= 0xFD0C,
+	IR_RX_C_COUNT_L		= 0xFD0D,
+	IR_RX_C_COUNT_H		= 0xFD0E,
+	IR_SUSPEND_CTRL		= 0xFD10,
+	IR_ERR_TOL_CTRL		= 0xFD11,
+	IR_UNIT_LEN		= 0xFD12,
+	IR_ERR_TOL_LEN		= 0xFD13,
+	IR_MAX_H_TOL_LEN	= 0xFD14,
+	IR_MAX_L_TOL_LEN	= 0xFD15,
+	IR_MASK_CTRL		= 0xFD16,
+	IR_MASK_DATA		= 0xFD17,
+	IR_RES_MASK_ADDR	= 0xFD18,
+	IR_RES_MASK_T_LEN	= 0xFD19,
 };
 
 enum blocks {
@@ -423,6 +469,7 @@ int rtlsdr_read_array(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_t *
 {
 	int r;
 	uint16_t index = (block << 8);
+	if (block == IRB) index = (SYSB << 8) | 0x01;
 
 	r = libusb_control_transfer(dev->devh, CTRL_IN, 0, addr, index, array, len, CTRL_TIMEOUT);
 #if 0
@@ -436,6 +483,7 @@ int rtlsdr_write_array(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_t 
 {
 	int r;
 	uint16_t index = (block << 8) | 0x10;
+	if (block == IRB) index = (SYSB << 8) | 0x11;
 
 	r = libusb_control_transfer(dev->devh, CTRL_OUT, 0, addr, index, array, len, CTRL_TIMEOUT);
 #if 0
@@ -490,8 +538,9 @@ uint16_t rtlsdr_read_reg(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_
 {
 	int r;
 	unsigned char data[2];
-	uint16_t index = (block << 8);
 	uint16_t reg;
+	uint16_t index = (block << 8);
+	if (block == IRB) index = (SYSB << 8) | 0x01;
 
 	r = libusb_control_transfer(dev->devh, CTRL_IN, 0, addr, index, data, len, CTRL_TIMEOUT);
 
@@ -509,6 +558,7 @@ int rtlsdr_write_reg(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint16_t v
 	unsigned char data[2];
 
 	uint16_t index = (block << 8) | 0x10;
+	if (block == IRB) index = (SYSB << 8) | 0x11;
 
 	if (len == 1)
 		data[0] = val & 0xff;
@@ -1991,4 +2041,161 @@ int rtlsdr_i2c_read_fn(void *dev, uint8_t addr, uint8_t *buf, int len)
 		return rtlsdr_i2c_read(((rtlsdr_dev_t *)dev), addr, buf, len);
 
 	return -1;
+}
+
+
+/* Infrared (IR) sensor support
+ * based on Linux dvb_usb_rtl28xxu drivers/media/usb/dvb-usb-v2/rtl28xxu.h
+ * Copyright (C) 2009 Antti Palosaari <crope@iki.fi>
+ * Copyright (C) 2011 Antti Palosaari <crope@iki.fi>
+ * Copyright (C) 2012 Thomas Mair <thomas.mair86@googlemail.com>
+ */
+
+struct rtl28xxu_req {
+	uint16_t value;
+	uint16_t index;
+	uint16_t size;
+	uint8_t *data;
+};
+
+struct rtl28xxu_reg_val {
+	uint16_t reg;
+	uint8_t val;
+};
+
+struct rtl28xxu_reg_val_mask {
+	int block;
+	uint16_t reg;
+	uint8_t val;
+	uint8_t mask;
+};
+
+static int rtlsdr_read_regs(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_t *data, uint8_t len)
+{
+	int r;
+	uint16_t index = (block << 8);
+	if (block == IRB) index = (SYSB << 8) | 0x01;
+
+	r = libusb_control_transfer(dev->devh, CTRL_IN, 0, addr, index, data, len, CTRL_TIMEOUT);
+
+	if (r < 0)
+		fprintf(stderr, "%s failed with %d\n", __FUNCTION__, r);
+
+	return r;
+}
+
+static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t val,
+		uint8_t mask)
+{
+	int ret;
+	uint8_t tmp;
+
+	/* no need for read if whole reg is written */
+	if (mask != 0xff) {
+		tmp = rtlsdr_read_reg(d, block, reg, 1);
+
+		val &= mask;
+		tmp &= ~mask;
+		val |= tmp;
+	}
+
+	return rtlsdr_write_reg(d, block, reg, (uint16_t)val, 1);
+}
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
+{
+	int ret = -1;
+	size_t i, len;
+	static const struct rtl28xxu_reg_val_mask refresh_tab[] = {
+		{IRB, IR_RX_IF,			   0x03, 0xff},
+		{IRB, IR_RX_BUF_CTRL,		 0x80, 0xff},
+		{IRB, IR_RX_CTRL,			 0x80, 0xff},
+	};
+
+	/* init remote controller */
+	if (!d->rc_active) {
+		//fprintf(stderr, "initializing remote controller\n");
+		static const struct rtl28xxu_reg_val_mask init_tab[] = {
+			{USBB, DEMOD_CTL,			 0x00, 0x04},
+			{USBB, DEMOD_CTL,			 0x00, 0x08},
+			{USBB, USB_CTRL,			  0x20, 0x20},
+			{USBB, GPD,				   0x00, 0x08},
+			{USBB, GPOE,				  0x08, 0x08},
+			{USBB, GPO,				   0x08, 0x08},
+			{IRB, IR_MAX_DURATION0,	   0xd0, 0xff},
+			{IRB, IR_MAX_DURATION1,	   0x07, 0xff},
+			{IRB, IR_IDLE_LEN0,		   0xc0, 0xff},
+			{IRB, IR_IDLE_LEN1,		   0x00, 0xff},
+			{IRB, IR_GLITCH_LEN,		  0x03, 0xff},
+			{IRB, IR_RX_CLK,			  0x09, 0xff},
+			{IRB, IR_RX_CFG,			  0x1c, 0xff},
+			{IRB, IR_MAX_H_TOL_LEN,	   0x1e, 0xff},
+			{IRB, IR_MAX_L_TOL_LEN,	   0x1e, 0xff},
+			{IRB, IR_RX_CTRL,			 0x80, 0xff},
+		};
+
+		for (i = 0; i < ARRAY_SIZE(init_tab); i++) {
+			ret = rtlsdr_write_reg_mask(d, init_tab[i].block, init_tab[i].reg,
+					init_tab[i].val, init_tab[i].mask);
+			if (ret < 0) {
+				fprintf(stderr, "write %d reg %d %.4x %.2x %.2x failed\n", i, init_tab[i].block,
+						init_tab[i].reg, init_tab[i].val, init_tab[i].mask);
+				goto err;
+			}
+		}
+
+		d->rc_active = 1;
+		//fprintf(stderr, "rc active\n");
+	}
+	// TODO: option to ir disable
+
+	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_IF, 1);
+
+	if (buf[0] != 0x83) {
+		if (buf[0] == 0 || // no IR signal
+			// also observed: 0x82, 0x81 - with lengths 1, 5, 0.. unknown, sometimes occurs at edges
+			// "IR not ready"? causes a -7 timeout if we read
+			buf[0] == 0x82 || buf[0] == 0x81) {
+			// graceful exit
+		} else {
+			fprintf(stderr, "read IR_RX_IF unexpected: %.2x\n", buf[0]);
+		}
+
+		ret = 0;
+		goto exit;
+	}
+
+	buf[0] = rtlsdr_read_reg(d, IRB, IR_RX_BC, 1);
+
+	len = buf[0];
+	//fprintf(stderr, "read IR_RX_BC len=%d\n", len);
+
+	if (len > buf_len) {
+		//fprintf(stderr, "read IR_RX_BC too large for buffer, %lu > %lu\n", buf_len, buf_len);
+		goto exit;
+	}
+
+	/* read raw code from hw */
+	ret = rtlsdr_read_regs(d, IRB, IR_RX_BUF, buf, len);
+	if (ret < 0)
+		goto err;
+
+	/* let hw receive new code */
+	for (i = 0; i < ARRAY_SIZE(refresh_tab); i++) {
+		ret = rtlsdr_write_reg_mask(d, refresh_tab[i].block, refresh_tab[i].reg,
+				refresh_tab[i].val, refresh_tab[i].mask);
+		if (ret < 0)
+			goto err;
+	}
+
+	// On success return length
+	ret = len;
+
+exit:
+	return ret;
+err:
+	printf("failed=%d\n", ret);
+	return ret;
 }
