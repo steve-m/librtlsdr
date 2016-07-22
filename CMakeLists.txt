@@ -57,6 +57,14 @@ if(CMAKE_COMPILER_IS_GNUCC AND NOT WIN32)
     add_definitions(-fvisibility=hidden)
 endif()
 
+#########################################################################
+# Bug Fix
+#########################################################################
+OPTION(NEED_PTHREADS_WORKARROUND "PThreads Workarround for timespec")
+IF (DEFINED NEED_PTHREADS_WORKARROUND)
+    ADD_DEFINITIONS(-DNEED_PTHREADS_WORKARROUND)
+ENDIF()
+
 ########################################################################
 # Find build dependencies
 ########################################################################

@@ -69,6 +69,10 @@
 #define _USE_MATH_DEFINES
 #endif
 
+#ifdef NEED_PTHREADS_WORKARROUND
+#define HAVE_STRUCT_TIMESPEC
+#endif
+
 #include <math.h>
 #include <pthread.h>
 #include <libusb.h>

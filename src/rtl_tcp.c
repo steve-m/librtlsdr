@@ -37,6 +37,9 @@
 #include "getopt/getopt.h"
 #endif
 
+#ifdef NEED_PTHREADS_WORKARROUND
+#define HAVE_STRUCT_TIMESPEC
+#endif
 #include <pthread.h>
 
 #include "rtl-sdr.h"

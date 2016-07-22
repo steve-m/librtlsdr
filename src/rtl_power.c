@@ -60,6 +60,9 @@
 #endif
 
 #include <math.h>
+#ifdef NEED_PTHREADS_WORKARROUND
+#define HAVE_STRUCT_TIMESPEC
+#endif
 #include <pthread.h>
 #include <libusb.h>
 
