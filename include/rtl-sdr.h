@@ -419,6 +419,17 @@ RTLSDR_API int rtlsdr_cancel_async(rtlsdr_dev_t *dev);
  */
 RTLSDR_API int rtlsdr_ir_query(rtlsdr_dev_t *dev, uint8_t *buf, size_t buf_len);
 
+
+/*!
+ * Enable or disable the bias tee on GPIO PIN 0. (Works for rtl-sdr.com v3 dongles)
+ * See: http://www.rtl-sdr.com/rtl-sdr-blog-v-3-dongles-user-guide/
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param on  1 for Bias T on. 0 for Bias T off.
+ * \return -1 if device is not initialized. 1 otherwise.
+ */
+RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
+
 #ifdef __cplusplus
 }
 #endif

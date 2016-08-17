@@ -2437,3 +2437,13 @@ err:
 	printf("failed=%d\n", ret);
 	return ret;
 }
+
+int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on) {
+	if (!dev)
+		return -1;
+
+	rtlsdr_set_gpio_output(dev, 0);
+	rtlsdr_set_gpio_bit(dev, 0, on);
+
+	return 1;
+}
