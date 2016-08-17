@@ -21,7 +21,7 @@ MACRO(RTLSDR_APPEND_SRCS)
     LIST(APPEND rtlsdr_srcs ${ARGV})
 ENDMACRO(RTLSDR_APPEND_SRCS)
 
-if(!WIN32)
+if(NOT WIN32)
 RTLSDR_APPEND_SRCS(
     librtlsdr.c
     tuner_e4k.c
@@ -105,7 +105,7 @@ add_executable(rtl_ir rtl_ir.c)
 add_executable(rtl_eeprom rtl_eeprom.c)
 add_executable(rtl_adsb rtl_adsb.c)
 add_executable(rtl_power rtl_power.c)
-if (!WIN32)
+if (NOT WIN32)
     add_executable(rtl_rpcd rtl_rpcd.c rtlsdr_rpc_msg.c)
     set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_rpcd)
 else()
@@ -144,7 +144,7 @@ target_link_libraries(rtl_power rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-if(!WIN32)
+if(NOT WIN32)
 target_link_libraries(rtl_rpcd rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
