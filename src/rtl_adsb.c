@@ -36,7 +36,10 @@
 #include <io.h>
 #include "getopt/getopt.h"
 #endif
-
+ 
+#ifdef NEED_PTHREADS_WORKARROUND
+#define HAVE_STRUCT_TIMESPEC
+#endif
 #include <pthread.h>
 #include <libusb.h>
 
@@ -45,7 +48,9 @@
 
 #ifdef _WIN32
 #define sleep Sleep
+#if defined(_MSC_VER) && (_MSC_VER < 1800)
 #define round(x) (x > 0.0 ? floor(x + 0.5): ceil(x - 0.5))
+#endif
 #endif
 
 #define ADSB_RATE			2000000
@@ -74,7 +79,7 @@ int quality = 10;
 int allowed_errors = 5;
 FILE *file;
 int adsb_frame[14];
-#define preamble_len		16
+#define preamble_len	16
 #define long_frame		112
 #define short_frame		56
 
