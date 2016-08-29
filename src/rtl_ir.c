@@ -61,7 +61,7 @@ struct dongle_state
 
 void dongle_init(struct dongle_state *s)
 {
-    bzero(s, sizeof(struct dongle_state));
+    memset(s, 0, sizeof(struct dongle_state));
 }
 
 struct dongle_state dongle;
@@ -77,7 +77,7 @@ void usage(void)
 		"\t[-b]\tDisplay output in binary (default), pulse=1, space=0; each 20 usec\n"
 		"\t[-t]\tDisplay output in text format\n"
 		"\t[-x]\tDisplay output in raw packed bytes, MSB=pulse/space, 7LSB=duration*20 usec\n"
-		"\t[-h\t]Help\n"
+        "\t[-h]\tHelp\n"
 		);
 	exit(1);
 }

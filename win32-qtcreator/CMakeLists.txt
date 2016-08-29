@@ -2,10 +2,10 @@ project(rtlsdr)
 cmake_minimum_required(VERSION 2.8)
 
 # created and tested with
-# Qt 5.5.1 for Windows 32-bit (MinGW 4.9.2) from
+# Qt 5.6.1 for Windows 32-bit (MinGW 4.9.2) from
 # https://www.qt.io/download-open-source/#section-2
 #
-# and QtCreator 4.0.0
+# and QtCreator 4.1.0
 #
 # and LibUSB 1.0.20 from
 # https://sourceforge.net/projects/libusb/files/
@@ -14,6 +14,22 @@ cmake_minimum_required(VERSION 2.8)
 
 # edit this path
 SET( LIBUSBBASE C:/src/_foreign/libusb-1.0.20 )
+
+OPTION(RTL_FULL_STATIC_BUILD "Build rtl-tools fully static." OFF)
+
+if(RTL_FULL_STATIC_BUILD)
+    if (WIN32)
+        if(MINGW)
+            # Special MINGW stuff here
+            # see https://cmake.org/pipermail/cmake/2012-September/051970.html
+            # see http://stackoverflow.com/questions/13768515/how-to-do-static-linking-of-libwinpthread-1-dll-in-mingw
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static -static-libgcc")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static -static-libgcc -static-libstdc++")
+            set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static -static-libgcc -s")
+            set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS} -static -static-libgcc -static-libstdc++ -s")
+        endif()
+    endif()
+endif()
 
 
 add_definitions( -DWIN32 -D_WIN32 -DNDEBUG )
@@ -73,3 +89,5 @@ target_link_libraries( rtl_adsb ${LIBUSB} )
 add_executable( rtl_power ../src/rtl_power.c ${RTLLIBFILES} )
 target_link_libraries( rtl_power ${LIBUSB} )
 
+add_executable( rtl_ir ../src/rtl_ir.c ${RTLLIBFILES} )
+target_link_libraries( rtl_ir ${LIBUSB} )
