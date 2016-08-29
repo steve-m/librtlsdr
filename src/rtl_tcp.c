@@ -100,7 +100,7 @@ void usage(void)
 		"\t[-g gain in dB (default: 0 for auto)]\n"
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
 		"\t[-b number of buffers (default: 15, set by library)]\n"
-		"\t[-l length of single buffer in units of 512 samples (default: 64 was 256)]\n"
+		"\t[-l length of single buffer in units of 512 samples (default: 32 was 256)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
 		"\t[-w rtlsdr tuner bandwidth [Hz] (for R820T and E4000 tuners)]\n"
 		"\t[-d device index (default: 0)]\n"
@@ -467,15 +467,17 @@ int main(int argc, char **argv)
 	struct sockaddr_in local, remote;
 	uint32_t buf_num = 0;
 	/* buf_len:
-	 * -> 256 -> 262 ms @ 250 kS  or  20.48 ms @ 3.2 MS (internal default)
-	 * -> 128 -> 131 ms @ 250 kS  or  10.24 ms @ 3.2 MS
-	 * ->  64 ->  65 ms @ 250 kS  or   5.12 ms @ 3.2 MS (new default)
+	 * must be multiple of 512 - else it will be overwritten
+	 * in rtlsdr_read_async() in librtlsdr.c with DEFAULT_BUF_LENGTH (= 16*32 *512 = 512 *512)
+	 *
+	 * -> 512*512 -> 1048 ms @ 250 kS  or  81.92 ms @ 3.2 MS (internal default)
+	 * ->  32*512 ->   65 ms @ 250 kS  or   5.12 ms @ 3.2 MS (new default)
 	 *
 	 * usual soundcard as reference:
 	 *   512 samples @ 48 kHz ~= 10.6 ms
 	 *   512 samples @  8 kHz  = 64 ms
 	 */
-	uint32_t buf_len = 64;
+	uint32_t buf_len = 32 * 512;
 	int dev_index = 0;
 	int dev_given = 0;
 	int gain = 0;
