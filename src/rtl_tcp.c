@@ -376,6 +376,10 @@ static void *command_worker(void *arg)
 			printf("set tuner bandwidth to %i Hz\n", bandwidth);
 			verbose_set_bandwidth(dev, bandwidth);
 			break;
+		case SET_BIAS_TEE:
+			printf("setting bias-t to %d\n", ntohl(cmd.param));
+			rtlsdr_set_bias_tee(dev, ntohl(cmd.param));
+			break;
 		default:
 			break;
 		}
