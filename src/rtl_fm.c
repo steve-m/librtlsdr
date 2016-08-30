@@ -208,6 +208,7 @@ void usage(void)
 		"\t	raw mode outputs 2x16 bit IQ pairs\n"
 		"\t[-s sample_rate (default: 24k)]\n"
 		"\t[-d device_index (default: 0)]\n"
+		"\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n"
 		"\t[-g tuner_gain (default: automatic)]\n"
 		"\t[-w tuner_bandwidth (default: automatic. enables offset tuning)]\n"
 		"\t[-l squelch_level (default: 0/off)]\n"
@@ -220,7 +221,6 @@ void usage(void)
 		"\t[-p ppm_error (default: 0)]\n"
 		"\t[-E enable_option (default: none)]\n"
 		"\t	use multiple -E to enable multiple options\n"
-		"\t	biasT:  enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)\n"
 		"\t	edge:   enable lower edge tuning\n"
 		"\t	rdc:    enable dc blocking filter on raw I/Q data at capture rate\n"
 		"\t	adc:    enable dc blocking filter on demodulated audio\n"
@@ -1173,7 +1173,7 @@ int main(int argc, char **argv)
 	output_init(&output);
 	controller_init(&controller);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:v")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:Tv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1227,8 +1227,6 @@ int main(int argc, char **argv)
 		case 'E':
 			if (strcmp("edge",  optarg) == 0) {
 				controller.edge = 1;}
-			if (strcmp("biasT", optarg) == 0 || strcmp("biast", optarg) == 0) {
-				enable_biastee = 1;}
 			if (strcmp("dc", optarg) == 0 || strcmp("adc", optarg) == 0) {
 				demod.dc_block_audio = 1;}
 			if (strcmp("rdc", optarg) == 0) {
@@ -1287,6 +1285,9 @@ int main(int argc, char **argv)
 				timeConstant = 50;
 			else
 				timeConstant = (int)atof(optarg);
+			break;
+		case 'T':
+			enable_biastee = 1;
 			break;
 		case 'v':
 			++verbosity;
@@ -1369,6 +1370,8 @@ int main(int argc, char **argv)
 	rtlsdr_set_agc_mode(dongle.dev, rtlagc);
   
 	rtlsdr_set_bias_tee(dongle.dev, enable_biastee);
+	if (enable_biastee)
+		fprintf(stderr, "activated bias-T on GPIO PIN 0\n");
 
 	verbose_ppm_set(dongle.dev, dongle.ppm_error);
 
