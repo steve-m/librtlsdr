@@ -1948,6 +1948,9 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 	if (!dev)
 		return -1;
 
+	/* automatic de-activation of bias-T */
+	rtlsdr_set_bias_tee(dev, 0);
+
 	if(!dev->dev_lost) {
 		/* block until all async operations have been completed (if any) */
 		while (RTLSDR_INACTIVE != dev->async_status) {
