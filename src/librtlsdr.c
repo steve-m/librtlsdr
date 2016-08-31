@@ -119,6 +119,8 @@ struct rtlsdr_dev {
 	uint32_t offs_freq; /* Hz */
 	int corr; /* ppm */
 	int gain; /* tenth dB */
+	enum rtlsdr_ds_mode direct_sampling_mode;
+	uint32_t direct_sampling_threshold; /* Hz */
 	struct e4k_state e4k_s;
 	struct r82xx_config r82xx_c;
 	struct r82xx_priv r82xx_p;
@@ -131,6 +133,7 @@ struct rtlsdr_dev {
 
 void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
 static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq);
+static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq);
 
 /* generic tuner interface functions, shall be moved to the tuner implementations */
 int e4000_init(void *dev) {
@@ -997,6 +1000,9 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 	if (!dev || !dev->tuner)
 		return -1;
 
+	if (dev->direct_sampling_mode > RTLSDR_DS_Q)
+		rtlsdr_update_ds(dev, freq);
+
 	if (dev->direct_sampling) {
 		r = rtlsdr_set_if_freq(dev, freq);
 	} else if (dev->tuner && dev->tuner->set_freq) {
@@ -1484,6 +1490,59 @@ int rtlsdr_get_direct_sampling(rtlsdr_dev_t *dev)
 		return -1;
 
 	return dev->direct_sampling;
+}
+
+int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t freq_threshold)
+{
+	if (!dev)
+		return -1;
+
+	uint32_t center_freq = rtlsdr_get_center_freq(dev);
+	if ( !center_freq )
+		return -2;
+
+	if (!freq_threshold) {
+		switch(dev->tuner_type) {
+		default:
+		case RTLSDR_TUNER_UNKNOWN:	freq_threshold = 28800000; break; /* no idea!!! */
+		case RTLSDR_TUNER_E4000:	freq_threshold = 50*1000000; break; /* E4K_FLO_MIN_MHZ */
+		case RTLSDR_TUNER_FC0012:	freq_threshold = 28800000; break; /* no idea!!! */
+		case RTLSDR_TUNER_FC0013:	freq_threshold = 28800000; break; /* no idea!!! */
+		case RTLSDR_TUNER_FC2580:	freq_threshold = 28800000; break; /* no idea!!! */
+		case RTLSDR_TUNER_R820T:	freq_threshold = 24000000; break; /* ~ */
+		case RTLSDR_TUNER_R828D:	freq_threshold = 28800000; break; /* no idea!!! */
+		}
+	}
+
+	dev->direct_sampling_mode = mode;
+	dev->direct_sampling_threshold = freq_threshold;
+
+	if (mode <= RTLSDR_DS_Q)
+		rtlsdr_set_direct_sampling(dev, mode);
+
+	return rtlsdr_set_center_freq(dev, center_freq);
+}
+
+static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq)
+{
+	int curr_ds = rtlsdr_get_direct_sampling(dev);
+	if ( curr_ds < 0 )
+		return -1;
+
+	int new_ds = 0;
+	switch (dev->direct_sampling_mode) {
+	default:
+	case RTLSDR_DS_IQ:		break;
+	case RTLSDR_DS_I:		new_ds = 1; break;
+	case RTLSDR_DS_Q:		new_ds = 2; break;
+	case RTLSDR_DS_I_BELOW:	new_ds = (freq < dev->direct_sampling_threshold) ? 1 : 0; break;
+	case RTLSDR_DS_Q_BELOW:	new_ds = (freq < dev->direct_sampling_threshold) ? 2 : 0; break;
+	}
+
+	if ( curr_ds != new_ds )
+		return rtlsdr_set_direct_sampling(dev, new_ds);
+
+	return 0;
 }
 
 int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on)
