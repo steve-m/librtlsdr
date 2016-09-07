@@ -1494,10 +1494,11 @@ int rtlsdr_get_direct_sampling(rtlsdr_dev_t *dev)
 
 int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t freq_threshold)
 {
+	uint32_t center_freq;
 	if (!dev)
 		return -1;
 
-	uint32_t center_freq = rtlsdr_get_center_freq(dev);
+	center_freq = rtlsdr_get_center_freq(dev);
 	if ( !center_freq )
 		return -2;
 
@@ -1525,11 +1526,11 @@ int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t fre
 
 static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq)
 {
+	int new_ds = 0;
 	int curr_ds = rtlsdr_get_direct_sampling(dev);
 	if ( curr_ds < 0 )
 		return -1;
 
-	int new_ds = 0;
 	switch (dev->direct_sampling_mode) {
 	default:
 	case RTLSDR_DS_IQ:		break;
