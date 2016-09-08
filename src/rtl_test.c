@@ -288,7 +288,7 @@ int main(int argc, char **argv)
 			dev_given = 1;
 			break;
 		case 's':
-			samp_rate = (uint32_t)atof(optarg);
+			samp_rate = (uint32_t)atofs(optarg);
 			break;
 		case 'b':
 			out_block_size = (uint32_t)atof(optarg);
