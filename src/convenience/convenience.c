@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -29,6 +30,7 @@
 #include <windows.h>
 #include <fcntl.h>
 #include <io.h>
+#include <process.h>
 #define _USE_MATH_DEFINES
 #endif
 
@@ -43,6 +45,8 @@ double atofs(char *s)
 	int len;
 	double suff = 1.0;
 	len = strlen(s);
+	/* allow formatting spaces from .csv command file */
+	while ( len > 1 && isspace(s[len-1]) )	--len;
 	last = s[len-1];
 	s[len-1] = '\0';
 	switch (last) {
@@ -324,5 +328,69 @@ int verbose_device_search(char *s)
 	fprintf(stderr, "No matching devices found.\n");
 	return -1;
 }
+
+#ifndef _WIN32
+
+void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] )
+{
+	pid_t pid;
+	char * argv[256] = { NULL };
+	int k, argc = 0;
+	argv[argc++] = file;
+	if (args) {
+		argv[argc] = strtok(args, " ");
+		while (argc < 256 && argv[argc]) {
+			argv[++argc] = strtok(NULL, " ");
+			for (k=0; argv[argc] && searchStr && replaceStr && searchStr[k] && replaceStr[k]; k++) {
+				if (!strcmp(argv[argc], searchStr[k])) {
+					argv[argc] = replaceStr[k];
+					break;
+				}
+			}
+		}
+	}
+
+	pid = fork();
+	switch (pid)
+	{
+	case -1:
+		/* Fork() has failed */
+		fprintf(stderr, "error: fork for '%s' failed!\n", file);
+		break;
+	case 0:
+		execvp(file, argv);
+		fprintf(stderr, "error: execv of '%s' from within fork failed!\n", file);
+		exit(10);
+		break;
+	default:
+		/* This is processed by the parent */
+		break;
+	}
+}
+
+#else
+
+void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] )
+{
+	char * argv[256] = { NULL };
+	int k, argc = 0;
+	argv[argc++] = file;
+ 	if (args) {
+		argv[argc] = strtok(args, " \t");
+		while (argc < 256 && argv[argc]) {
+			argv[++argc] = strtok(NULL, " \t");
+			for (k=0; argv[argc] && searchStr && replaceStr && searchStr[k] && replaceStr[k]; k++) {
+				if (!strcmp(argv[argc], searchStr[k])) {
+					argv[argc] = replaceStr[k];
+					break;
+				}
+			}
+		}
+	}
+
+	spawnvp(P_NOWAIT, file, argv);
+}
+
+#endif
 
 // vim: tabstop=8:softtabstop=8:shiftwidth=8:noexpandtab
