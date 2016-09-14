@@ -118,6 +118,11 @@ struct cmd_state
 	FILE * file;
 	int lineNo;
 	char acLine[4096];
+	int checkADCmax;
+	int checkADCrms;
+	uint32_t prevFreq;
+	int prevGain;
+	uint32_t prevBandwidth;
 	uint32_t freq;
 	int gain;
 	enum trigExpr trigCrit;
@@ -156,6 +161,9 @@ struct dongle_state
 	int	  direct_sampling;
 	int	  mute;
 	struct demod_state *demod_target;
+	double samplePowSum;
+	int samplePowCount;
+	unsigned char sampleMax;
 };
 
 struct demod_state
@@ -257,6 +265,7 @@ void usage(void)
 		"\t[-D direct_sampling_threshold_frequency (default: 0 use tuner specific frequency threshold for 3 and 4)]\n"
 		"\t[-g tuner_gain (default: automatic)]\n"
 		"\t[-w tuner_bandwidth in Hz (default: automatic)]\n"
+		"\t[-W length of single buffer in units of 512 samples (default: 32 was 256)]\n"
 		"\t[-l squelch_level (default: 0/off)]\n"
 		"\t[-L N  prints levels every N calculations]\n"
 		"\t	output are comma separated values (csv):\n"
@@ -475,6 +484,11 @@ static void cmd_init(struct cmd_state *c)
 	c->filename = NULL;
 	c->file = NULL;
 	c->lineNo = 1;
+	c->checkADCmax = 0;
+	c->checkADCrms = 0;
+	c->prevFreq = -1;
+	c->prevGain = -200;
+	c->prevBandwidth = -1;
 	c->freq = 0;
 	c->gain = 0;
 	c->trigCrit = crit_IN;
@@ -486,7 +500,7 @@ static void cmd_init(struct cmd_state *c)
 	c->args = NULL;
 	c->levelSum = 0.0;
 	c->numSummed = 0;
-	c->omitFirstFreqLevels = 1;
+	c->omitFirstFreqLevels = 3;
 	for (k = 0; k < FREQUENCIES_LIMIT; k++) {
 		c->waitTrigger[k] = 0;
 		c->statNumLevels[k] = 0;
@@ -536,7 +550,17 @@ static int toNextCmdLine(struct cmd_state *c)
 
 		pCmdFreq = strtok(pLine, delim);
 		if (!pCmdFreq) { fprintf(stderr, "error parsing frequency in line %d of command file!\n", c->lineNo); continue; }
-		c->freq = (uint32_t)atofs(trim(pCmdFreq));
+		pCmdFreq = trim(pCmdFreq);
+		/* check keywords */
+		if (!strcmp(pCmdFreq, "adc") || !strcmp(pCmdFreq, "adcmax")) {
+			c->checkADCmax = 1;
+			continue;
+		}
+		else if (!strcmp(pCmdFreq, "adcrms")) {
+			c->checkADCrms = 1;
+			continue;
+		}
+		c->freq = (uint32_t)atofs(pCmdFreq);
 
 		pCmdGain = strtok(NULL, delim);
 		if (!pCmdGain) { fprintf(stderr, "error parsing gain in line %d of command file!\n", c->lineNo); continue; }
@@ -612,13 +636,16 @@ static int testTrigCrit(struct cmd_state *c, double level)
 	return 0;
 }
 
-static void checkTriggerCommand(struct cmd_state *c)
+static void checkTriggerCommand(struct cmd_state *c, unsigned char adcSampleMax, double powerSum, int powerCount )
 {
 	char acRepFreq[32], acRepGain[32], acRepMLevel[32], acRepRefLevel[32], acRepRefTolerance[32];
 	char * execSearchStrings[7] = { "!freq!", "!gain!", "!mlevel!", "!crit!", "!reflevel!", "!reftol!", NULL };
 	char * execReplaceStrings[7] = { acRepFreq, acRepGain, acRepMLevel, NULL, acRepRefLevel, acRepRefTolerance, NULL };
 	double triggerLevel;
+	double adcRms = 0.0;
 	int k, triggerCommand = 0;
+	int adcMax = (int)adcSampleMax - 127;
+	char adcText[128];
 
 	if (c->numSummed != c->numMeas)
 		return;
@@ -658,11 +685,24 @@ static void checkTriggerCommand(struct cmd_state *c)
 		}
 	}
 
+	adcText[0] = 0;
+	if (c->checkADCmax && c->checkADCrms) {
+		adcRms = (powerCount >0) ? sqrt( powerSum / powerCount ) : -1.0;
+		sprintf(adcText, "adc max %3d%s rms %5.1f ", adcMax, (adcMax>=64 ? (adcMax>=120 ? "!!" : "! " ) : "  "), adcRms );
+	}
+	else if (c->checkADCmax)
+		sprintf(adcText, "adc max %3d%s ", adcMax, (adcMax>=64 ? (adcMax>=120 ? "!!" : "! " ) : "  ") );
+	else if (c->checkADCrms) {
+		adcRms = (powerCount >0) ? sqrt( powerSum / powerCount ) : -1.0;
+		sprintf(adcText, "adc rms %5.1f ", adcRms );
+	}
+
 	if ( c->lineNo < FREQUENCIES_LIMIT && c->waitTrigger[c->lineNo] <= 0 ) {
 			c->waitTrigger[c->lineNo] = triggerCommand ? c->numBlockTrigger : 0;
 			if (verbosity)
-				fprintf(stderr, "frequency %.3f kHz: level %.1f dB => %s\n",
-					(double)c->freq /1000.0, triggerLevel, (triggerCommand ? "activates trigger" : "does not trigger") );
+				fprintf(stderr, "%.3f kHz: gain %4.1f + level %4.1f dB %s=> %s\n",
+					(double)c->freq /1000.0, 0.1*c->gain, triggerLevel, adcText,
+					(triggerCommand ? "activates trigger" : "does not trigger") );
 			if (triggerCommand && c->command && c->command[0]) {
 				fprintf(stderr, "command to trigger is '%s %s'\n", c->command, c->args);
 				/* prepare search/replace of special parameters for command arguments */
@@ -674,9 +714,9 @@ static void checkTriggerCommand(struct cmd_state *c)
 				snprintf(acRepRefTolerance, 32, "%d", (int)(0.5 + c->refLevelTol*10.0) );
 				executeInBackground( c->command, c->args, execSearchStrings, execReplaceStrings );
 			}
-	} else {
-		fprintf(stderr, "frequency %.3f kHz: level %.1f dB => %s, blocks for %d\n",
-			(double)c->freq /1000.0, triggerLevel, (triggerCommand ? "would trigger" : "does not trigger"),
+	} else if (verbosity) {
+		fprintf(stderr, "%.3f kHz: gain %4.1f + level %4.1f dB %s=> %s, blocks for %d\n",
+			(double)c->freq /1000.0, 0.1*c->gain, triggerLevel, adcText, (triggerCommand ? "would trigger" : "does not trigger"),
 			(c->lineNo < FREQUENCIES_LIMIT ? c->waitTrigger[c->lineNo] : -1 ) );
 	}
 	c->numSummed++;
@@ -1129,6 +1169,7 @@ void full_demod(struct demod_state *d)
 	double freqK, avgRms, rmsLevel, avgRmsLevel;
 	int i, ds_p;
 	int sr = 0;
+	static int printBlockLen = 1;
 	ds_p = d->downsample_passes;
 	if (ds_p) {
 		for (i=0; i < ds_p; i++) {
@@ -1185,6 +1226,12 @@ void full_demod(struct demod_state *d)
 	if (c->filename) {
 		if (!sr)
 			sr = rms(d->lowpassed, d->lp_len, 1, d->dc_block_raw);
+		if ( printBlockLen && verbosity ) {
+			fprintf(stderr, "block length for rms after decimation is %d samples\n", d->lp_len);
+			if ( d->lp_len < 128 )
+				fprintf(stderr, "\n  WARNING: increase block length with option -W\n\n");
+			--printBlockLen;
+		}
 		if (!c->numSummed)
 			c->levelSum = 0;
 		if (c->numSummed < c->numMeas && sr >= 0) {
@@ -1217,6 +1264,9 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 	struct demod_state *d = s->demod_target;
 	struct cmd_state *c = d->cmd;
 	int i, muteLen = s->mute;
+	unsigned char sampleMax;
+	uint32_t sampleP, samplePowSum = 0.0;
+	int samplePowCount = 0, step = 2;
 
 	if (do_exit) {
 		return;}
@@ -1230,6 +1280,33 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			for (i=0; i<muteLen; i++)
 				buf[i] = 127;
 		}
+		/* reset adc max and power */
+		s->samplePowSum = 0.0;
+		s->samplePowCount = 0;
+		s->sampleMax = 0;
+	}
+	/* OR all samples to allow checking overflow
+	 * - before conversion to 16 bit and before DC filtering.
+	 * we only get bitmask of positive samples (after -127) but that won't matter */
+	if (c->checkADCmax ) {
+		sampleMax = s->sampleMax;
+		for (i=0; i<(int)len; i++) {
+			if ( buf[i] > sampleMax )
+				sampleMax = buf[i];
+		}
+		s->sampleMax = sampleMax;
+	}
+	if (c->checkADCrms ) {
+		while ( len >= 16384 * step )
+			step += 2;
+		for (i=0; i<(int)len; i+= step) {
+			sampleP  = ( (int)buf[i]   -127 ) * ( (int)buf[i]   -127 );  /* I^2 */
+			sampleP += ( (int)buf[i+1] -127 ) * ( (int)buf[i+1] -127 );  /* Q^2 */
+			samplePowSum += sampleP;
+			++samplePowCount;
+		}
+		s->samplePowSum += (double)samplePowSum / samplePowCount;
+		s->samplePowCount += 1;
 	}
 	/* 1st: convert to 16 bit - to allow easier calculation of DC */
 	for (i=0; i<(int)len; i++) {
@@ -1282,7 +1359,7 @@ static void *demod_thread_fn(void *arg)
 			break;
 
 		if (c->filename && c->numSummed >= c->numMeas) {
-			checkTriggerCommand(c);
+			checkTriggerCommand(c, dongle.sampleMax, dongle.samplePowSum, dongle.samplePowCount);
 
 			safe_cond_signal(&controller.hop, &controller.hop_m);
 			continue;
@@ -1421,25 +1498,40 @@ static void *controller_thread_fn(void *arg)
 
 			optimal_settings(c->freq, demod.rate_in);
 			/* 1- set center frequency */
-			rtlsdr_set_center_freq(dongle.dev, dongle.freq);
+			if (c->prevFreq != dongle.freq) {
+				rtlsdr_set_center_freq(dongle.dev, dongle.freq);
+				c->prevFreq != dongle.freq;
+			}
 			/* 2- Set the tuner gain */
-			if (c->gain == AUTO_GAIN) {
-				r = rtlsdr_set_tuner_gain_mode(dongle.dev, 0);
-				if (r != 0)
-					fprintf(stderr, "WARNING: Failed to set automatic tuner gain.\n");
-			} else {
-				c->gain = nearest_gain(dongle.dev, c->gain);
-				r = rtlsdr_set_tuner_gain_mode(dongle.dev, 1);
-				if (r < 0)
-					fprintf(stderr, "WARNING: Failed to enable manual gain.\n");
-				r = rtlsdr_set_tuner_gain(dongle.dev, c->gain);
-				if (r != 0)
-					fprintf(stderr, "WARNING: Failed to set tuner gain.\n");
+			if (c->prevGain != c->gain) {
+				if (c->gain == AUTO_GAIN) {
+					r = rtlsdr_set_tuner_gain_mode(dongle.dev, 0);
+					if (r != 0)
+						fprintf(stderr, "WARNING: Failed to set automatic tuner gain.\n");
+					else
+						c->prevGain = c->gain;
+				} else {
+					c->gain = nearest_gain(dongle.dev, c->gain);
+					r = rtlsdr_set_tuner_gain_mode(dongle.dev, 1);
+					if (r < 0)
+						fprintf(stderr, "WARNING: Failed to enable manual gain.\n");
+					else {
+						r = rtlsdr_set_tuner_gain(dongle.dev, c->gain);
+						if (r != 0)
+							fprintf(stderr, "WARNING: Failed to set tuner gain.\n");
+						else
+							c->prevGain = c->gain;
+					}
+				}
 			}
 			/* 3- Set tuner bandwidth */
-			r = rtlsdr_set_tuner_bandwidth(dongle.dev, dongle.bandwidth);
-			if (r < 0)
-				fprintf(stderr, "WARNING: Failed to set bandwidth.\n");
+			if (c->prevBandwidth != dongle.bandwidth) {
+				r = rtlsdr_set_tuner_bandwidth(dongle.dev, dongle.bandwidth);
+				if (r < 0)
+					fprintf(stderr, "WARNING: Failed to set bandwidth.\n");
+				else
+					c->prevBandwidth != dongle.bandwidth;
+			}
 			/* 4- Set ADC samplerate *
 			r = rtlsdr_set_sample_rate(dongle.dev, dongle.rate);
 			if (r < 0)
@@ -1453,6 +1545,10 @@ static void *controller_thread_fn(void *arg)
 			demod.dc_avgI = 0;
 			demod.dc_avgQ = 0;
 			dongle.mute = BufferDump;
+			/* reset adc max and power */
+			dongle.samplePowSum = 0.0;
+			dongle.samplePowCount = 0;
+			dongle.sampleMax = 0;
 		}
 
 	}
@@ -1487,6 +1583,9 @@ void dongle_init(struct dongle_state *s)
 	s->direct_sampling = 0;
 	s->offset_tuning = 0;
 	s->demod_target = &demod;
+	s->samplePowSum = 0.0;
+	s->samplePowCount = 0;
+	s->sampleMax = 0;
 	s->bandwidth = 0;
 	s->buf_len = 32 * 512;  /* see rtl_tcp */
 }
@@ -1602,7 +1701,7 @@ int main(int argc, char **argv)
 	controller_init(&controller);
 	cmd_init(&cmd);
 
-	while ((opt = getopt(argc, argv, "d:f:C:B:m:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:D:Tnv")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:C:B:m:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:W:D:Tnv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1744,6 +1843,11 @@ int main(int argc, char **argv)
 		case 'w':
 			dongle.bandwidth = (uint32_t)atofs(optarg);
 			break;
+		case 'W':
+			dongle.buf_len = 512 * atoi(optarg);
+			if (dongle.buf_len > MAXIMUM_BUF_LENGTH)
+				dongle.buf_len = MAXIMUM_BUF_LENGTH;
+			break;
 		case 'h':
 		case '?':
 		default:
@@ -1766,10 +1870,10 @@ int main(int argc, char **argv)
 	if (controller.freq_len > 1) {
 		demod.terminate_on_squelch = 0;}
 
-	if (argc <= optind) {
-		output.filename = "-";
-	} else {
+	if (optind < argc) {
 		output.filename = argv[optind];
+	} else {
+		output.filename = "-";
 	}
 
 	ACTUAL_BUF_LENGTH = lcm_post[demod.post_downsample] * DEFAULT_BUF_LENGTH;
@@ -1853,6 +1957,8 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Failed to open %s\n", output.filename);
 			exit(1);
 		}
+		else
+			fprintf(stderr, "Open %s for write\n", output.filename);
 	}
 
 	//r = rtlsdr_set_testmode(dongle.dev, 1);
