@@ -77,7 +77,7 @@ void usage(void)
 		"\t[-b]\tDisplay output in binary (default), pulse=1, space=0; each 20 usec\n"
 		"\t[-t]\tDisplay output in text format\n"
 		"\t[-x]\tDisplay output in raw packed bytes, MSB=pulse/space, 7LSB=duration*20 usec\n"
-        "\t[-h]\tHelp\n"
+		"\t[-h]\tHelp\n"
 		);
 	exit(1);
 }
