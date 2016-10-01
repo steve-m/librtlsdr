@@ -43,6 +43,7 @@
 #include <pthread.h>
 
 #include "rtl-sdr.h"
+#include "rtl_tcp.h"
 #include "convenience/convenience.h"
 
 #ifdef _WIN32
