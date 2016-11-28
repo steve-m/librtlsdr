@@ -89,7 +89,7 @@ echo ${DEB_PKG}
 rm -fr /tmp/librtlsdr-dev/
 mkdir -p /tmp/librtlsdr-dev/
 mkdir -p /tmp/librtlsdr-dev/usr/include
-mkdir -p /tmp/librtlsdr-dev/usr/lib/i386-linux-gnu/pkgconfig
+mkdir -p /tmp/librtlsdr-dev/usr/lib/pkgconfig
 mkdir -p /tmp/librtlsdr-dev/DEBIAN
 
 cat <<- EOF > /tmp/librtlsdr-dev/DEBIAN/control
@@ -114,6 +114,7 @@ EOF
 DEB_PKG="librtlsdr-dev_${VERSION}_i386.deb"
 
 cp -rf ${REPO_DIR}/include/*.h /tmp/librtlsdr-dev/usr/include
+cp ${REPO_DIR}/build/librtlsdr.pc /tmp/librtlsdr-dev/usr/lib/pkgconfig/
 dpkg-deb -b /tmp/librtlsdr-dev/ ./${DEB_PKG}
 
 echo ${DEB_PKG}
