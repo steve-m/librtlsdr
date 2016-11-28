@@ -43,6 +43,7 @@
 #include <pthread.h>
 
 #include "rtl-sdr.h"
+#include "rtl_tcp.h"
 #include "convenience/convenience.h"
 
 #ifdef _WIN32
@@ -82,6 +83,7 @@ typedef struct { /* structure size must be multiple of 2 bytes */
 static rtlsdr_dev_t *dev = NULL;
 
 static int verbosity = 0;
+static int enable_biastee = 0;
 static uint32_t bandwidth = 0;
 static int global_numq = 0;
 static struct llist *ll_buffers = 0;
@@ -100,11 +102,14 @@ void usage(void)
 		"\t[-g gain in dB (default: 0 for auto)]\n"
 		"\t[-s samplerate in Hz (default: 2048000 Hz)]\n"
 		"\t[-b number of buffers (default: 15, set by library)]\n"
-		"\t[-l length of single buffer in units of 512 samples (default: 64 was 256)]\n"
+		"\t[-l length of single buffer in units of 512 samples (default: 32 was 256)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
 		"\t[-w rtlsdr tuner bandwidth [Hz] (for R820T and E4000 tuners)]\n"
 		"\t[-d device index (default: 0)]\n"
 		"\t[-P ppm_error (default: 0)]\n"
+		"\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n"
+		"\t[-D direct_sampling_mode (default: 0, 1 = I, 2 = Q, 3 = I below threshold, 4 = Q below threshold)]\n"
+		"\t[-D direct_sampling_threshold_frequency (default: 0 use tuner specific frequency threshold for 3 and 4)]\n"
 		"\t[-v increase verbosity (default: 0)]\n");
 	exit(1);
 }
@@ -376,6 +381,10 @@ static void *command_worker(void *arg)
 			printf("set tuner bandwidth to %i Hz\n", bandwidth);
 			verbose_set_bandwidth(dev, bandwidth);
 			break;
+		case SET_BIAS_TEE:
+			printf("setting bias-t to %d\n", ntohl(cmd.param));
+			rtlsdr_set_bias_tee(dev, ntohl(cmd.param));
+			break;
 		default:
 			break;
 		}
@@ -464,18 +473,22 @@ int main(int argc, char **argv)
 	int wait_ir = 10000;
 	pthread_t thread_ir;
 	uint32_t frequency = 100000000, samp_rate = 2048000;
+	enum rtlsdr_ds_mode ds_mode = RTLSDR_DS_IQ;
+	uint32_t ds_temp, ds_threshold = 0;
 	struct sockaddr_in local, remote;
 	uint32_t buf_num = 0;
 	/* buf_len:
-	 * -> 256 -> 262 ms @ 250 kS  or  20.48 ms @ 3.2 MS (internal default)
-	 * -> 128 -> 131 ms @ 250 kS  or  10.24 ms @ 3.2 MS
-	 * ->  64 ->  65 ms @ 250 kS  or   5.12 ms @ 3.2 MS (new default)
+	 * must be multiple of 512 - else it will be overwritten
+	 * in rtlsdr_read_async() in librtlsdr.c with DEFAULT_BUF_LENGTH (= 16*32 *512 = 512 *512)
+	 *
+	 * -> 512*512 -> 1048 ms @ 250 kS  or  81.92 ms @ 3.2 MS (internal default)
+	 * ->  32*512 ->   65 ms @ 250 kS  or   5.12 ms @ 3.2 MS (new default)
 	 *
 	 * usual soundcard as reference:
 	 *   512 samples @ 48 kHz ~= 10.6 ms
 	 *   512 samples @  8 kHz  = 64 ms
 	 */
-	uint32_t buf_len = 64;
+	uint32_t buf_len = 32 * 512;
 	int dev_index = 0;
 	int dev_given = 0;
 	int gain = 0;
@@ -498,7 +511,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:I:W:f:g:s:b:l:n:d:P:w:v")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:I:W:f:g:s:b:l:n:d:P:w:D:vT")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -542,6 +555,16 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			++verbosity;
+			break;
+		case 'T':
+			enable_biastee = 1;
+			break;
+		case 'D':
+			ds_temp = (uint32_t)( atofs(optarg) + 0.5 );
+			if (ds_temp <= RTLSDR_DS_Q_BELOW)
+				ds_mode = (enum rtlsdr_ds_mode)ds_temp;
+			else
+				ds_threshold = ds_temp;
 			break;
 		default:
 			usage();
@@ -590,6 +613,9 @@ int main(int argc, char **argv)
 	if (r < 0)
 		fprintf(stderr, "WARNING: Failed to set sample rate.\n");
 
+	/* Set direct sampling with threshold */
+	rtlsdr_set_ds_mode(dev, ds_mode, ds_threshold);
+
 	/* Set the frequency */
 	r = rtlsdr_set_center_freq(dev, frequency);
 	if (r < 0)
@@ -617,6 +643,10 @@ int main(int argc, char **argv)
 	}
 
 	verbose_set_bandwidth(dev, bandwidth);
+
+	rtlsdr_set_bias_tee(dev, enable_biastee);
+	if (enable_biastee)
+		fprintf(stderr, "activated bias-T on GPIO PIN 0\n");
 
 	/* Reset endpoint before we start reading from it (mandatory) */
 	r = rtlsdr_reset_buffer(dev);

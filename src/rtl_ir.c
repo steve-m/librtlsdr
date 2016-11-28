@@ -23,7 +23,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #include <errno.h>
 #include <signal.h>
 #include <string.h>

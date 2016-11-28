@@ -35,6 +35,7 @@
 #include "convenience/convenience.h"
 
 #define DEFAULT_SAMPLE_RATE		2048000
+#define DEFAULT_BANDWIDTH		0	/* automatic bandwidth */
 #define DEFAULT_BUF_LENGTH		(16 * 16384)
 #define MINIMAL_BUF_LENGTH		512
 #define MAXIMAL_BUF_LENGTH		(256 * 16384)
@@ -49,6 +50,7 @@ void usage(void)
 		"rtl_sdr, an I/Q recorder for RTL2832 based DVB-T receivers\n\n"
 		"Usage:\t -f frequency_to_tune_to [Hz]\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
+		"\t[-w tuner_bandwidth (default: automatic)]\n"
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-g gain (default: 0 for auto)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
@@ -118,10 +120,11 @@ int main(int argc, char **argv)
 	int dev_index = 0;
 	int dev_given = 0;
 	uint32_t frequency = 100000000;
+	uint32_t bandwidth = DEFAULT_BANDWIDTH;
 	uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:n:p:S")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:S")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -135,6 +138,9 @@ int main(int argc, char **argv)
 			break;
 		case 's':
 			samp_rate = (uint32_t)atofs(optarg);
+			break;
+		case 'w':
+			bandwidth = (uint32_t)atofs(optarg);
 			break;
 		case 'p':
 			ppm_error = atoi(optarg);
@@ -199,6 +205,9 @@ int main(int argc, char **argv)
 #endif
 	/* Set the sample rate */
 	verbose_set_sample_rate(dev, samp_rate);
+
+	/* Set the tuner bandwidth */
+	verbose_set_bandwidth(dev, bandwidth);
 
 	/* Set the frequency */
 	verbose_set_frequency(dev, frequency);

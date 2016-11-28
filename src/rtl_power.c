@@ -136,6 +136,9 @@ void usage(void)
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-g tuner_gain (default: automatic)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
+		"\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n"
+		"\t[-D direct_sampling_mode (default: 0, 1 = I, 2 = Q, 3 = I below threshold, 4 = Q below threshold)]\n"
+		"\t[-D direct_sampling_threshold_frequency (default: 0 use tuner specific frequency threshold for 3 and 4)]\n"
 		"\tfilename (a '-' dumps samples to stdout)\n"
 		"\t (omitting the filename also uses stdout)\n"
 		"\n"
@@ -774,6 +777,9 @@ int main(int argc, char **argv)
 	int single = 0;
 	int direct_sampling = 0;
 	int offset_tuning = 0;
+	int enable_biastee = 0;
+	enum rtlsdr_ds_mode ds_mode = RTLSDR_DS_IQ;
+	uint32_t ds_temp, ds_threshold = 0;
 	double crop = 0.0;
 	char *freq_optarg;
 	time_t next_tick;
@@ -784,7 +790,7 @@ int main(int argc, char **argv)
 	double (*window_fn)(int, int) = rectangle;
 	freq_optarg = "";
 
-	while ((opt = getopt(argc, argv, "f:i:s:t:d:g:p:e:w:c:F:1PDOh")) != -1) {
+	while ((opt = getopt(argc, argv, "f:i:s:t:d:g:p:e:w:c:F:D:1POTh")) != -1) {
 		switch (opt) {
 		case 'f': // lower:upper:bin_size
 			freq_optarg = strdup(optarg);
@@ -843,7 +849,15 @@ int main(int argc, char **argv)
 			peak_hold = 1;
 			break;
 		case 'D':
-			direct_sampling = 1;
+			if(!optarg) {
+				direct_sampling = 1;
+			} else {
+				ds_temp = (uint32_t)( atofs(optarg) + 0.5 );
+				if (ds_temp <= RTLSDR_DS_Q_BELOW)
+					ds_mode = (enum rtlsdr_ds_mode)ds_temp;
+				else
+					ds_threshold = ds_temp;
+			}
 			break;
 		case 'O':
 			offset_tuning = 1;
@@ -851,6 +865,9 @@ int main(int argc, char **argv)
 		case 'F':
 			boxcar = 0;
 			comp_fir_size = atoi(optarg);
+			break;
+		case 'T':
+			enable_biastee = 1;
 			break;
 		case 'h':
 		default:
@@ -914,6 +931,9 @@ int main(int argc, char **argv)
 		verbose_direct_sampling(dev, 1);
 	}
 
+	/* Set direct sampling with threshold */
+	rtlsdr_set_ds_mode(dev, ds_mode, ds_threshold);
+
 	if (offset_tuning) {
 		verbose_offset_tuning(dev);
 	}
@@ -927,6 +947,10 @@ int main(int argc, char **argv)
 	}
 
 	verbose_ppm_set(dev, ppm_error);
+
+	rtlsdr_set_bias_tee(dev, enable_biastee);
+	if (enable_biastee)
+		fprintf(stderr, "activated bias-T on GPIO PIN 0\n");
 
 	if (strcmp(filename, "-") == 0) { /* Write log to stdout */
 		file = stdout;

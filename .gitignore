@@ -53,3 +53,5 @@ src/rtl_rpcd
 src/rtl_test
 
 debianize/*.deb
+.cproject
+.project

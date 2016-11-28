@@ -1,0 +1,94 @@
+
+rtl_fm now has option '-C' for a command file, from which a list of frequencies are read.
+So it's similar to using a frequency range, as with "-f 118M:137M:25k"
+The difference is, that you can parametrize one frequency per line together with
+- the tuner gain
+- condition for triggering
+- measurement duration
+and a command to execute.
+Lines starting with '#' are skipped / interpreted as comments.
+Parameters a seperated by comma.
+
+Here's an example:
+---
+# freq in Hz or special keyword, gain in dB, trig_crit (in/out/lt/gt), trig_level, trig_tolerance, #meas, #blocks, trigger_command
+# windows: rtl_fm -f 105.2m -E rdc -w 350k -s 200k -m 2.2m      -B 200000 -C cmdfile.csv -n -v
+#          rtl_fm -f 105.2m -E rdc -w 350k -s 200k -m 2.2m -W 4 -B 10000  -C cmdfile.csv -n -v
+# linux: ./rtl_fm -f 105.2m -E rdc -w 350k -s 200k -m 2.2m -B 200000 -C cmdfile.csv -n -v
+#
+# windows command examples:
+# cmd.exe, /C echo hello world
+# cmd.exe, /C start notepad
+# calc.exe
+#
+# linux examples:
+# ssmtp
+# sendxmpp
+## for piping some message to ssmtp or sendxmpp you'll need to write small scripts
+
+# 'adcmax' keyword in first column activates measurement of max adc value at capture rate to determine optimum gain and avoid oversteering
+# 'adcrms' keyword activates rms calculation at capture rate. for usual it's similar to adcmax. there are differences in case of oversteering
+#   activate verbose output (option '-v') to get the output. The maximum possible sample value is 128.
+#   You should have approx. 6 dB headroom to allow measuring stronger signals, that means measured baseline values should be below 64.
+#   An the other side you'll want to measure weaker signals, so the measured baseline value should be above a minimum of approx 8 or 16.
+adcmax,
+adcrms,
+100.7m, 30, in, 0, 1, 10, 100,
+33.0m, 20,out,60, 3, 10, 400, /home/odroid/test/simple.sh, frq !freq! gain !gain! measured !mlevel! tenth dB !crit! { !reflevel! +/- !reftol! tenth dB }
+# now check for optimal gain in some steps, which should be done per frequency!:
+100.7m, 0, gt, 400, 1, 1, 100,
+100.7m, 3, gt, 400, 1, 1, 100,
+100.7m, 6, gt, 400, 1, 1, 100,
+100.7m, 12, gt, 400, 1, 1, 100,
+100.7m, 18, gt, 400, 1, 1, 100,
+
+---
+
+* first frequency is 100.7 MHz, tuned with ~ 30 dB tuner gain;
+condition is 'in' { 0 +/- 1 } dB,
+with 10 measurements, averaging the rms level in dB.
+Each single measurement is processed after decimation of block/buffer-size many samples (see option -W).
+  The resulting number of decimated samples might get too small to allow a reliable measurement.
+  This number also depends on the capture rate: ensure minimum capture rate with option '-m'. This is also important for reducing aliases.
+  Check the output 'block length after decimation is ... samples'!
+If condition for measured level is true, then a command can be triggered, which is executed in background.
+Then, a next trigger for this frequency is blocked for 100 measurements.
+There is nothing triggered for 100.7 MHz.
+
+* 2nd frequency is 33.0 MHz, tuned with ~ 20 dB tuner gain;
+condition is 'out' { 60 +/- 3 } dB,
+with 10 measurements.
+That means, the trigger is activated when averaged level is below 57 dB or above 63 dB.
+Next trigger for this frequency is blocked for 400 measurements.
+Triggered command is the shell script '/home/odroid/test/simple.sh',
+with the arguments 'frq !freq! gain !gain! measured !mlevel! tenth dB !crit! { !reflevel! +/- !reftol! tenth dB }'.
+You can use following keywords in the arguments, which need to be free standing!:
+- !freq!
+current frequency in Hz
+
+- !gain!
+current tuner gain in tenth dB to allow easier evaluation from scripts.
+
+- !mlevel!
+average measured level in tenth dB
+
+- !crit!
+one of "in", "out", "<" or ">" for the tested condition
+
+- !reflevel!
+condition's reference level in tenth dB
+
+- !reftol!
+condition's reference tolerance in tenth dB
+
+
+Application might be monitoring of some stations
+and triggering a notification, e.g. via ssmtp or sendxmpp,
+when a stations power level is below it's expected value.
+
+Another application might be triggering a recording with a second RTL dongle.
+
+
+Send comments, suggestions or reports to
+Hayati Ayguen <h_ayguen@web.de>
+

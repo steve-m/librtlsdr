@@ -154,4 +154,7 @@ int verbose_reset_buffer(rtlsdr_dev_t *dev);
 
 int verbose_device_search(char *s);
 
+
+void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] );
+
 #endif /*__CONVENIENCE_H*/

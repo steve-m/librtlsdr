@@ -31,7 +31,6 @@ extern "C" {
 
 #include <stdint.h>
 #include <rtl-sdr_export.h>
-#include <rtl_tcp.h>
 
 typedef struct rtlsdr_dev rtlsdr_dev_t;
 
@@ -342,6 +341,25 @@ RTLSDR_API int rtlsdr_set_direct_sampling(rtlsdr_dev_t *dev, int on);
  */
 RTLSDR_API int rtlsdr_get_direct_sampling(rtlsdr_dev_t *dev);
 
+enum rtlsdr_ds_mode {
+	RTLSDR_DS_IQ = 0,	/* I/Q quadrature sampling of tuner output */
+	RTLSDR_DS_I,		/* 1: direct sampling on I branch: usually not connected */
+	RTLSDR_DS_Q,		/* 2: direct sampling on Q branch: HF on rtl-sdr v3 dongle */
+	RTLSDR_DS_I_BELOW,	/* 3: direct sampling on I branch when frequency below 'DS threshold frequency' */
+	RTLSDR_DS_Q_BELOW	/* 4: direct sampling on Q branch when frequency below 'DS threshold frequency' */
+};
+
+/*!
+ * Set direct sampling mode with threshold
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param mode static modes 0 .. 2 as in rtlsdr_set_direct_sampling(). other modes do automatic switching
+ * \param freq_threshold direct sampling is used below this frequency, else quadrature mode through tuner
+ *   set 0 for using default setting per tuner - not fully implemented yet!
+ * \return negative on error, 0 on success
+ */
+RTLSDR_API int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t freq_threshold);
+
 /*!
  * Enable or disable offset tuning for zero-IF tuners, which allows to avoid
  * problems caused by the DC offset of the ADCs and 1/f noise.
@@ -418,6 +436,17 @@ RTLSDR_API int rtlsdr_cancel_async(rtlsdr_dev_t *dev);
  * \return 0 if no signal, >0 number of bytes written into buf, <0 for error
  */
 RTLSDR_API int rtlsdr_ir_query(rtlsdr_dev_t *dev, uint8_t *buf, size_t buf_len);
+
+
+/*!
+ * Enable or disable the bias tee on GPIO PIN 0. (Works for rtl-sdr.com v3 dongles)
+ * See: http://www.rtl-sdr.com/rtl-sdr-blog-v-3-dongles-user-guide/
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param on  1 for Bias T on. 0 for Bias T off.
+ * \return -1 if device is not initialized. 1 otherwise.
+ */
+RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
 
 #ifdef __cplusplus
 }
