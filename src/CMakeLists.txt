@@ -99,6 +99,7 @@ endif()
 ########################################################################
 add_executable(rtl_sdr rtl_sdr.c)
 add_executable(rtl_tcp rtl_tcp.c)
+add_executable(rtl_udp rtl_udp.c)
 add_executable(rtl_test rtl_test.c)
 add_executable(rtl_fm rtl_fm.c)
 add_executable(rtl_ir rtl_ir.c)
@@ -107,9 +108,9 @@ add_executable(rtl_adsb rtl_adsb.c)
 add_executable(rtl_power rtl_power.c)
 if (NOT WIN32)
     add_executable(rtl_rpcd rtl_rpcd.c rtlsdr_rpc_msg.c)
-    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_rpcd)
+    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_rpcd)
 else()
-    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power)
+    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power)
 endif()
 
 target_link_libraries(rtl_sdr rtlsdr_shared convenience_static
@@ -117,6 +118,10 @@ target_link_libraries(rtl_sdr rtlsdr_shared convenience_static
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_tcp rtlsdr_shared convenience_static
+    ${LIBUSB_LIBRARIES}
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+target_link_libraries(rtl_udp rtlsdr_shared convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
@@ -166,6 +171,7 @@ endif()
 if(WIN32)
 target_link_libraries(rtl_sdr libgetopt_static)
 target_link_libraries(rtl_tcp ws2_32 libgetopt_static)
+target_link_libraries(rtl_udp ws2_32 libgetopt_static)
 target_link_libraries(rtl_test libgetopt_static)
 target_link_libraries(rtl_fm libgetopt_static)
 target_link_libraries(rtl_ir libgetopt_static)
@@ -175,6 +181,7 @@ target_link_libraries(rtl_power libgetopt_static)
 #target_link_libraries(rtl_rpcd ws2_32 libgetopt_static)
 set_property(TARGET rtl_sdr APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
 set_property(TARGET rtl_tcp APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
+set_property(TARGET rtl_udp APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
 set_property(TARGET rtl_test APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
 set_property(TARGET rtl_fm APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
 set_property(TARGET rtl_ir APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )

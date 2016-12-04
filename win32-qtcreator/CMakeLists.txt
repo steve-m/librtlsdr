@@ -83,6 +83,9 @@ target_link_libraries( rtl_fm ${LIBUSB} )
 add_executable( rtl_tcp ../src/rtl_tcp.c ${RTLLIBFILES} )
 target_link_libraries( rtl_tcp ${LIBUSB} ${SOCKLIBS} )
 
+add_executable( rtl_udp ../src/rtl_udp.c ${RTLLIBFILES} )
+target_link_libraries( rtl_udp ${LIBUSB} ${SOCKLIBS} )
+
 add_executable( rtl_adsb ../src/rtl_adsb.c ${RTLLIBFILES} )
 target_link_libraries( rtl_adsb ${LIBUSB} )
 
