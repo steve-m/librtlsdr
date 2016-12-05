@@ -386,6 +386,11 @@ static void *command_worker(void *arg)
 			printf("setting bias-t to %d\n", ntohl(cmd.param));
 			rtlsdr_set_bias_tee(dev, ntohl(cmd.param));
 			break;
+		case UDP_TERMINATE:
+			printf("comm recv bye\n");
+			sighandler(0);
+			pthread_exit(NULL);
+			break;
 		default:
 			break;
 		}
@@ -688,7 +693,7 @@ int main(int argc, char **argv)
 		printf("Use the device argument 'rtl_tcp=%s:%d' in OsmoSDR "
 		       "(gr-osmosdr) source\n"
 		       "to receive samples in GRC and control "
-		       "rtl_tcp parameters (frequency, gain, ...).\n",
+		       "rtl_udp parameters (frequency, gain, ...).\n",
 		       addr, port);
 
 		while(1) {
