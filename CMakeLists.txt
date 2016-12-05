@@ -61,7 +61,7 @@ endif()
 # Bug Fix
 #########################################################################
 OPTION(NEED_PTHREADS_WORKARROUND "PThreads Workarround for timespec")
-IF (DEFINED NEED_PTHREADS_WORKARROUND)
+IF (NEED_PTHREADS_WORKARROUND)
     ADD_DEFINITIONS(-DNEED_PTHREADS_WORKARROUND)
 ENDIF()
 
