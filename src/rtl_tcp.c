@@ -35,6 +35,7 @@
 #else
 #include <winsock2.h>
 #include "getopt/getopt.h"
+#define usleep(x) Sleep(x/1000)
 #endif
 
 #ifdef NEED_PTHREADS_WORKARROUND
