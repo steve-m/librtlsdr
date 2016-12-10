@@ -734,7 +734,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "\n");
 		}
 
-		r = send(s, (const char *)&dongle_info, sizeof(dongle_info), 0);
+		r = sendto(s, (const char *)&dongle_info, sizeof(dongle_info), 0, (struct sockaddr *)&remote, sizeof(remote));
 		if (sizeof(dongle_info) != r)
 			printf("failed to send dongle information\n");
 
@@ -748,8 +748,6 @@ int main(int argc, char **argv)
 
 		pthread_join(tcp_worker_thread, &status);
 		pthread_join(command_thread, &status);
-
-		closesocket(s);
 
 		printf("all threads dead..\n");
 		curelem = ll_buffers;
