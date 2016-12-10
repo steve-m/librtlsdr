@@ -705,11 +705,11 @@ int main(int argc, char **argv)
 			if(do_exit) {
 				goto out;
 			} else if(r) {
-				int buff = 0;
+				char buff = 0;
 				socklen_t blen = sizeof(buff);
 				rlen = sizeof(remote);
 				r = recvfrom(s, &buff, blen, 0, (struct sockaddr *)&remote, &rlen);
-				if(ntohl(buff) == UDP_ESTABLISH)
+				if(buff == UDP_ESTABLISH)
 					break;
 			}
 		}
