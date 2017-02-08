@@ -9,7 +9,7 @@ rtl-sdr turns your Realtek RTL2832 based DVB dongle into a SDR receiver
 
 # For more information see:
 
-https://osmocom.org/projects/rtl-sdr/wiki
+https://osmocom.org/projects/rtl-sdr/wiki/Rtl-sdr
 
 
 # Setup for SDR only use - without DVB compatibility:
