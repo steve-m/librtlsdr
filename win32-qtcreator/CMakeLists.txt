@@ -86,6 +86,9 @@ target_link_libraries( rtl_tcp ${LIBUSB} ${SOCKLIBS} )
 add_executable( rtl_udp ../src/rtl_udp.c ${RTLLIBFILES} )
 target_link_libraries( rtl_udp ${LIBUSB} ${SOCKLIBS} )
 
+add_executable( rtl_sdr ../src/rtl_sdr.c  ${RTLLIBFILES} )
+target_link_libraries( rtl_sdr ${LIBUSB} )
+
 add_executable( rtl_adsb ../src/rtl_adsb.c ${RTLLIBFILES} )
 target_link_libraries( rtl_adsb ${LIBUSB} )
 
@@ -94,3 +97,13 @@ target_link_libraries( rtl_power ${LIBUSB} )
 
 add_executable( rtl_ir ../src/rtl_ir.c ${RTLLIBFILES} )
 target_link_libraries( rtl_ir ${LIBUSB} )
+
+add_executable( rtl_eeprom ../src/rtl_eeprom.c ${RTLLIBFILES} )
+target_link_libraries( rtl_eeprom ${LIBUSB} )
+
+if (NOT WIN32)
+  # errors at compilation with MinGW, e.g. missing include sys/select.h
+  add_executable( rtl_rpcd ../src/rtl_rpcd.c ../src/rtlsdr_rpc_msg.c ${RTLLIBFILES} )
+  target_link_libraries( rtl_rpcd ${LIBUSB} )
+endif()
+
