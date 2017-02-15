@@ -57,6 +57,22 @@ if(CMAKE_COMPILER_IS_GNUCC AND NOT WIN32)
     add_definitions(-fvisibility=hidden)
 endif()
 
+OPTION(RTL_STATIC_BUILD "Build rtl-tools static (except RTLSDR.DLL) on MinGW/Win32" ON)
+if(RTL_STATIC_BUILD)
+    if (WIN32)
+        if(MINGW)
+            # Special MINGW stuff here
+            # see https://cmake.org/pipermail/cmake/2012-September/051970.html
+            # see http://stackoverflow.com/questions/13768515/how-to-do-static-linking-of-libwinpthread-1-dll-in-mingw
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
+            set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s")
+            set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS} -static-libgcc -static-libstdc++ -s")
+        endif()
+    endif()
+endif()
+
+
 #########################################################################
 # Bug Fix
 #########################################################################

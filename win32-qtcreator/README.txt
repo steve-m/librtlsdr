@@ -29,3 +29,15 @@ the resulting executables have no other dependencies than libwinpthread-1.dll
 from the MINGW system at C:\Qt\Qt5.5.1\Tools\mingw492_32\bin\
   or C:\Qt\Qt5.5.1\5.5\mingw492_32\bin
 
+=======================================================================
+
+opening main CMakeLists.txt in root (above win32-qtcreator) with above QT 5.5/qtcreator
+
+set RTL_STATIC_BUILD = ON
+set LIBUSB_FOUND = TRUE
+set LIBUSB_INCLUDE_DIR = C:/src/_foreign/libusb-1.0.20/include/libusb-1.0
+set LIBUSB_LIBRARIES = C:/src/_foreign/libusb-1.0.20/MinGW32/static/libusb-1.0.a
+set THREADS_PTHREADS_INCLUDE_DIR = C:/Qt/Qt5.6.1/Tools/mingw492_32/i686-w64-mingw32/include
+set THREADS_PTHREADS_WIN32_LIBRARY = C:/Qt/Qt5.6.1/Tools/mingw492_32/i686-w64-mingw32/lib/libwinpthread.a
+
+the resulting executables have no other dependencies, except the freshly built librtlsdr.dll
