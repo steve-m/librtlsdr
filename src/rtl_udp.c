@@ -682,7 +682,7 @@ int main(int argc, char **argv)
 	bind(s,(struct sockaddr *)&local,sizeof(local));
 
 #ifdef _WIN32
-	ioctlsocket(listensocket, FIONBIO, &blockmode);
+	ioctlsocket(s, FIONBIO, &blockmode);
 #else
 	r = fcntl(s, F_GETFL, 0);
 	r = fcntl(s, F_SETFL, r | O_NONBLOCK);
