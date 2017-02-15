@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 2.8)
 # edit this path
 SET( LIBUSBBASE C:/src/_foreign/libusb-1.0.20 )
 
-OPTION(RTL_FULL_STATIC_BUILD "Build rtl-tools fully static." OFF)
+OPTION(RTL_FULL_STATIC_BUILD "Build rtl-tools fully static." ON)
 
 if(RTL_FULL_STATIC_BUILD)
     if (WIN32)
