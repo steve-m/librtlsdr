@@ -342,7 +342,7 @@ int e4k_if_filter_bw_get(struct e4k_state *e4k, enum e4k_if_filter filter)
 
 #define E4K_FVCO_MIN_KHZ	2600000	/* 2.6 GHz */
 #define E4K_FVCO_MAX_KHZ	3900000	/* 3.9 GHz */
-#define E4K_PLL_Y		65536
+#define E4K_PLL_Y			65536
 
 #ifdef OUT_OF_SPEC
 #define E4K_FLO_MIN_MHZ		50
@@ -646,10 +646,10 @@ static const struct reg_field if_stage_gain_regs[] = {
 static const int32_t lnagain[] = {
 	-50,	0,
 	-25,	1,
-	0,	4,
-	25,	5,
-	50,	6,
-	75,	7,
+	0,		4,
+	25,		5,
+	50,		6,
+	75,		7,
 	100,	8,
 	125,	9,
 	150,	10,

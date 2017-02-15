@@ -36,7 +36,10 @@
 #include <io.h>
 #include "getopt/getopt.h"
 #endif
-
+ 
+#ifdef NEED_PTHREADS_WORKARROUND
+#define HAVE_STRUCT_TIMESPEC
+#endif
 #include <pthread.h>
 #include <libusb.h>
 
@@ -76,7 +79,7 @@ int quality = 10;
 int allowed_errors = 5;
 FILE *file;
 int adsb_frame[14];
-#define preamble_len		16
+#define preamble_len	16
 #define long_frame		112
 #define short_frame		56
 
@@ -96,6 +99,7 @@ void usage(void)
 		"\t[-e allowed_errors (default: 5)]\n"
 		"\t[-g tuner_gain (default: automatic)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
+		"\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n"
 		"\tfilename (a '-' dumps samples to stdout)\n"
 		"\t (omitting the filename also uses stdout)\n\n"
 		"Streaming with netcat:\n"
@@ -182,7 +186,7 @@ int magnitute(uint8_t *buf, int len)
 	return len/2;
 }
 
-inline uint16_t single_manchester(uint16_t a, uint16_t b, uint16_t c, uint16_t d)
+static inline uint16_t single_manchester(uint16_t a, uint16_t b, uint16_t c, uint16_t d)
 /* takes 4 consecutive real samples, return 0 or 1, BADSAMPLE on error */
 {
 	int bit, bit_p;
@@ -233,7 +237,7 @@ inline uint16_t max16(uint16_t a, uint16_t b)
 	return a>b ? a : b;
 }
 
-inline int preamble(uint16_t *buf, int i)
+static inline int preamble(uint16_t *buf, int i)
 /* returns 0/1 for preamble at index i */
 {
 	int i2;
@@ -371,11 +375,12 @@ int main(int argc, char **argv)
 	int dev_index = 0;
 	int dev_given = 0;
 	int ppm_error = 0;
+	int enable_biastee = 0;
 	pthread_cond_init(&ready, NULL);
 	pthread_mutex_init(&ready_m, NULL);
 	squares_precompute();
 
-	while ((opt = getopt(argc, argv, "d:g:p:e:Q:VS")) != -1)
+	while ((opt = getopt(argc, argv, "d:g:p:e:Q:VST")) != -1)
 	{
 		switch (opt) {
 		case 'd':
@@ -399,6 +404,9 @@ int main(int argc, char **argv)
 			break;
 		case 'Q':
 			quality = (int)(atof(optarg) * 10);
+			break;
+		case 'T':
+			enable_biastee = 1;
 			break;
 		default:
 			usage();
@@ -469,6 +477,10 @@ int main(int argc, char **argv)
 
 	/* Set the sample rate */
 	verbose_set_sample_rate(dev, ADSB_RATE);
+
+	rtlsdr_set_bias_tee(dev, enable_biastee);
+	if (enable_biastee)
+		fprintf(stderr, "activated bias-T on GPIO PIN 0\n");
 
 	/* Reset endpoint before we start reading from it (mandatory) */
 	verbose_reset_buffer(dev);

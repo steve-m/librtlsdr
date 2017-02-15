@@ -39,7 +39,7 @@
 
 /* Those initial values start from REG_SHADOW_START */
 static const uint8_t r82xx_init_array[NUM_REGS] = {
-	0x83, 0x32, 0x75,			/* 05 to 07 */
+	0x83, 0x32, 0x75,				/* 05 to 07 */
 	0xc0, 0x40, 0xd6, 0x6c,			/* 08 to 0b */
 	0xf5, 0x63, 0x75, 0x68,			/* 0c to 0f */
 	0x6c, 0x83, 0x80, 0x00,			/* 10 to 13 */
@@ -51,173 +51,173 @@ static const uint8_t r82xx_init_array[NUM_REGS] = {
 /* Tuner frequency ranges */
 static const struct r82xx_freq_range freq_ranges[] = {
 	{
-	/* .freq = */		0,	/* Start freq, in MHz */
-	/* .open_d = */		0x08,	/* low */
+	/* .freq = */			0,	/* Start freq, in MHz */
+	/* .open_d = */			0x08,	/* low */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0xdf,	/* R27[7:0]  band2,band0 */
+	/* .tf_c = */			0xdf,	/* R27[7:0]  band2,band0 */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		50,	/* Start freq, in MHz */
-	/* .open_d = */		0x08,	/* low */
+	/* .freq = */			50,	/* Start freq, in MHz */
+	/* .open_d = */			0x08,	/* low */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0xbe,	/* R27[7:0]  band4,band1  */
+	/* .tf_c = */			0xbe,	/* R27[7:0]  band4,band1  */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		55,	/* Start freq, in MHz */
-	/* .open_d = */		0x08,	/* low */
+	/* .freq = */			55,	/* Start freq, in MHz */
+	/* .open_d = */			0x08,	/* low */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x8b,	/* R27[7:0]  band7,band4 */
+	/* .tf_c = */			0x8b,	/* R27[7:0]  band7,band4 */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		60,	/* Start freq, in MHz */
-	/* .open_d = */		0x08,	/* low */
+	/* .freq = */			60,	/* Start freq, in MHz */
+	/* .open_d = */			0x08,	/* low */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x7b,	/* R27[7:0]  band8,band4 */
+	/* .tf_c = */			0x7b,	/* R27[7:0]  band8,band4 */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		65,	/* Start freq, in MHz */
-	/* .open_d = */		0x08,	/* low */
+	/* .freq = */			65,	/* Start freq, in MHz */
+	/* .open_d = */			0x08,	/* low */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x69,	/* R27[7:0]  band9,band6 */
+	/* .tf_c = */			0x69,	/* R27[7:0]  band9,band6 */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		70,	/* Start freq, in MHz */
-	/* .open_d = */		0x08,	/* low */
+	/* .freq = */			70,	/* Start freq, in MHz */
+	/* .open_d = */			0x08,	/* low */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x58,	/* R27[7:0]  band10,band7 */
+	/* .tf_c = */			0x58,	/* R27[7:0]  band10,band7 */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		75,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			75,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x44,	/* R27[7:0]  band11,band11 */
+	/* .tf_c = */			0x44,	/* R27[7:0]  band11,band11 */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		80,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			80,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x44,	/* R27[7:0]  band11,band11 */
+	/* .tf_c = */			0x44,	/* R27[7:0]  band11,band11 */
 	/* .xtal_cap20p = */	0x02,	/* R16[1:0]  20pF (10)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		90,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			90,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x34,	/* R27[7:0]  band12,band11 */
+	/* .tf_c = */			0x34,	/* R27[7:0]  band12,band11 */
 	/* .xtal_cap20p = */	0x01,	/* R16[1:0]  10pF (01)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		100,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			100,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x34,	/* R27[7:0]  band12,band11 */
+	/* .tf_c = */			0x34,	/* R27[7:0]  band12,band11 */
 	/* .xtal_cap20p = */	0x01,	/* R16[1:0]  10pF (01)    */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		110,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			110,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x24,	/* R27[7:0]  band13,band11 */
+	/* .tf_c = */			0x24,	/* R27[7:0]  band13,band11 */
 	/* .xtal_cap20p = */	0x01,	/* R16[1:0]  10pF (01)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		120,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			120,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x24,	/* R27[7:0]  band13,band11 */
+	/* .tf_c = */			0x24,	/* R27[7:0]  band13,band11 */
 	/* .xtal_cap20p = */	0x01,	/* R16[1:0]  10pF (01)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		140,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			140,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x14,	/* R27[7:0]  band14,band11 */
+	/* .tf_c = */			0x14,	/* R27[7:0]  band14,band11 */
 	/* .xtal_cap20p = */	0x01,	/* R16[1:0]  10pF (01)   */
 	/* .xtal_cap10p = */	0x01,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		180,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			180,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x13,	/* R27[7:0]  band14,band12 */
+	/* .tf_c = */			0x13,	/* R27[7:0]  band14,band12 */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		220,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			220,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x13,	/* R27[7:0]  band14,band12 */
+	/* .tf_c = */			0x13,	/* R27[7:0]  band14,band12 */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		250,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			250,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x11,	/* R27[7:0]  highest,highest */
+	/* .tf_c = */			0x11,	/* R27[7:0]  highest,highest */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		280,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			280,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x02,	/* R26[7:6]=0 (LPF)  R26[1:0]=2 (low) */
-	/* .tf_c = */		0x00,	/* R27[7:0]  highest,highest */
+	/* .tf_c = */			0x00,	/* R27[7:0]  highest,highest */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		310,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			310,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x41,	/* R26[7:6]=1 (bypass)  R26[1:0]=1 (middle) */
-	/* .tf_c = */		0x00,	/* R27[7:0]  highest,highest */
+	/* .tf_c = */			0x00,	/* R27[7:0]  highest,highest */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		450,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			450,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x41,	/* R26[7:6]=1 (bypass)  R26[1:0]=1 (middle) */
-	/* .tf_c = */		0x00,	/* R27[7:0]  highest,highest */
+	/* .tf_c = */			0x00,	/* R27[7:0]  highest,highest */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		588,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			588,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x40,	/* R26[7:6]=1 (bypass)  R26[1:0]=0 (highest) */
-	/* .tf_c = */		0x00,	/* R27[7:0]  highest,highest */
+	/* .tf_c = */			0x00,	/* R27[7:0]  highest,highest */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}, {
-	/* .freq = */		650,	/* Start freq, in MHz */
-	/* .open_d = */		0x00,	/* high */
+	/* .freq = */			650,	/* Start freq, in MHz */
+	/* .open_d = */			0x00,	/* high */
 	/* .rf_mux_ploy = */	0x40,	/* R26[7:6]=1 (bypass)  R26[1:0]=0 (highest) */
-	/* .tf_c = */		0x00,	/* R27[7:0]  highest,highest */
+	/* .tf_c = */			0x00,	/* R27[7:0]  highest,highest */
 	/* .xtal_cap20p = */	0x00,	/* R16[1:0]  0pF (00)   */
 	/* .xtal_cap10p = */	0x00,
-	/* .xtal_cap0p = */	0x00,
+	/* .xtal_cap0p = */		0x00,
 	}
 };
 
@@ -250,7 +250,7 @@ static void shadow_store(struct r82xx_priv *priv, uint8_t reg, const uint8_t *va
 }
 
 static int r82xx_write(struct r82xx_priv *priv, uint8_t reg, const uint8_t *val,
-		       unsigned int len)
+			   unsigned int len)
 {
 	int rc, size, pos = 0;
 
@@ -561,8 +561,8 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 }
 
 static int r82xx_sysfreq_sel(struct r82xx_priv *priv, uint32_t freq,
-			     enum r82xx_tuner_type type,
-			     uint32_t delsys)
+				 enum r82xx_tuner_type type,
+				 uint32_t delsys)
 {
 	int rc;
 	uint8_t mixer_top, lna_top, cp_cur, div_buf_cur, lna_vth_l, mixer_vth_l;
@@ -1004,7 +1004,7 @@ static const int r82xx_mixer_gain_steps[]  = {
 	0, 5, 10, 10, 19, 9, 10, 25, 17, 10, 8, 16, 13, 6, 3, -8
 };
 
-int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
+int r82xx_set_gain_old(struct r82xx_priv *priv, int set_manual_gain, int gain)
 {
 	int rc;
 
@@ -1073,6 +1073,113 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
 	return 0;
 }
 
+int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
+  int extended_mode, int lna_gain, int mixer_gain, int vga_gain)
+{
+  int rc;
+
+  int i, total_gain = 0;
+  uint8_t mix_index = 0, lna_index = 0;
+  uint8_t data[4];
+
+  if (extended_mode) {
+	/*
+	// LNA auto off
+	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
+	if (rc < 0)
+	  return rc;
+
+	// Mixer auto off
+	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
+	if (rc < 0)
+	  return rc;
+
+	rc = r82xx_read(priv, 0x00, data, sizeof(data));
+	if (rc < 0)
+	  return rc;
+	*/
+
+	/* Set LNA */
+	rc = r82xx_write_reg_mask(priv, 0x05, lna_gain, 0x0f);
+	if (rc < 0)
+	  return rc;
+
+	/* Set Mixer */
+	rc = r82xx_write_reg_mask(priv, 0x07, mixer_gain, 0x0f);
+	if (rc < 0)
+	  return rc;
+
+	/* Set VGA */
+	rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain, 0x9f);
+	if (rc < 0)
+	  return rc;
+
+	return 0;
+  }
+
+  if (set_manual_gain) {
+
+	/* LNA auto off */
+	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
+	if (rc < 0)
+	  return rc;
+
+	 /* Mixer auto off */
+	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
+	if (rc < 0)
+	  return rc;
+
+	rc = r82xx_read(priv, 0x00, data, sizeof(data));
+	if (rc < 0)
+	  return rc;
+
+	/* set fixed VGA gain for now (16.3 dB) */
+	rc = r82xx_write_reg_mask(priv, 0x0c, 0x08, 0x9f);
+	if (rc < 0)
+	  return rc;
+
+	for (i = 0; i < 15; i++) {
+	  if (total_gain >= gain)
+		break;
+
+	  total_gain += r82xx_lna_gain_steps[++lna_index];
+
+	  if (total_gain >= gain)
+		break;
+
+	  total_gain += r82xx_mixer_gain_steps[++mix_index];
+	}
+
+	/* set LNA gain */
+	rc = r82xx_write_reg_mask(priv, 0x05, lna_index, 0x0f);
+	if (rc < 0)
+	  return rc;
+
+	/* set Mixer gain */
+	rc = r82xx_write_reg_mask(priv, 0x07, mix_index, 0x0f);
+	if (rc < 0)
+	  return rc;
+  } else {
+	/* LNA */
+	rc = r82xx_write_reg_mask(priv, 0x05, 0, 0x10);
+	if (rc < 0)
+	  return rc;
+
+	/* Mixer */
+	rc = r82xx_write_reg_mask(priv, 0x07, 0x10, 0x10);
+	if (rc < 0)
+	  return rc;
+
+	/* set fixed VGA gain for now (26.5 dB) */
+	rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f);
+	if (rc < 0)
+	  return rc;
+  }
+
+  return 0;
+}
+
+
 /* Bandwidth contribution by low-pass filter. */
 static const int r82xx_if_low_pass_bw_table[] = {
 	1700000, 1600000, 1550000, 1450000, 1200000, 900000, 700000, 550000, 450000, 350000
@@ -1080,7 +1187,7 @@ static const int r82xx_if_low_pass_bw_table[] = {
 
 #define FILT_HP_BW1 350000
 #define FILT_HP_BW2 380000
-int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
+int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t * applied_bw, int apply)
 {
 	int rc;
 	unsigned int i;
@@ -1090,27 +1197,35 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
 
 	if (bw > 7000000) {
 		// BW: 8 MHz
+		*applied_bw = 8000000;
 		reg_0a = 0x10;
 		reg_0b = 0x0b;
-		priv->int_freq = 4570000;
+		if (apply)
+			priv->int_freq = 4570000;
 	} else if (bw > 6000000) {
 		// BW: 7 MHz
+		*applied_bw = 7000000;
 		reg_0a = 0x10;
 		reg_0b = 0x2a;
-		priv->int_freq = 4570000;
+		if (apply)
+			priv->int_freq = 4570000;
 	} else if (bw > r82xx_if_low_pass_bw_table[0] + FILT_HP_BW1 + FILT_HP_BW2) {
 		// BW: 6 MHz
+		*applied_bw = 6000000;
 		reg_0a = 0x10;
 		reg_0b = 0x6b;
-		priv->int_freq = 3570000;
+		if (apply)
+			priv->int_freq = 3570000;
 	} else {
 		reg_0a = 0x00;
 		reg_0b = 0x80;
-		priv->int_freq = 2300000;
+		if (apply)
+			priv->int_freq = 2300000;
 
 		if (bw > r82xx_if_low_pass_bw_table[0] + FILT_HP_BW1) {
 			bw -= FILT_HP_BW2;
-			priv->int_freq += FILT_HP_BW2;
+			if (apply)
+				priv->int_freq += FILT_HP_BW2;
 			real_bw += FILT_HP_BW2;
 		} else {
 			reg_0b |= 0x20;
@@ -1118,7 +1233,8 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
 
 		if (bw > r82xx_if_low_pass_bw_table[0]) {
 			bw -= FILT_HP_BW1;
-			priv->int_freq += FILT_HP_BW1;
+			if (apply)
+				priv->int_freq += FILT_HP_BW1;
 			real_bw += FILT_HP_BW1;
 		} else {
 			reg_0b |= 0x40;
@@ -1133,8 +1249,14 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate)
 		reg_0b |= 15 - i;
 		real_bw += r82xx_if_low_pass_bw_table[i];
 
-		priv->int_freq -= real_bw / 2;
+		*applied_bw = real_bw;
+
+		if (apply)
+			priv->int_freq -= real_bw / 2;
 	}
+
+	if (!apply)
+		return 0;
 
 	rc = r82xx_write_reg_mask(priv, 0x0a, reg_0a, 0x10);
 	if (rc < 0)
@@ -1170,7 +1292,7 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 	air_cable1_in = (freq > MHZ(345)) ? 0x00 : 0x60;
 
 	if ((priv->cfg->rafael_chip == CHIP_R828D) &&
-	    (air_cable1_in != priv->input)) {
+		(air_cable1_in != priv->input)) {
 		priv->input = air_cable1_in;
 		rc = r82xx_write_reg_mask(priv, 0x05, air_cable1_in, 0x60);
 	}

@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -29,6 +30,7 @@
 #include <windows.h>
 #include <fcntl.h>
 #include <io.h>
+#include <process.h>
 #define _USE_MATH_DEFINES
 #endif
 
@@ -43,6 +45,8 @@ double atofs(char *s)
 	int len;
 	double suff = 1.0;
 	len = strlen(s);
+	/* allow formatting spaces from .csv command file */
+	while ( len > 1 && isspace(s[len-1]) )	--len;
 	last = s[len-1];
 	s[len-1] = '\0';
 	switch (last) {
@@ -160,6 +164,25 @@ int verbose_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 	return r;
 }
 
+int verbose_set_bandwidth(rtlsdr_dev_t *dev, uint32_t bandwidth)
+{
+	int r;
+	uint32_t applied_bw = 0;
+	/* r = rtlsdr_set_tuner_bandwidth(dev, bandwidth); */
+	r = rtlsdr_set_and_get_tuner_bandwidth(dev, bandwidth, &applied_bw, 1 /* =apply_bw */);
+	if (r < 0) {
+		fprintf(stderr, "WARNING: Failed to set bandwidth.\n");
+	} else if (bandwidth > 0) {
+		if (applied_bw)
+			fprintf(stderr, "Bandwidth parameter %u Hz resulted in %u Hz.\n", bandwidth, applied_bw);
+		else
+			fprintf(stderr, "Set bandwidth parameter %u Hz.\n", bandwidth);
+	} else {
+		fprintf(stderr, "Bandwidth set to automatic resulted in %u Hz.\n", applied_bw);
+	}
+	return r;
+}
+
 int verbose_direct_sampling(rtlsdr_dev_t *dev, int on)
 {
 	int r;
@@ -182,7 +205,12 @@ int verbose_offset_tuning(rtlsdr_dev_t *dev)
 	int r;
 	r = rtlsdr_set_offset_tuning(dev, 1);
 	if (r != 0) {
-		fprintf(stderr, "WARNING: Failed to set offset tuning.\n");
+		if ( r == -2 )
+			fprintf(stderr, "WARNING: Failed to set offset tuning: tuner doesn't support offset tuning!\n");
+		else if ( r == -3 )
+			fprintf(stderr, "WARNING: Failed to set offset tuning: direct sampling not combinable with offset tuning!\n");
+		else
+			fprintf(stderr, "WARNING: Failed to set offset tuning.\n");
 	} else {
 		fprintf(stderr, "Offset tuning mode enabled.\n");
 	}
@@ -300,5 +328,69 @@ int verbose_device_search(char *s)
 	fprintf(stderr, "No matching devices found.\n");
 	return -1;
 }
+
+#ifndef _WIN32
+
+void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] )
+{
+	pid_t pid;
+	char * argv[256] = { NULL };
+	int k, argc = 0;
+	argv[argc++] = file;
+	if (args) {
+		argv[argc] = strtok(args, " ");
+		while (argc < 256 && argv[argc]) {
+			argv[++argc] = strtok(NULL, " ");
+			for (k=0; argv[argc] && searchStr && replaceStr && searchStr[k] && replaceStr[k]; k++) {
+				if (!strcmp(argv[argc], searchStr[k])) {
+					argv[argc] = replaceStr[k];
+					break;
+				}
+			}
+		}
+	}
+
+	pid = fork();
+	switch (pid)
+	{
+	case -1:
+		/* Fork() has failed */
+		fprintf(stderr, "error: fork for '%s' failed!\n", file);
+		break;
+	case 0:
+		execvp(file, argv);
+		fprintf(stderr, "error: execv of '%s' from within fork failed!\n", file);
+		exit(10);
+		break;
+	default:
+		/* This is processed by the parent */
+		break;
+	}
+}
+
+#else
+
+void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] )
+{
+	char * argv[256] = { NULL };
+	int k, argc = 0;
+	argv[argc++] = file;
+ 	if (args) {
+		argv[argc] = strtok(args, " \t");
+		while (argc < 256 && argv[argc]) {
+			argv[++argc] = strtok(NULL, " \t");
+			for (k=0; argv[argc] && searchStr && replaceStr && searchStr[k] && replaceStr[k]; k++) {
+				if (!strcmp(argv[argc], searchStr[k])) {
+					argv[argc] = replaceStr[k];
+					break;
+				}
+			}
+		}
+	}
+
+	spawnvp(P_NOWAIT, file, argv);
+}
+
+#endif
 
 // vim: tabstop=8:softtabstop=8:shiftwidth=8:noexpandtab

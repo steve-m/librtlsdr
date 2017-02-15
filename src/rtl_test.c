@@ -48,7 +48,7 @@
 #define MINIMAL_BUF_LENGTH		512
 #define MAXIMAL_BUF_LENGTH		(256 * 16384)
 
-#define MHZ(x)	((x)*1000*1000)
+#define MHZ(x)					((x)*1000*1000)
 
 #define PPM_DURATION			10
 #define PPM_DUMP_TIME			5
@@ -288,7 +288,7 @@ int main(int argc, char **argv)
 			dev_given = 1;
 			break;
 		case 's':
-			samp_rate = (uint32_t)atof(optarg);
+			samp_rate = (uint32_t)atofs(optarg);
 			break;
 		case 'b':
 			out_block_size = (uint32_t)atof(optarg);

@@ -1,0 +1,43 @@
+This implementation of librtlsdr makes remote dongles
+appear to the local software as if they were on the
+same computer. It works by forwarding librtlsdr calls
+to the remote computer over TCP.
+
+It allows one to use existing tools without modifying
+them. Also, it allows a developer to use the same API
+no matter weither the dongle is local or distant.
+
+To use it, one must compile and install the library
+with CMAKE the usual way. Note that you may need to
+uninstall the existing librtlsdr, as people reported
+runtime errors due to conflicting installs.
+
+Then, a server (called rtl_rpcd) must be run on the
+remote location.
+
+In my case, the dongle is in a beagle bone black is
+at address 192.168.0.43:
+beagleboneblack #> ./rtl_rpcd
+
+Then, the existing tool (for instance rtlizer) can be
+run on the local computer using:
+RTLSDR_RPC_IS_ENABLED=1 RTLSDR_RPC_SERV_ADDR=192.168.0.43 \
+rtlizer
+
+This implementation still has some limitations, but
+works well in most cases. Please report any bug to
+texane@gmail.com
+
+Also, note that the latest version of libusb should be
+used as librtlsdr crashed when used with older version
+(esp. the rtlsdr_read_async routine):
+https://github.com/libusb/libusb.git
+
+list of known working software:
+rtl_fm
+rtl_power
+rtlsdr-waterfall
+rtlizer
+gnuradio-companion
+cubicsdr
+gqrx
