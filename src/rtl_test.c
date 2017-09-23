@@ -202,7 +202,7 @@ static void ppm_test(uint32_t len)
 	interval += (int64_t)(ppm_now.tv_nsec - ppm_recent.tv_nsec);
 	nsamples_total += nsamples;
 	interval_total += interval;
-	printf("real sample rate: %i current PPM: %i cumulative PPM: %i\n",
+	fprintf(stderr, "real sample rate: %i current PPM: %i cumulative PPM: %i\n",
 		(int)((1000000000UL * nsamples) / interval),
 		ppm_report(nsamples, interval),
 		ppm_report(nsamples_total, interval_total));
