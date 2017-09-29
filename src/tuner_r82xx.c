@@ -1014,12 +1014,12 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
 		uint8_t data[4];
 
 		/* LNA auto off */
-		rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
+		rc = r82xx_write_reg_mask(priv, 0x05, 0x04, 0x10);
 		if (rc < 0)
 			return rc;
 
 		 /* Mixer auto off */
-		rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
+		rc = r82xx_write_reg_mask(priv, 0x07, 0x04, 0x10);
 		if (rc < 0)
 			return rc;
 
@@ -1055,12 +1055,12 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
 			return rc;
 	} else {
 		/* LNA */
-		rc = r82xx_write_reg_mask(priv, 0x05, 0, 0x10);
+		rc = r82xx_write_reg_mask(priv, 0x05, 0x04, 0x10);
 		if (rc < 0)
 			return rc;
 
 		/* Mixer */
-		rc = r82xx_write_reg_mask(priv, 0x07, 0x10, 0x10);
+		rc = r82xx_write_reg_mask(priv, 0x07, 0x04, 0x10);
 		if (rc < 0)
 			return rc;
 
