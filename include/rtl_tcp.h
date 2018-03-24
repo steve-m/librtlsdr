@@ -42,7 +42,9 @@ enum RTL_TCP_COMMANDS {
     SET_TUNER_CRYSTAL         = 0x0C,
     SET_TUNER_GAIN_BY_INDEX   = 0x0D,
     SET_TUNER_BANDWIDTH       = 0x0E,
-    SET_BIAS_TEE              = 0x0F
+    SET_BIAS_TEE              = 0x0F,
+    UDP_ESTABLISH             = 0x10,
+    UDP_TERMINATE             = 0x11
 };
 
 #ifdef __cplusplus
