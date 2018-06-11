@@ -37,6 +37,9 @@ if(NOT LIB_INSTALL_DIR)
    set(LIB_INSTALL_DIR lib)
 endif()
 
+OPTION(LINK_RTLTOOLS_AGAINST_STATIC_LIB "Link rtl-tools statically against librtlsdr" OFF)
+
+
 # Set the version information here
 set(VERSION_INFO_MAJOR_VERSION 0) # increment major on api compatibility changes
 set(VERSION_INFO_MINOR_VERSION 7) # increment minor on feature-level changes

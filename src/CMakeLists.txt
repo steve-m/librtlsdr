@@ -78,6 +78,17 @@ if(NOT WIN32)
 set_target_properties(rtlsdr_static PROPERTIES OUTPUT_NAME rtlsdr)
 endif()
 
+
+########################################################################
+# Set link library
+########################################################################
+
+if(LINK_RTLTOOLS_AGAINST_STATIC_LIB)
+  set(RTLSDR_TOOL_LIB rtlsdr_static)
+else()
+  set(RTLSDR_TOOL_LIB rtlsdr_shared)
+endif()
+
 ########################################################################
 # Setup libraries used in executables
 ########################################################################
@@ -90,7 +101,7 @@ add_library(libgetopt_static STATIC
     getopt/getopt.c
 )
 target_link_libraries(convenience_static
-    rtlsdr_shared
+    ${RTLSDR_TOOL_LIB}
 )
 endif()
 
@@ -113,44 +124,44 @@ else()
     set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power)
 endif()
 
-target_link_libraries(rtl_sdr rtlsdr_shared convenience_static
+target_link_libraries(rtl_sdr ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_tcp rtlsdr_shared convenience_static
+target_link_libraries(rtl_tcp ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_udp rtlsdr_shared convenience_static
+target_link_libraries(rtl_test ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_test rtlsdr_shared convenience_static
+target_link_libraries(rtl_fm ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_fm rtlsdr_shared convenience_static
+target_link_libraries(rtl_ir ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_ir rtlsdr_shared convenience_static
+target_link_libraries(rtl_eeprom ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_eeprom rtlsdr_shared convenience_static
+target_link_libraries(rtl_adsb ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_adsb rtlsdr_shared convenience_static
+target_link_libraries(rtl_adsb ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_power rtlsdr_shared convenience_static
+target_link_libraries(rtl_power ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 if(NOT WIN32)
-target_link_libraries(rtl_rpcd rtlsdr_shared convenience_static
+target_link_libraries(rtl_rpcd ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
