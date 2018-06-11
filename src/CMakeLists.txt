@@ -152,7 +152,7 @@ target_link_libraries(rtl_adsb ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries(rtl_adsb ${RTLSDR_TOOL_LIB} convenience_static
+target_link_libraries(rtl_udp ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
