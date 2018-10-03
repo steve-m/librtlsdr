@@ -227,12 +227,12 @@ static inline uint16_t single_manchester(uint16_t a, uint16_t b, uint16_t c, uin
 	return BADSAMPLE;
 }
 
-inline uint16_t min16(uint16_t a, uint16_t b)
+static inline uint16_t min16(uint16_t a, uint16_t b)
 {
 	return a<b ? a : b;
 }
 
-inline uint16_t max16(uint16_t a, uint16_t b)
+static inline uint16_t max16(uint16_t a, uint16_t b)
 {
 	return a>b ? a : b;
 }
