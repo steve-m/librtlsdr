@@ -790,7 +790,7 @@ int main(int argc, char **argv)
 	double (*window_fn)(int, int) = rectangle;
 	freq_optarg = "";
 
-	while ((opt = getopt(argc, argv, "f:i:s:t:d:g:p:e:w:c:F:D:1POTh")) != -1) {
+	while ((opt = getopt(argc, argv, "f:i:s:t:d:g:p:e:w:c:F:1POhTD:")) != -1) {
 		switch (opt) {
 		case 'f': // lower:upper:bin_size
 			freq_optarg = strdup(optarg);
