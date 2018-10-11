@@ -51,7 +51,7 @@ void usage(void)
 		"Usage:\t -f frequency_to_tune_to [Hz]\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-w tuner_bandwidth (default: automatic)]\n"
-		"\t[-d device_index (default: 0)]\n"
+		"\t[-d device_index or serial (default: 0)]\n"
 		"\t[-g gain (default: 0 for auto)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
