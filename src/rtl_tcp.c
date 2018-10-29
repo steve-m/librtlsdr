@@ -107,7 +107,7 @@ void usage(void)
 		"\t[-l length of single buffer in units of 512 samples (default: 32 was 256)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
 		"\t[-w rtlsdr tuner bandwidth [Hz] (for R820T and E4000 tuners)]\n"
-		"\t[-d device index (default: 0)]\n"
+		"\t[-d device index or serial (default: 0)]\n"
 		"\t[-P ppm_error (default: 0)]\n"
 		"\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n"
 
