@@ -1704,7 +1704,7 @@ int main(int argc, char **argv)
 	controller_init(&controller);
 	cmd_init(&cmd);
 
-	while ((opt = getopt(argc, argv, "d:f:C:B:m:g:s:b:l:L:o:t:r:p:E:q:F:A:M:c:h:w:W:D:Tnv")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:o:t:r:p:E:F:A:M:hTC:B:m:L:q:c:w:W:D:nv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1822,6 +1822,9 @@ int main(int argc, char **argv)
 				demod.deemph = 1;
 				demod.squelch_level = 0;}
 			break;
+		case 'T':
+			enable_biastee = 1;
+			break;
 		case 'c':
 			if (strcmp("us",  optarg) == 0)
 				timeConstant = 75;
@@ -1829,9 +1832,6 @@ int main(int argc, char **argv)
 				timeConstant = 50;
 			else
 				timeConstant = (int)atof(optarg);
-			break;
-		case 'T':
-			enable_biastee = 1;
 			break;
 		case 'D':
 			ds_temp = (uint32_t)( atofs(optarg) + 0.5 );

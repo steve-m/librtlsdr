@@ -84,8 +84,9 @@ typedef struct { /* structure size must be multiple of 2 bytes */
 static rtlsdr_dev_t *dev = NULL;
 
 static int verbosity = 0;
-static int enable_biastee = 0;
 static uint32_t bandwidth = 0;
+
+static int enable_biastee = 0;
 static int global_numq = 0;
 static struct llist *ll_buffers = 0;
 static int llbuf_num = 500;
@@ -109,6 +110,7 @@ void usage(void)
 		"\t[-d device index (default: 0)]\n"
 		"\t[-P ppm_error (default: 0)]\n"
 		"\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n"
+
 		"\t[-D direct_sampling_mode (default: 0, 1 = I, 2 = Q, 3 = I below threshold, 4 = Q below threshold)]\n"
 		"\t[-D direct_sampling_threshold_frequency (default: 0 use tuner specific frequency threshold for 3 and 4)]\n"
 		"\t[-v increase verbosity (default: 0)]\n");
@@ -377,14 +379,14 @@ static void *command_worker(void *arg)
 			printf("set tuner gain by index %d\n", ntohl(cmd.param));
 			set_gain_by_index(dev, ntohl(cmd.param));
 			break;
+		case SET_BIAS_TEE:
+			printf("set bias tee %d\n", ntohl(cmd.param));
+			rtlsdr_set_bias_tee(dev, (int)ntohl(cmd.param));
+			break;
 		case SET_TUNER_BANDWIDTH:
 			bandwidth = ntohl(cmd.param);
 			printf("set tuner bandwidth to %i Hz\n", bandwidth);
 			verbose_set_bandwidth(dev, bandwidth);
-			break;
-		case SET_BIAS_TEE:
-			printf("setting bias-t to %d\n", ntohl(cmd.param));
-			rtlsdr_set_bias_tee(dev, ntohl(cmd.param));
 			break;
 		default:
 			break;
@@ -512,7 +514,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:I:W:f:g:s:b:l:n:d:P:w:D:vT")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:TI:W:l:w:D:v")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -551,14 +553,14 @@ int main(int argc, char **argv)
 		case 'P':
 			ppm_error = atoi(optarg);
 			break;
+		case 'T':
+			enable_biastee = 1;
+			break;
 		case 'w':
 			bandwidth = (uint32_t)atofs(optarg);
 			break;
 		case 'v':
 			++verbosity;
-			break;
-		case 'T':
-			enable_biastee = 1;
 			break;
 		case 'D':
 			ds_temp = (uint32_t)( atofs(optarg) + 0.5 );

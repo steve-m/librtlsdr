@@ -58,6 +58,9 @@ if(CMAKE_COMPILER_IS_GNUCC AND NOT WIN32)
     ADD_DEFINITIONS(-Wdeclaration-after-statement)
     #http://gcc.gnu.org/wiki/Visibility
     add_definitions(-fvisibility=hidden)
+elseif(MSVC14 OR MSVC14)
+#pthread-w32 issue, timespec is now part of time.h
+    ADD_DEFINITIONS(-D_TIMESPEC_DEFINED)
 endif()
 
 OPTION(RTL_STATIC_BUILD "Build rtl-tools static (except RTLSDR.DLL) on MinGW/Win32" ON)
@@ -89,7 +92,9 @@ ENDIF()
 ########################################################################
 find_package(PkgConfig)
 find_package(LibUSB)
-set(THREADS_USE_PTHREADS_WIN32 true)
+if(WIN32 AND NOT MINGW)
+    set(THREADS_USE_PTHREADS_WIN32 true)
+endif()
 find_package(Threads)
 
 if(NOT LIBUSB_FOUND)
