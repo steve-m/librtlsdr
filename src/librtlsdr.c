@@ -349,6 +349,7 @@ static rtlsdr_dongle_t known_devices[] = {
 	{ 0x0ccd, 0x00d3, "Terratec Cinergy T Stick RC (Rev.3)" },
 	{ 0x0ccd, 0x00d7, "Terratec T Stick PLUS" },
 	{ 0x0ccd, 0x00e0, "Terratec NOXON DAB/DAB+ USB dongle (rev 2)" },
+	{ 0x1209, 0x2832, "Generic RTL2832U" },
 	{ 0x1554, 0x5020, "PixelView PV-DT235U(RN)" },
 	{ 0x15f4, 0x0131, "Astrometa DVB-T/DVB-T2" },
 	{ 0x15f4, 0x0133, "HanfTek DAB+FM+DVB-T" },

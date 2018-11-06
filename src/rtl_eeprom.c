@@ -73,6 +73,8 @@ void usage(void)
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-m <str> set manufacturer string]\n"
 		"\t[-p <str> set product string]\n"
+		"\t[-M <id> set manufacturer ID (aka vendor ID) in hexadecimal]\n"
+		"\t[-P <id> set product ID in hexadecimal]\n"
 		"\t[-s <str> set serial number string]\n"
 		"\t[-i <0,1> disable/enable IR-endpoint]\n"
 		"\t[-g <conf> generate default config and write to device]\n"
@@ -85,7 +87,7 @@ void usage(void)
 		"\t[-w <filename> write dumped file to device]\n"
 		"\t[-r <filename> dump EEPROM to file]\n"
 		"\t[-h display this help text]\n"
-		"\nUse on your own risk, especially -w!\n");
+		"\nUse on your own risk, especially -w, -M and -P!\n");
 	exit(1);
 }
 
@@ -255,6 +257,8 @@ int main(int argc, char **argv)
 	FILE *file = NULL;
 	char *manuf_str = NULL;
 	char *product_str = NULL;
+	int manuf_id = 0;
+	int product_id = 0;
 	char *serial_str = NULL;
 	uint8_t buf[EEPROM_SIZE];
 	rtlsdr_config_t conf;
@@ -264,7 +268,7 @@ int main(int argc, char **argv)
 	int ir_endpoint = 0;
 	char ch;
 
-	while ((opt = getopt(argc, argv, "d:m:p:s:i:g:w:r:h?")) != -1) {
+	while ((opt = getopt(argc, argv, "d:m:p:M:P:s:i:g:w:r:h?")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = atoi(optarg);
@@ -275,6 +279,14 @@ int main(int argc, char **argv)
 			break;
 		case 'p':
 			product_str = optarg;
+			change = 1;
+			break;
+		case 'M':
+			manuf_id = (int)strtol(optarg, NULL, 16);
+			change = 1;
+			break;
+		case 'P':
+			product_id = (int)strtol(optarg, NULL, 16);
 			change = 1;
 			break;
 		case 's':
@@ -374,6 +386,12 @@ int main(int argc, char **argv)
 
 	if (product_str)
 		strncpy((char*)&conf.product, product_str, MAX_STR_SIZE);
+
+	if (manuf_id > 0)
+		conf.vendor_id = manuf_id;
+
+	if (product_id > 0)
+		conf.product_id = product_id;
 
 	if (serial_str) {
 		conf.have_serial = 1;
