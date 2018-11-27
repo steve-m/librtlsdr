@@ -12,6 +12,15 @@ rtl-sdr turns your Realtek RTL2832 based DVB dongle into a SDR receiver
 https://osmocom.org/projects/rtl-sdr/wiki
 
 
+# Setup for SDR only use - without DVB compatibility:
+
+- a special USB vendor/product id got reserved at http://pid.codes/ : 0x1209/0x2832
+- for such devices the linux kernel's DVB modules are not loaded automatically,
+ thus can be used without blacklisting dvb_usb_rtl28xxu below /etc/modprobe.d/
+- this allows to use a second RTL dongle for use with DVB in parallel
+- the IDs can be programmed with 'rtl_eeprom -n' or 'rtl_eeprom -g realtek_sdr'
+
+
 # Contributing
 
 Pull requests are always welcome but please make changes to, and pull request from, the development branch.

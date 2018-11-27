@@ -75,6 +75,8 @@ void usage(void)
 		"\t[-p <str> set product string]\n"
 		"\t[-M <id> set manufacturer ID (aka vendor ID) in hexadecimal]\n"
 		"\t[-P <id> set product ID in hexadecimal]\n"
+		"\t[-n sets manufacturer and product ID to 0x1209/0x2832]\n"
+		"\t[    as with '-g realtek_sdr']\n"
 		"\t[-s <str> set serial number string]\n"
 		"\t[-i <0,1> disable/enable IR-endpoint]\n"
 		"\t[-g <conf> generate default config and write to device]\n"
@@ -84,6 +86,7 @@ void usage(void)
 		"\t[   noxon\t\tTerratec NOXON DAB Stick]\n"
 		"\t[   terratec_black\tTerratec T Stick Black]\n"
 		"\t[   terratec_plus\tTerratec T Stick+ (DVB-T/DAB)]\n"
+		"\t[   realtek_sdr\t\tRealtek SDR - without DVB compatibility]\n"
 		"\t[-w <filename> write dumped file to device]\n"
 		"\t[-r <filename> dump EEPROM to file]\n"
 		"\t[-h display this help text]\n"
@@ -183,6 +186,7 @@ enum configs {
 	TERRATEC_NOXON,
 	TERRATEC_T_BLACK,
 	TERRATEC_T_PLUS,
+	REALTEK_SDR,
 };
 
 void gen_default_conf(rtlsdr_config_t *conf, int config)
@@ -243,6 +247,17 @@ void gen_default_conf(rtlsdr_config_t *conf, int config)
 		conf->enable_ir = 1;
 		conf->remote_wakeup = 0;
 		break;
+	case REALTEK_SDR:
+		fprintf(stderr, "Realtek SDR\n");
+		conf->vendor_id = 0x1209;
+		conf->product_id = 0x2832;
+		strcpy(conf->manufacturer, "Realtek");
+		strcpy(conf->product, "RTL2832U_SDR");
+		strcpy(conf->serial, "00000001");
+		conf->have_serial = 1;
+		conf->enable_ir = 0;
+		conf->remote_wakeup = 0;
+		break;
 	default:
 		break;
 	};
@@ -268,7 +283,7 @@ int main(int argc, char **argv)
 	int ir_endpoint = 0;
 	char ch;
 
-	while ((opt = getopt(argc, argv, "d:m:p:M:P:s:i:g:w:r:h?")) != -1) {
+	while ((opt = getopt(argc, argv, "d:m:p:M:P:ns:i:g:w:r:h?")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = atoi(optarg);
@@ -287,6 +302,11 @@ int main(int argc, char **argv)
 			break;
 		case 'P':
 			product_id = (int)strtol(optarg, NULL, 16);
+			change = 1;
+			break;
+		case 'n':
+			manuf_id = 0x1209;
+			product_id = 0x2832;
 			change = 1;
 			break;
 		case 's':
@@ -308,7 +328,8 @@ int main(int argc, char **argv)
 				default_config = TERRATEC_T_BLACK;
 			else if (!strcmp(optarg, "terratec_plus"))
 				default_config = TERRATEC_T_PLUS;
-
+			else if (!strcmp(optarg, "realtek_sdr"))
+				default_config = REALTEK_SDR;
 			if (default_config != CONF_NONE)
 				change = 1;
 			break;
