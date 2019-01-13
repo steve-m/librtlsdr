@@ -288,6 +288,9 @@ void usage(void)
 		"\t	deemp:  enable de-emphasis filter\n"
 		"\t	direct: enable direct sampling (bypasses tuner, uses rtl2832 xtal)\n"
 		"\t	offset: enable offset tuning (only e4000 tuner)\n"
+		"\t[-O set RTL options string seperated with ':' ]\n"
+		"\t  f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
+		"\t  dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
 		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\t[-n disables demodulation output to stdout/file]\n"
 		"\tfilename ('-' means stdout)\n"
@@ -1694,6 +1697,7 @@ int main(int argc, char **argv)
 	int dev_given = 0;
 	int custom_ppm = 0;
 	int enable_biastee = 0;
+	const char * rtlOpts = NULL;
 	enum rtlsdr_ds_mode ds_mode = RTLSDR_DS_IQ;
 	uint32_t ds_temp, ds_threshold = 0;
 	int timeConstant = 75; /* default: U.S. 75 uS */
@@ -1704,7 +1708,7 @@ int main(int argc, char **argv)
 	controller_init(&controller);
 	cmd_init(&cmd);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:o:t:r:p:E:F:A:M:hTC:B:m:L:q:c:w:W:D:nv")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:o:t:r:p:E:O:F:A:M:hTC:B:m:L:q:c:w:W:D:nv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1783,6 +1787,9 @@ int main(int argc, char **argv)
 				dongle.offset_tuning = 1;}
 			if (strcmp("rtlagc", optarg) == 0 || strcmp("agc", optarg) == 0) {
 				rtlagc = 1;}
+			break;
+		case 'O':
+			rtlOpts = optarg;
 			break;
 		case 'q':
 			demod.rdc_block_const = atoi(optarg);
@@ -1947,6 +1954,10 @@ int main(int argc, char **argv)
 			last_bw = out_bw;
 		}
 		fprintf(stderr,"\n");
+	}
+
+	if (rtlOpts) {
+		rtlsdr_set_opt_string(dongle.dev, rtlOpts, verbosity);
 	}
 
 	if (strcmp(output.filename, "-") == 0) { /* Write samples to stdout */

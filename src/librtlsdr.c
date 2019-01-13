@@ -2564,3 +2564,79 @@ int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on)
 
 	return 0;
 }
+
+
+int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
+{
+	char * optStr, * optPart;
+	int retAll = 0;
+
+	if (!dev)
+		return -1;
+
+	optStr = strdup(opts);
+	if (!optStr)
+		return -1;
+
+	optPart = strtok(optStr, ":,");
+	while (optPart)
+	{
+		int ret = 0;
+		if (!strncmp(optPart, "f=", 2)) {
+			uint32_t freq = (uint32_t)atol(optPart + 2);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed frequency %u\n", (unsigned)freq);
+			ret = rtlsdr_set_center_freq(dev, freq);
+		}
+		else if (!strncmp(optPart, "bw=", 3)) {
+			uint32_t bw = (uint32_t)( atol(optPart +3) * 1000 );
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed bandwidth %u\n", (unsigned)bw);
+			ret = rtlsdr_set_tuner_bandwidth(dev, bw);
+		}
+		else if (!strncmp(optPart, "agc=", 4)) {
+			int manual = 1 - atoi(optPart +4);	/* invert logic */
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed tuner gain mode, manual=%d\n", manual);
+			ret = rtlsdr_set_tuner_gain_mode(dev, manual);
+		}
+		else if (!strncmp(optPart, "gain=", 5)) {
+			int gain = atoi(optPart +5);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed tuner gain = %d /10 dB\n", gain);
+			ret = rtlsdr_set_tuner_gain(dev, gain);
+		}
+		else if (!strncmp(optPart, "dagc=", 5)) {
+			int on = atoi(optPart +5);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed rtl/digital gain mode %d\n", on);
+			ret = rtlsdr_set_agc_mode(dev, on);
+		}
+		else if (!strncmp(optPart, "ds=", 3)) {
+			int on = atoi(optPart +3);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed direct sampling mode %d\n", on);
+			ret = rtlsdr_set_direct_sampling(dev, on);
+		}
+		else if (!strncmp(optPart, "t=", 2) || !strncmp(optPart, "T=", 2)) {
+			int on = atoi(optPart +2);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed bias tee %d\n", on);
+			ret = rtlsdr_set_bias_tee(dev, on);
+		}
+		else {
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed unknown option '%s'\n", optPart);
+			ret = -1;  /* unknown option */
+		}
+		if (verbose)
+			fprintf(stderr, "  application of option returned %d\n", ret);
+		if (ret < 0)
+			retAll = ret;
+		optPart = strtok(NULL, ":,");
+	}
+
+	free(optStr);
+	return retAll;
+}
+
