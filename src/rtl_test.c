@@ -91,6 +91,9 @@ void usage(void)
 		"Usage:\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-d device_index or serial (default: 0)]\n"
+		"\t[-O set RTL options string seperated with ':' ]\n"
+		"\t  f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
+		"\t  dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
 		"\t[-t enable Elonics E4000 tuner benchmark]\n"
 #ifndef _WIN32
 		"\t[-p[seconds] enable PPM error measurement (default: 10 seconds)]\n"
@@ -308,6 +311,7 @@ int main(int argc, char **argv)
 #endif
 	int n_read, r, opt, i;
 	int sync_mode = 0;
+	const char * rtlOpts = NULL;
 	uint8_t *buffer;
 	int dev_index = 0;
 	int dev_given = 0;
@@ -315,7 +319,7 @@ int main(int argc, char **argv)
 	int count;
 	int gains[100];
 
-	while ((opt = getopt(argc, argv, "d:s:b:tp::Sh")) != -1) {
+	while ((opt = getopt(argc, argv, "d:s:b:O:tp::Sh")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -326,6 +330,9 @@ int main(int argc, char **argv)
 			break;
 		case 'b':
 			out_block_size = (uint32_t)atof(optarg);
+			break;
+		case 'O':
+			rtlOpts = optarg;
 			break;
 		case 't':
 			test_mode = TUNER_BENCHMARK;
@@ -400,6 +407,10 @@ int main(int argc, char **argv)
 			fprintf(stderr, "No E4000 tuner found, aborting.\n");
 
 		goto exit;
+	}
+
+	if (rtlOpts) {
+		rtlsdr_set_opt_string(dev, rtlOpts, 1);
 	}
 
 	/* Enable test mode */

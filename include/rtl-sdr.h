@@ -449,6 +449,32 @@ RTLSDR_API int rtlsdr_ir_query(rtlsdr_dev_t *dev, uint8_t *buf, size_t buf_len);
  */
 RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
 
+/*!
+ * Sets multiple options from a string encoded like "bw=300:agc=0:gain=27.3:dagc=0:T=1".
+ * this is a helper function, that programs don't need to implement every single option
+ *   at the command line interface.
+ * Options are seperated by colon ':'.
+ * There mustn't be extra spaces between option name and '='.
+ * option 'f' set center frequency as in rtlsdr_set_center_freq()
+ * option 'bw' sets tuner bandwidth as in rtlsdr_set_tuner_bandwidth()
+ *   - but value is in kHz.
+ * option 'agc' sets tuner gain mode as with rtlsdr_set_tuner_gain_mode():
+ *   '1' means manual gain mode shall be enabled.
+ * option 'gain' sets tuner gain as with rtlsdr_set_tuner_gain():
+ *   values in tenth dB.
+ * option 'dagc' or 'dgc' de/activates digital agc as with rtlsdr_set_agc_mode().
+ *   value 1 to enable. 0 to disable.
+ * option 'ds' set direct sampling as with rtlsdr_set_direct_sampling():
+ *   '0' to deactivate, '1' or 'i' for I-ADC input, '2' or 'q' for Q-ADC input
+ * option 't' or 'T' for enabling bias tee on GPIO PIN 0 as with rtlsdr_set_bias_tee():
+ *   '1' for Bias T on. '0' for Bias T off.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param opts described option string
+ * \param verbose print parsed options to stderr
+ */
+RTLSDR_API int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose);
+
 #ifdef __cplusplus
 }
 #endif
