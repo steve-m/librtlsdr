@@ -54,6 +54,9 @@ void usage(void)
 		"\t[-d device_index or serial (default: 0)]\n"
 		"\t[-g gain (default: 0 for auto)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
+		"\t[-O set RTL options string seperated with ':' ]\n"
+		"\t  f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
+		"\t  dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
 		"\t[-n number of samples to read (default: 0, infinite)]\n"
 		"\t[-S force sync output (default: async)]\n"
@@ -117,14 +120,16 @@ int main(int argc, char **argv)
 	int sync_mode = 0;
 	FILE *file;
 	uint8_t *buffer;
+	const char * rtlOpts = NULL;
 	int dev_index = 0;
 	int dev_given = 0;
 	uint32_t frequency = 100000000;
 	uint32_t bandwidth = DEFAULT_BANDWIDTH;
 	uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
+	int verbosity = 0;
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:S")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:O:Sv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -145,6 +150,9 @@ int main(int argc, char **argv)
 		case 'p':
 			ppm_error = atoi(optarg);
 			break;
+		case 'O':
+			rtlOpts = optarg;
+			break;
 		case 'b':
 			out_block_size = (uint32_t)atof(optarg);
 			break;
@@ -153,6 +161,9 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 			sync_mode = 1;
+			break;
+		case 'v':
+			++verbosity;
 			break;
 		default:
 			usage();
@@ -219,6 +230,10 @@ int main(int argc, char **argv)
 		/* Enable manual gain */
 		gain = nearest_gain(dev, gain);
 		verbose_gain_set(dev, gain);
+	}
+
+	if (rtlOpts) {
+		rtlsdr_set_opt_string(dev, rtlOpts, verbosity);
 	}
 
 	verbose_ppm_set(dev, ppm_error);
