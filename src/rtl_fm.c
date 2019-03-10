@@ -293,6 +293,8 @@ void usage(void)
 		"\t	dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
 		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\t[-n disables demodulation output to stdout/file]\n"
+		"\t[-H write wave Header to file (default: off)]\n"
+		"\t	limitation: only 1st tuned frequency will be written into the header!\n"
 		"\tfilename ('-' means stdout)\n"
 		"\t	omitting the filename also uses stdout\n\n"
 		"Experimental options:\n"
@@ -1390,6 +1392,7 @@ static void *output_thread_fn(void *arg)
 		safe_cond_wait(&s->ready, &s->ready_m);
 		pthread_rwlock_rdlock(&s->rw);
 		fwrite(s->result, 2, s->result_len, s->file);
+		waveDataSize += 2 * s->result_len;
 		pthread_rwlock_unlock(&s->rw);
 	}
 	return 0;
@@ -1695,6 +1698,7 @@ int main(int argc, char **argv)
 #endif
 	int r, opt;
 	int dev_given = 0;
+	int writeWav = 0;
 	int custom_ppm = 0;
 	int enable_biastee = 0;
 	const char * rtlOpts = NULL;
@@ -1708,7 +1712,7 @@ int main(int argc, char **argv)
 	controller_init(&controller);
 	cmd_init(&cmd);
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:o:t:r:p:E:O:F:A:M:hTC:B:m:L:q:c:w:W:D:nv")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:l:o:t:r:p:E:O:F:A:M:hTC:B:m:L:q:c:w:W:D:nHv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dongle.dev_index = verbose_device_search(optarg);
@@ -1847,6 +1851,9 @@ int main(int argc, char **argv)
 			else
 				ds_threshold = ds_temp;
 			break;
+		case 'H':
+			writeWav = 1;
+			break;
 		case 'v':
 			++verbosity;
 			break;
@@ -1972,7 +1979,15 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 		else
+		{
 			fprintf(stderr, "Open %s for write\n", output.filename);
+			if (writeWav) {
+				int nChan = (demod.mode_demod == &raw_demod) ? 2 : 1;
+				int srate = (demod.rate_out2 > 0) ? demod.rate_out2 : demod.rate_out;
+				uint32_t f = controller.freqs[0];	/* only 1st frequency!!! */
+				waveWriteHeader(srate, f, 16, nChan, output.file);
+			}
+		}
 	}
 
 	//r = rtlsdr_set_testmode(dongle.dev, 1);
@@ -2019,6 +2034,9 @@ int main(int argc, char **argv)
 	}
 
 	if (output.file != stdout) {
+		if (writeWav) {
+			waveFinalizeHeader(output.file);
+		}
 		fclose(output.file);}
 
 	rtlsdr_close(dongle.dev);

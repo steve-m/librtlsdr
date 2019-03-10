@@ -17,6 +17,8 @@
 #ifndef __CONVENIENCE_H
 #define __CONVENIENCE_H
 
+#include <stdint.h>
+
 
 /* a collection of user friendly tools */
 
@@ -156,5 +158,22 @@ int verbose_device_search(char *s);
 
 
 void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] );
+
+
+/*!
+ * helper functions to write and finalize wave headers
+ *   with compatibility to some SDR programs - showing frequency:
+ * raw sample data still have to be written by caller to FILE*.
+ * call waveWriteHeader() before writing anything to to file
+ * and call waveFinalizeHeader() afterwards,
+ * AND count/increment the written raw size in variable 'waveDataSize'.
+ * stdout/stdout can't be used, because seek to begin isn't possible.
+ * 
+ */
+
+extern uint32_t	waveDataSize;
+void waveWriteHeader(unsigned samplerate, unsigned freq, int bitsPerSample, int numChannels, FILE * f);
+void waveFinalizeHeader();
+
 
 #endif /*__CONVENIENCE_H*/

@@ -60,6 +60,7 @@ void usage(void)
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
 		"\t[-n number of samples to read (default: 0, infinite)]\n"
 		"\t[-S force sync output (default: async)]\n"
+		"\t[-H write wave Header to file (default: off)]\n"
 		"\tfilename (a '-' dumps samples to stdout)\n\n");
 	exit(1);
 }
@@ -101,6 +102,10 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			fprintf(stderr, "Short write, samples lost, exiting!\n");
 			rtlsdr_cancel_async(dev);
 		}
+		else
+		{
+			waveDataSize += len;
+		}
 
 		if (bytes_to_read > 0)
 			bytes_to_read -= len;
@@ -123,13 +128,14 @@ int main(int argc, char **argv)
 	const char * rtlOpts = NULL;
 	int dev_index = 0;
 	int dev_given = 0;
+	int writeWav = 0;
 	uint32_t frequency = 100000000;
 	uint32_t bandwidth = DEFAULT_BANDWIDTH;
 	uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
 	int verbosity = 0;
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:O:Sv")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:O:SHv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -161,6 +167,9 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 			sync_mode = 1;
+			break;
+		case 'H':
+			writeWav = 1;
 			break;
 		case 'v':
 			++verbosity;
@@ -249,6 +258,9 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Failed to open %s\n", filename);
 			goto out;
 		}
+		if (writeWav) {
+			waveWriteHeader(samp_rate, frequency, 8, 2, file);
+		}
 	}
 
 	/* Reset endpoint before we start reading from it (mandatory) */
@@ -272,6 +284,7 @@ int main(int argc, char **argv)
 				fprintf(stderr, "Short write, samples lost, exiting!\n");
 				break;
 			}
+			waveDataSize += n_read;
 
 			if ((uint32_t)n_read < out_block_size) {
 				fprintf(stderr, "Short read, samples lost, exiting!\n");
@@ -285,6 +298,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Reading samples in async mode...\n");
 		r = rtlsdr_read_async(dev, rtlsdr_callback, (void *)file,
 				      0, out_block_size);
+	}
+
+	if (writeWav) {
+		waveFinalizeHeader(file);
 	}
 
 	if (do_exit)
