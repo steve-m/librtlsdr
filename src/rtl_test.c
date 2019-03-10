@@ -92,8 +92,8 @@ void usage(void)
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-d device_index or serial (default: 0)]\n"
 		"\t[-O set RTL options string seperated with ':' ]\n"
-		"\t  f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
-		"\t  dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"\t	f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
+		"\t	dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
 		"\t[-t enable Elonics E4000 tuner benchmark]\n"
 #ifndef _WIN32
 		"\t[-p[seconds] enable PPM error measurement (default: 10 seconds)]\n"
