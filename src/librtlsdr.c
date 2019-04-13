@@ -31,6 +31,14 @@
 #ifndef WIN32
 #include "rtlsdr_rpc.h"
 #endif
+
+#include <pthread.h>
+
+/* cond dumbness */
+#define safe_cond_signal(n, m) pthread_mutex_lock(m); pthread_cond_signal(n); pthread_mutex_unlock(m)
+#define safe_cond_wait(n, m) pthread_mutex_lock(m); pthread_cond_wait(n, m); pthread_mutex_unlock(m)
+
+
 /*
  * All libusb callback functions should be marked with the LIBUSB_CALL macro
  * to ensure that they are compiled with the same calling convention as libusb.
@@ -94,6 +102,49 @@ static const int fir_default[FIR_LEN] = {
 	101, 156, 215, 273, 327, 372, 404, 421	/* 12 bit signed */
 };
 
+
+enum softagc_mode {
+	SOFTAGC_OFF = 0,	/* off */
+	SOFTAGC_ON_CHANGE,	/* activate on initial start and on relevant changes .. and deactivate afterwards */
+	SOFTAGC_AUTO_ATTEN,	/* operate full time - but do only attenuate after initial control (ON_CHANGE) */
+	SOFTAGC_AUTO		/* operate full time - attenuate and gain */
+};
+
+enum softagc_stateT {
+	SOFTSTATE_OFF = 0,
+	SOFTSTATE_ON,
+	SOFTSTATE_RESET_CONT,
+	SOFTSTATE_RESET,
+	SOFTSTATE_INIT
+};
+
+struct softagc_state {
+	pthread_t		command_thread;
+	pthread_mutex_t	mutex;
+	pthread_cond_t	cond;
+	volatile int	exit_command_thread;
+	volatile int	command_newGain;
+	volatile int	command_changeGain;
+
+	enum softagc_stateT	agcState;	/* active: don't forward samples while active for initial measurement */
+	enum softagc_mode	softAgcMode;
+
+	float	scanTimeMs;         /* scan duration per gain level - to look for maximum */
+	float	deadTimeMs;         /* dead time in ms - after changing tuner gain */
+	int		scanTimeSps;        /* scan duration in samples */
+	int		deadTimeSps;        /* dead time in samples */
+	volatile int	remainingDeadSps;   /* dead time in samples */
+	int		remainingScanSps;   /* scan duration in samples */
+	int		numInHisto;         /* number of values in histogram */
+	int		histo[16];          /* count histogram over high 4 bits */
+
+	int		gainIdx;            /* currently tested gain idx */
+	int		softAgcBiasT;
+
+	int		rpcNumGains;		/* local copy for RPC speedup */
+	int *	rpcGainValues;
+};
+
 struct rtlsdr_dev {
 	libusb_context *ctx;
 	struct libusb_device_handle *devh;
@@ -125,16 +176,24 @@ struct rtlsdr_dev {
 	struct e4k_state e4k_s;
 	struct r82xx_config r82xx_c;
 	struct r82xx_priv r82xx_p;
+	/* soft tuner agc */
+	struct softagc_state softagc;
+
 	/* status */
 	int dev_lost;
 	int driver_active;
 	unsigned int xfer_errors;
 	int rc_active;
+	int verbose;
 };
 
 void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
 static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq);
 static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq);
+
+static void softagc_init(rtlsdr_dev_t *dev);
+static void softagc_uninit(rtlsdr_dev_t *dev);
+static int reactivate_softagc(rtlsdr_dev_t *dev, enum softagc_stateT newState);
 
 /* generic tuner interface functions, shall be moved to the tuner implementations */
 int e4000_init(void *dev) {
@@ -260,9 +319,9 @@ int r820t_set_bw(void *dev, int bw, uint32_t *applied_bw, int apply) {
 
 	r = r82xx_set_bandwidth(&devt->r82xx_p, bw, devt->rate, applied_bw, apply);
 	if(!apply)
-			return 0;
+		return 0;
 	if(r < 0)
-			return r;
+		return r;
 
 	r = rtlsdr_set_if_freq(devt, r);
 	if (r)
@@ -379,6 +438,14 @@ static rtlsdr_dongle_t known_devices[] = {
 
 #define DEFAULT_BUF_NUMBER	15
 #define DEFAULT_BUF_LENGTH	(16 * 32 * 512)
+/* buf_len:
+ * must be multiple of 512 - else it will be overwritten
+ * in rtlsdr_read_async() in librtlsdr.c with DEFAULT_BUF_LENGTH (= 16*32 *512 = 512 *512)
+ *
+ * -> 512*512 -> 1048 ms @ 250 kS  or  81.92 ms @ 3.2 MS (internal default)
+ * ->  32*512 ->   65 ms @ 250 kS  or   5.12 ms @ 3.2 MS (new default)
+ */
+
 
 #define DEF_RTL_XTAL_FREQ	28800000
 #define MIN_RTL_XTAL_FREQ	(DEF_RTL_XTAL_FREQ - 1000)
@@ -1011,6 +1078,7 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = dev->tuner->set_freq(dev, freq - dev->offs_freq);
 		rtlsdr_set_i2c_repeater(dev, 0);
+		reactivate_softagc(dev, SOFTSTATE_RESET);
 	}
 
 	if (!r)
@@ -1097,34 +1165,48 @@ enum rtlsdr_tuner rtlsdr_get_tuner_type(rtlsdr_dev_t *dev)
 	return dev->tuner_type;
 }
 
-int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains)
+static
+const int * get_tuner_gains(rtlsdr_dev_t *dev, int *pNum )
 {
 	/* all gain values are expressed in tenths of a dB */
-	const int e4k_gains[] = { -10, 15, 40, 65, 90, 115, 140, 165, 190, 215,
+	static const int e4k_gains[] = { -10, 15, 40, 65, 90, 115, 140, 165, 190, 215,
 					240, 290, 340, 420 };
-	const int fc0012_gains[] = { -99, -40, 71, 179, 192 };
-	const int fc0013_gains[] = { -99, -73, -65, -63, -60, -58, -54, 58, 61,
+	static const int fc0012_gains[] = { -99, -40, 71, 179, 192 };
+	static const int fc0013_gains[] = { -99, -73, -65, -63, -60, -58, -54, 58, 61,
 							 	  63, 65, 67, 68, 70, 71, 179, 181, 182,
 							 	  184, 186, 188, 191, 197 };
-	const int fc2580_gains[] = { 0 /* no gain values */ };
-	const int r82xx_gains[] = { 0, 9, 14, 27, 37, 77, 87, 125, 144, 157,
+	static const int fc2580_gains[] = { 0 /* no gain values */ };
+	static const int r82xx_gains[] = { 0, 9, 14, 27, 37, 77, 87, 125, 144, 157,
 								166, 197, 207, 229, 254, 280, 297, 328,
 						 		338, 364, 372, 386, 402, 421, 434, 439,
 						 		445, 480, 496 };
-	const int unknown_gains[] = { 0 /* no gain values */ };
+	static const int unknown_gains[] = { 0 /* no gain values */ };
 
 	const int *ptr = NULL;
 	int len = 0;
 
-	#ifdef _ENABLE_RPC
+#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
-	  return rtlsdr_rpc_get_tuner_gains(dev, gains);
+		if ( !dev->softagc.rpcGainValues )
+		{
+			dev->softagc.rpcNumGains = rtlsdr_rpc_get_tuner_gains(dev, NULL);
+			if ( dev->softagc.rpcNumGains > 0 )
+			{
+				dev->softagc.rpcGainValues = malloc( dev->softagc.rpcNumGains * sizeof(int) );
+				if ( dev->softagc.rpcGainValues )
+					rtlsdr_get_tuner_gains(dev, dev->softagc.rpcGainValues);
+			}
+		}
+		if ( dev->softagc.rpcGainValues )
+		{
+			*pNum = dev->softagc.rpcNumGains;
+			return dev->softagc.rpcGainValues;
+		}
+		*pNum = 0;
+		return NULL;
 	}
-	#endif
-
-	if (!dev)
-		return -1;
+#endif
 
 	switch (dev->tuner_type) {
 	case RTLSDR_TUNER_E4000:
@@ -1147,6 +1229,22 @@ int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains)
 		ptr = unknown_gains; len = sizeof(unknown_gains);
 		break;
 	}
+
+	*pNum = len / sizeof(int);
+	return ptr;
+}
+
+
+int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains)
+{
+	const int *ptr = NULL;
+	int len = 0;
+
+	if (!dev)
+		return -1;
+
+	ptr = get_tuner_gains(dev, &len );
+	len = len * sizeof(int);
 
 	if (!gains) { /* no buffer provided, just return the count */
 		return len / sizeof(int);
@@ -1179,6 +1277,7 @@ int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw, uint32_t 
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = dev->tuner->set_bw(dev, bw > 0 ? bw : dev->rate, applied_bw, apply_bw);
 		rtlsdr_set_i2c_repeater(dev, 0);
+		reactivate_softagc(dev, SOFTSTATE_RESET);
 		if (r)
 			return r;
 		dev->bw = bw;
@@ -1276,6 +1375,7 @@ int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain)
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = dev->tuner->set_if_gain(dev, stage, gain);
 		rtlsdr_set_i2c_repeater(dev, 0);
+		reactivate_softagc(dev, SOFTSTATE_RESET);
 	}
 
 	return r;
@@ -1296,6 +1396,11 @@ int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int mode)
 		return -1;
 
 	if (dev->tuner->set_gain_mode) {
+		if ( dev->softagc.softAgcMode != SOFTAGC_OFF ) {
+			mode = 1;		/* use manual gain mode - for softagc */
+			if ( dev->verbose )
+				fprintf(stderr, "rtlsdr_set_tuner_gain_mode() - overridden for softagc!\n");
+		}
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = dev->tuner->set_gain_mode((void *)dev, mode);
 		rtlsdr_set_i2c_repeater(dev, 0);
@@ -1361,6 +1466,11 @@ int rtlsdr_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 	if (dev->offs_freq)
 		rtlsdr_set_offset_tuning(dev, 1);
 
+	if ( reactivate_softagc(dev, SOFTSTATE_RESET) ) {
+		dev->softagc.deadTimeSps = 0;
+		dev->softagc.scanTimeSps = 0;
+	}
+
 	return r;
 }
 
@@ -1399,7 +1509,7 @@ int rtlsdr_set_agc_mode(rtlsdr_dev_t *dev, int on)
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
-	  return rtlsdr_rpc_set_agc_mode(dev, on);
+		return rtlsdr_rpc_set_agc_mode(dev, on);
 	}
 	#endif
 
@@ -1575,7 +1685,7 @@ int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on)
 	r |= rtlsdr_set_if_freq(dev, dev->offs_freq);
 
 	if (dev->tuner && dev->tuner->set_bw) {
-				uint32_t applied_bw = 0;
+		uint32_t applied_bw = 0;
 		rtlsdr_set_i2c_repeater(dev, 1);
 		if (on) {
 			bw = 2 * dev->offs_freq;
@@ -1584,7 +1694,7 @@ int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on)
 		} else {
 			bw = dev->rate;
 		}
-				dev->tuner->set_bw(dev, bw, &applied_bw, 1);
+		dev->tuner->set_bw(dev, bw, &applied_bw, 1);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 
@@ -1823,6 +1933,16 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 		return -1;
 	}
 
+	/* dev->softagc.command_thread; */
+	dev->softagc.agcState = SOFTSTATE_OFF;
+	dev->softagc.softAgcMode = SOFTAGC_OFF;	/* SOFTAGC_FREQ_CHANGE SOFTAGC_ATTEN SOFTAGC_ALL */
+	dev->softagc.scanTimeMs = 100;	/* parameter: default: 100 ms */
+	dev->softagc.deadTimeMs = 1;	/* parameter: default: 1 ms */
+	dev->softagc.scanTimeSps = 0;
+	dev->softagc.deadTimeSps = 0;
+	dev->softagc.rpcNumGains = 0;
+	dev->softagc.rpcGainValues = NULL;
+
 	dev->dev_lost = 1;
 
 	cnt = libusb_get_device_list(dev->ctx, &list);
@@ -2027,6 +2147,8 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 		rtlsdr_deinit_baseband(dev);
 	}
 
+	softagc_uninit(dev);
+
 	libusb_release_interface(dev->devh, 0);
 
 #ifdef DETACH_KERNEL_DRIVER
@@ -2080,12 +2202,274 @@ int rtlsdr_read_sync(rtlsdr_dev_t *dev, void *buf, int len, int *n_read)
 	return libusb_bulk_transfer(dev->devh, 0x81, buf, len, n_read, BULK_TIMEOUT);
 }
 
+
+/* return == softagc got activated */
+static int reactivate_softagc(rtlsdr_dev_t *dev, enum softagc_stateT newState)
+{
+	if ( dev->softagc.softAgcMode > SOFTAGC_OFF )
+	{
+		if ( dev->softagc.agcState != SOFTSTATE_OFF
+			 && dev->softagc.softAgcMode >= SOFTAGC_AUTO )
+		{
+			/* softagc already running -> nothing to do */
+			if ( dev->verbose )
+				fprintf(stderr, "rtlsdr reactivate_softagc(): state already %d\n", dev->softagc.agcState);
+			return 1;
+		}
+		else
+		{
+			dev->softagc.agcState =  newState;
+			if ( dev->verbose )
+				fprintf(stderr, "rtlsdr reactivate_softagc switched to state %d\n", newState);
+			return 1;
+		}
+	}
+	if ( dev->verbose )
+		fprintf(stderr, "*** rtlsdr reactivate_softagc(): Soft AGC is inactive!\n");
+	return 0;
+}
+
+static void *softagc_control_worker(void *arg)
+{
+	rtlsdr_dev_t *dev = (rtlsdr_dev_t *)arg;
+	struct softagc_state *agc = &dev->softagc;
+	while(1) {
+		safe_cond_wait(&agc->cond, &agc->mutex);
+
+		if ( agc->exit_command_thread )
+			pthread_exit(0);
+
+		if ( agc->command_changeGain )
+		{
+			/* no need for extra mutex/buffer: next call is after DEAD_TIME */
+			agc->command_changeGain = 0;
+			rtlsdr_set_tuner_gain( dev, dev->softagc.command_newGain );
+			dev->softagc.remainingDeadSps = dev->softagc.deadTimeSps;
+			if ( dev->verbose )
+				fprintf(stderr, "rtlsdr softagc_control_worker(): applied gain %d\n"
+					, dev->softagc.command_newGain );
+		}
+	}
+}
+
+static void softagc_init(rtlsdr_dev_t *dev)
+{
+	pthread_attr_t attr;
+	/* prepare thread */
+	dev->softagc.exit_command_thread = 0;
+	dev->softagc.command_newGain = 0;
+	dev->softagc.command_changeGain = 0;
+	/* create thread */
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	pthread_mutex_init(&dev->softagc.mutex, NULL);
+	pthread_cond_init(&dev->softagc.cond, NULL);
+	pthread_create( &dev->softagc.command_thread, &attr, softagc_control_worker, dev);
+	pthread_attr_destroy(&attr);
+	/* manual gain mode for "softagc" */
+	rtlsdr_set_tuner_gain_mode(dev, 1 );
+}
+
+static void softagc_uninit(rtlsdr_dev_t *dev)
+{
+	if ( dev->softagc.softAgcMode == SOFTAGC_OFF )
+		return;
+
+	dev->softagc.exit_command_thread = 1;
+	safe_cond_signal(&dev->softagc.cond, &dev->softagc.mutex);
+	pthread_join(dev->softagc.command_thread, NULL);
+	pthread_cond_destroy(&dev->softagc.cond);
+	pthread_mutex_destroy(&dev->softagc.mutex);
+}
+
+/* return == keepBlock */
+static int softagc(rtlsdr_dev_t *dev, unsigned char *buf, int len)
+{
+	struct softagc_state * agc = &dev->softagc;
+	int distrib[16];
+
+	if ( agc->agcState == SOFTSTATE_INIT )
+	{
+		agc->agcState = SOFTSTATE_RESET;
+#if 0
+		fprintf(stderr, "*** init softagc gainmode\n");
+#endif
+		return 0;		/* throw away this block */
+	}
+	else if ( agc->agcState == SOFTSTATE_RESET )
+	{
+		int k, numGains = 0;
+		const int * gains = get_tuner_gains(dev, &numGains );
+#if 0
+		fprintf(stderr, "*** rtlsdr softagc: get_tuner_gains() delivered %d values\n", numGains);
+#endif
+
+		if ( ! numGains )
+		{
+			// device is not initialized yet
+			return 1;
+		}
+
+		if ( numGains == 1 )
+		{
+			agc->softAgcMode = SOFTAGC_OFF;
+			agc->agcState = SOFTSTATE_OFF;
+			if ( dev->verbose )
+				fprintf(stderr, "*** rtlsdr softagc(): just single gain -> deactivating\n");
+			return 1;
+		}
+
+		/* initialize measurement */
+		if (!agc->scanTimeSps)
+			agc->scanTimeSps = (int)( (agc->scanTimeMs * dev->rate) / 1000 );
+		if (!agc->deadTimeSps)
+			agc->deadTimeSps = (int)( (agc->deadTimeMs * dev->rate) / 1000 );
+
+		agc->remainingDeadSps = INT_MAX;
+		agc->remainingScanSps = agc->scanTimeSps;
+
+		agc->numInHisto = 0;
+		for ( k = 0; k < 16; ++k )
+			agc->histo[k] = 0;
+
+		dev->softagc.gainIdx = numGains - 1;
+		dev->softagc.command_newGain = gains[dev->softagc.gainIdx];
+		dev->softagc.command_changeGain = 1;
+		safe_cond_signal(&dev->softagc.cond, &dev->softagc.mutex);
+		if ( dev->verbose )
+			fprintf(stderr, "rtlsdr softagc(): set maximum gain %d / 10 dB at idx %d\n"
+				, gains[dev->softagc.gainIdx]
+				, dev->softagc.gainIdx );
+
+		agc->agcState = SOFTSTATE_RESET_CONT;
+		return 0;
+	}
+
+	if ( agc->remainingDeadSps == INT_MAX )
+		return 0;
+	if ( agc->remainingDeadSps )
+	{
+		if ( agc->remainingDeadSps >= len/2 )
+		{
+			/* fprintf(stderr, "cont waiting dead samples: received %d of remaining %d smp\n", len, agc->remainingDeadSps); */
+			agc->remainingDeadSps -= len/2;
+			return ( agc->agcState == SOFTSTATE_RESET_CONT ) ? 0 : 1;
+		}
+		else
+		{
+			buf = buf + ( 2 * agc->remainingDeadSps);
+			len -= 2 * agc->remainingDeadSps;
+			agc->remainingDeadSps = 0;
+		}
+	}
+
+	/* finish when arrived at lowest possible gain */
+	if ( ! agc->gainIdx && agc->agcState == SOFTSTATE_RESET_CONT )
+	{
+		agc->agcState = SOFTSTATE_OFF;
+		/* TODO: try deactivating Bias-T */
+		if ( dev->verbose )
+			fprintf(stderr, "rtlsdr softagc(): gain idx is 0 -> finish soft agc\n");
+		return 1;
+	}
+
+	/* calculate histogram and distribution */
+	{
+		int * histo = &(agc->histo[0]);
+		int i, k;
+		for ( i = 0; i < len; ++i )
+		{
+			if ( buf[i] >= 128 )
+				++histo[ ( (unsigned)buf[i] -128) >> 3 ];		/* -128 ==> max is then 127 == 7 bit */
+			else
+				++histo[ ( 127 - (unsigned)buf[i] ) >> 3 ];
+		}
+		agc->numInHisto += len;
+		agc->remainingScanSps -= len/2;
+
+		distrib[15] = histo[15];
+		for ( k = 14; k >= 8; --k )
+			distrib[k] = distrib[k+1] + histo[k];
+	}
+
+	/* detect oversteering */
+	if ( 64 * distrib[15] >= agc->numInHisto	/* max more often than 1.56% (= 100/64) of all near 1 */
+	   ||16 * distrib[12] >= agc->numInHisto	/* more often than 6.25% of all >= 0.75 */
+	   || 4 * distrib[ 8] >= agc->numInHisto )	/* more often than 25% of all >= 0.5 */
+	{
+		const int N = agc->numInHisto;
+#if 0
+		fprintf(stderr, "dp[8-15]: ");
+		for ( int k = 8; k < 16; ++k )
+			fprintf(stderr, "%d:%d, ", k, (distrib[k] * 100) / N);
+		fprintf(stderr, "\ttotal %d\n", N);
+#endif
+
+		if ( agc->gainIdx > 0 )
+		{
+			int k, numGains = 0;
+			const int * gains = get_tuner_gains(dev, &numGains );
+
+			agc->remainingDeadSps = INT_MAX;
+			agc->remainingScanSps = agc->scanTimeSps;
+			agc->numInHisto = 0;
+			for ( k = 0; k < 16; ++k )
+				agc->histo[k] = 0;
+
+			-- agc->gainIdx;
+			agc->command_newGain = gains[agc->gainIdx];
+			agc->command_changeGain = 1;
+			safe_cond_signal(&agc->cond, &agc->mutex);
+		}
+		return ( agc->agcState == SOFTSTATE_RESET_CONT ) ? 0 : 1;
+	}
+
+	if ( agc->remainingScanSps < 0 )
+	{
+		/* TODO: check if we should increase gain .. or even activate Bias-T */
+		if ( dev->verbose )
+			fprintf(stderr, "*** rtlsdr softagc(): no more remaining samples to wait for\n");
+
+		agc->remainingScanSps = 0;
+		switch ( agc->softAgcMode )
+		{
+		case SOFTAGC_OFF:
+		case SOFTAGC_ON_CHANGE:
+			switch ( agc->agcState )
+			{
+			case SOFTSTATE_OFF:
+			case SOFTSTATE_RESET_CONT:
+				agc->agcState = SOFTSTATE_OFF;
+				if ( dev->verbose )
+					fprintf(stderr, "softagc finished. now mode %d, state %d\n", agc->softAgcMode, agc->agcState);
+				return 1;
+			case SOFTSTATE_ON:
+			case SOFTSTATE_RESET:
+			case SOFTSTATE_INIT:
+				return 1;
+			}
+			break;
+		case SOFTAGC_AUTO_ATTEN:
+		case SOFTAGC_AUTO:
+			agc->agcState == SOFTSTATE_ON;
+			return 1;
+		}
+	}
+	
+	return ( agc->agcState == SOFTSTATE_RESET_CONT ) ? 0 : 1;
+}
+
+
 static void LIBUSB_CALL _libusb_callback(struct libusb_transfer *xfer)
 {
 	rtlsdr_dev_t *dev = (rtlsdr_dev_t *)xfer->user_data;
 
 	if (LIBUSB_TRANSFER_COMPLETED == xfer->status) {
-		if (dev->cb)
+		int keepBlock = 1;
+		if ( dev->softagc.agcState != SOFTSTATE_OFF )
+			keepBlock = softagc(dev, xfer->buffer, xfer->actual_length);
+
+		if (dev->cb && keepBlock)
 			dev->cb(xfer->buffer, xfer->actual_length, dev->cb_ctx);
 
 		libusb_submit_transfer(xfer); /* resubmit transfer */
@@ -2561,6 +2945,7 @@ int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on)
 
 	rtlsdr_set_gpio_output(dev, 0);
 	rtlsdr_set_gpio_bit(dev, 0, on);
+	reactivate_softagc(dev, SOFTSTATE_RESET);
 
 	return 0;
 }
@@ -2574,6 +2959,10 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 	if (!dev)
 		return -1;
 
+	/* set some defaults */
+	dev->softagc.deadTimeMs = 100;
+	dev->softagc.scanTimeMs = 100;
+
 	optStr = strdup(opts);
 	if (!optStr)
 		return -1;
@@ -2582,7 +2971,10 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 	while (optPart)
 	{
 		int ret = 0;
-		if (!strncmp(optPart, "f=", 2)) {
+		if (!strcmp(optPart, "verbose")) {
+			dev->verbose = 1;
+		}
+		else if (!strncmp(optPart, "f=", 2)) {
 			uint32_t freq = (uint32_t)atol(optPart + 2);
 			if (verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed frequency %u\n", (unsigned)freq);
@@ -2624,6 +3016,25 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed bias tee %d\n", on);
 			ret = rtlsdr_set_bias_tee(dev, on);
 		}
+		else if (!strncmp(optPart, "softagc=", 8)) {
+			int on = atoi(optPart +8);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed soft agc mode %d\n", on);
+			dev->softagc.softAgcMode = on;
+			dev->softagc.agcState = on ? SOFTSTATE_INIT : SOFTSTATE_OFF;
+		}
+		else if (!strncmp(optPart, "softscantime=", 13)) {
+			float d = atof(optPart +13);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed soft agc scan time %f ms\n", d);
+			dev->softagc.scanTimeMs = d;
+		}
+		else if (!strncmp(optPart, "softdeadtime=", 13)) {
+			float d = atof(optPart +13);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed soft agc dead time %f ms\n", d);
+			dev->softagc.deadTimeMs = d;
+		}
 		else {
 			if (verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed unknown option '%s'\n", optPart);
@@ -2635,6 +3046,9 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			retAll = ret;
 		optPart = strtok(NULL, ":,");
 	}
+
+	if ( dev->softagc.agcState != SOFTSTATE_OFF )
+		softagc_init(dev);
 
 	free(optStr);
 	return retAll;
