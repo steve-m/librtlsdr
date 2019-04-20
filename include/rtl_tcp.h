@@ -26,6 +26,9 @@ extern "C" {
 
 /*!
  * This enum defines the possible commands in rtl_tcp
+ * commands 0x01..0x0E are compatible to osmocom's rtlsdr
+ * see https://github.com/osmocom/rtl-sdr/blob/master/src/rtl_tcp.c
+ * commands >= 0x40 are extensions
  */
 enum RTL_TCP_COMMANDS {
     SET_FREQUENCY             = 0x01,
@@ -44,7 +47,8 @@ enum RTL_TCP_COMMANDS {
     SET_BIAS_TEE              = 0x0E,
     SET_TUNER_BANDWIDTH       = 0x40,
     UDP_ESTABLISH             = 0x41,
-    UDP_TERMINATE             = 0x42
+    UDP_TERMINATE             = 0x42,
+    SET_I2C_TUNER_REGISTER    = 0x43   /* for experiments: data: 31 .. 16: register; 15 .. 8: mask; 7 .. 0: data */
 };
 
 #ifdef __cplusplus

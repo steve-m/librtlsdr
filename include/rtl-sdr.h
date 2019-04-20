@@ -475,6 +475,19 @@ RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
  */
 RTLSDR_API int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose);
 
+
+/*!
+ * Exposes/permits hacking of Tuner-specific I2C registers
+ *
+ * \param dev           the device handle given by rtlsdr_open()
+ * \param i2c_register  1 for Bias T on. 0 for Bias T off.
+ * \param mask          8-bit bitmask, indicating which bits shall be set
+ * \param data          8-bit data, which shall be set
+ * \return -1 if device is not initialized. 0 otherwise.
+ */
+RTLSDR_API int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask, unsigned data);
+
+
 #ifdef __cplusplus
 }
 #endif

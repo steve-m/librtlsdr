@@ -1134,6 +1134,16 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 }
 
 
+/* expose/permit tuner specific i2c register hacking! */
+int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned mask, unsigned data)
+{
+	uint8_t reg = i2c_register & 0xFF;
+	uint8_t reg_mask = mask & 0xFF;
+	uint8_t reg_val = data & 0xFF;
+	return r82xx_write_reg_mask(priv, reg, reg_val, reg_mask);
+}
+
+
 /* Bandwidth contribution by low-pass filter. */
 static const int r82xx_if_low_pass_bw_table[] = {
 	1700000, 1600000, 1550000, 1450000, 1200000, 900000, 700000, 550000, 450000, 350000

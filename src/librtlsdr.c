@@ -74,6 +74,7 @@ typedef struct rtlsdr_tuner_iface {
 	int (*set_gain)(void *, int gain /* tenth dB */);
 	int (*set_if_gain)(void *, int stage, int gain /* tenth dB */);
 	int (*set_gain_mode)(void *, int manual);
+	int (*set_i2c_register)(void *, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ );
 } rtlsdr_tuner_iface_t;
 
 enum rtlsdr_async_status {
@@ -344,40 +345,46 @@ int r820t_set_gain_mode(void *dev, int manual) {
 	return r82xx_set_gain(&devt->r82xx_p, manual, 0, 0, 0, 0, 0);
 }
 
+int r820t_set_i2c_register(void *dev, unsigned i2c_register, unsigned mask, unsigned data ) {
+	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+	return r82xx_set_i2c_register(&devt->r82xx_p, i2c_register, mask, data);
+}
+
+
 /* definition order must match enum rtlsdr_tuner */
 static rtlsdr_tuner_iface_t tuners[] = {
 	{
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
 	},
 	{
 		e4000_init, e4000_exit,
 		e4000_set_freq, e4000_set_bw, e4000_set_gain, e4000_set_if_gain,
-		e4000_set_gain_mode
+		e4000_set_gain_mode, NULL
 	},
 	{
 		_fc0012_init, fc0012_exit,
 		fc0012_set_freq, fc0012_set_bw, _fc0012_set_gain, NULL,
-		fc0012_set_gain_mode
+		fc0012_set_gain_mode, NULL
 	},
 	{
 		_fc0013_init, fc0013_exit,
 		fc0013_set_freq, fc0013_set_bw, _fc0013_set_gain, NULL,
-		fc0013_set_gain_mode
+		fc0013_set_gain_mode, NULL
 	},
 	{
 		fc2580_init, fc2580_exit,
 		_fc2580_set_freq, fc2580_set_bw, fc2580_set_gain, NULL,
-		fc2580_set_gain_mode
+		fc2580_set_gain_mode, NULL
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
-		r820t_set_gain_mode
+		r820t_set_gain_mode, r820t_set_i2c_register
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
-		r820t_set_gain_mode
+		r820t_set_gain_mode, r820t_set_i2c_register
 	},
 };
 
@@ -1408,6 +1415,30 @@ int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int mode)
 
 	return r;
 }
+
+int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ )
+{
+	int r = 0;
+
+	#ifdef _ENABLE_RPC
+	if (rtlsdr_rpc_is_enabled())
+	{
+		/* TODO */
+		return -1;
+	}
+	#endif
+
+	if (!dev || !dev->tuner)
+		return -1;
+
+	if (dev->tuner->set_i2c_register) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = dev->tuner->set_i2c_register((void *)dev, i2c_register, mask, data);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	}
+	return r;
+}
+
 
 int rtlsdr_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 {
