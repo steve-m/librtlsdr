@@ -1167,6 +1167,26 @@ static const int r82xx_if_low_pass_bw_table[] = {
 	1700000, 1600000, 1550000, 1450000, 1200000, 900000, 700000, 550000, 450000, 350000
 };
 
+
+#if 0
+static const int r82xx_bw_tablen = 17;
+/* Hayati:                          0        1        2        3        4        5        6        7        8        9        10       11       12       13       14       15       16 */
+/*                                  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  centered centered centered centered ?!       */
+static const int r82xx_bws[]=     { 200000,  300000,  400000,  500000,  600000,  700000,  800000,  900000,  1000000, 1100000, 1200000, 1300000, 1400000, 1550000, 1700000, 1900000, 2200000 };
+static const uint8_t r82xx_0xb[]= { 0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xCF,    0xAF,    0x8F,    0x51 };
+static const int r82xx_if[]  =    { 1900000, 1850000, 1800000, 1750000, 1700000, 1650000, 1600000, 1550000, 1500000, 1450000, 1400000, 1350000, 1300000, 1400000, 1450000, 1600000, 4700000};
+#else
+
+static const int r82xx_bw_tablen = 24;
+/* duplicated lower bandwidths to allow "sideband" selection: which is filtered with help of IF corner */
+/* Hayati:                          0        1        2        3        4        5        6        7        8        9        10       11       12       13       14       15       16       17       18       19       20       21       22       23 */
+/*                                  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  centered centered centered centered ?!       */
+static const int r82xx_bws[]=     { 200000,  200400,  300000,  300400,  400000,  400400,  500000,  500400,  600000,  600400,  700000,  700400,  800000,  800400,  900000,  1000000, 1100000, 1200000, 1300000, 1400000, 1550000, 1700000, 1900000, 2200000 };
+static const uint8_t r82xx_0xb[]= { 0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xCF,    0xAF,    0x8F,    0x51 };
+static const int r82xx_if[]  =    { 1900000,  700000, 1850000,  750000, 1800000,  800000, 1750000,  850000, 1700000,  900000, 1650000,  950000, 1600000, 1000000, 1550000, 1500000, 1450000, 1400000, 1350000, 1300000, 1400000, 1450000, 1600000, 4700000};
+#endif
+
+
 #define FILT_HP_BW1 350000
 #define FILT_HP_BW2 380000
 int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t * applied_bw, int apply)
@@ -1195,7 +1215,7 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 		reg_0b = 0x2a;
 		if (apply)
 			priv->int_freq = 4570000;
-	} else if (bw > r82xx_if_low_pass_bw_table[0] + FILT_HP_BW1 + FILT_HP_BW2) {
+	} else if (bw > 4500000) {
 		// BW: 6 MHz
 		*applied_bw = 6000000;
 		reg_0a = 0x10;
@@ -1203,49 +1223,37 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 		if (apply)
 			priv->int_freq = 3570000;
 	} else {
-		reg_0a = 0x00;
-		reg_0b = 0x80;
-		if (apply)
-			priv->int_freq = 2300000;
 
-		if (bw > r82xx_if_low_pass_bw_table[0] + FILT_HP_BW1) {
-			bw -= FILT_HP_BW2;
-			if (apply)
-				priv->int_freq += FILT_HP_BW2;
-			real_bw += FILT_HP_BW2;
-		} else {
-			reg_0b |= 0x20;
-		}
-
-		if (bw > r82xx_if_low_pass_bw_table[0]) {
-			bw -= FILT_HP_BW1;
-			if (apply)
-				priv->int_freq += FILT_HP_BW1;
-			real_bw += FILT_HP_BW1;
-		} else {
-			reg_0b |= 0x40;
-		}
-
-		// find low-pass filter
-		for(i = 0; i < ARRAY_SIZE(r82xx_if_low_pass_bw_table); ++i) {
-			if (bw > r82xx_if_low_pass_bw_table[i])
+		for(i=0; i < r82xx_bw_tablen-1; ++i) {
+			/* bandwidth is compared to median of the current and next available bandwidth in the table */
+			if (bw < (r82xx_bws[i+1] + r82xx_bws[i])/2)
 				break;
 		}
-		--i;
-		reg_0b |= 15 - i;
-		real_bw += r82xx_if_low_pass_bw_table[i];
 
+		reg_0a = 0x0F;
+		reg_0b = r82xx_0xb[i];
+		real_bw = ( r82xx_bws[i] / 1000 ) * 1000;   /* round on kHz */
+#if 0
+		fprintf(stderr, "%s: selected idx %d: R10 = %02X, R11 = %02X, Bw %d, IF %d\n"
+			, __FUNCTION__, i
+			, (unsigned)reg_0a
+			, (unsigned)reg_0b
+			, real_bw
+			, r82xx_if[i]
+			);
+#endif
 		*applied_bw = real_bw;
-
 		if (apply)
-			priv->int_freq -= real_bw / 2;
+			priv->int_freq = r82xx_if[i];
 	}
 
 #if USE_R82XX_ENV_VARS
 	// hacking RTLSDR IF-Center frequency - on environment variable
 	if ( priv->filterCenter && apply )
 	{
+#if 0
 		fprintf(stderr, "*** applied IF center %d\n", priv->filterCenter);
+#endif
 		priv->int_freq = priv->filterCenter;
 	}
 #endif
@@ -1268,7 +1276,7 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 #endif
 
 	/* Register 0xA = R10 */
-	reg_mask = 0x10;	// default: 0001 0000
+	reg_mask = 0x0F;	// default: 0001 0000
 #if USE_R82XX_ENV_VARS
 	if ( priv->haveR10H ) {
 		reg_0a = ( reg_0a & ~0xf0 ) | ( priv->valR10H << 4 );
@@ -1279,7 +1287,6 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 		reg_mask |= 0x0f;
 	}
 #endif
-
 	rc = r82xx_write_reg_mask_ext(priv, 0x0a, reg_0a, reg_mask, __FUNCTION__);
 	if (rc < 0) {
 		fprintf(stderr, "ERROR setting I2C register 0x0A to value %02X with mask %02X\n", (unsigned)reg_0a, (unsigned)reg_mask);
