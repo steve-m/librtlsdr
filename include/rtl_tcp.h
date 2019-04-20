@@ -44,8 +44,15 @@ enum RTL_TCP_COMMANDS {
     SET_RTL_CRYSTAL           = 0x0B,
     SET_TUNER_CRYSTAL         = 0x0C,
     SET_TUNER_GAIN_BY_INDEX   = 0x0D,
+#if 1
+    /* development branch since 2018-10-03 */
     SET_BIAS_TEE              = 0x0E,
     SET_TUNER_BANDWIDTH       = 0x40,
+#else
+    /* prev code - used in ExtIO - to build compatible rtl_tcp.exe */
+    SET_TUNER_BANDWIDTH       = 0x0E,
+    SET_BIAS_TEE              = 0x0F
+#endif
     UDP_ESTABLISH             = 0x41,
     UDP_TERMINATE             = 0x42,
     SET_I2C_TUNER_REGISTER    = 0x43   /* for experiments: data: 31 .. 16: register; 15 .. 8: mask; 7 .. 0: data */

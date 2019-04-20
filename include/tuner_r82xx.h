@@ -41,6 +41,8 @@
 
 #define VER_NUM				49
 
+#define USE_R82XX_ENV_VARS	1
+
 enum r82xx_chip {
 	CHIP_R820T,
 	CHIP_R620D,
@@ -90,6 +92,21 @@ struct r82xx_priv {
 	enum r82xx_tuner_type	type;
 	uint32_t				bw;	/* in MHz */
 	void 					*rtl_dev;
+
+#if USE_R82XX_ENV_VARS
+	/* store some environment variables */
+	int printI2C;
+	unsigned int filterCenter;
+	unsigned int haveR9, valR9;
+	unsigned int haveR10L, valR10L;
+	unsigned int haveR10H, valR10H;
+	unsigned int haveR11L, valR11L;
+	unsigned int haveR11H, valR11H;
+	unsigned int haveR13L, valR13L;
+	unsigned int haveR13H, valR13H;
+	unsigned int haveR14L, valR14L;
+	unsigned int haveR14H, valR14H;
+#endif
 };
 
 struct r82xx_freq_range {

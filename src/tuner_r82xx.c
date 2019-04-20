@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "rtlsdr_i2c.h"
 #include "tuner_r82xx.h"
@@ -313,6 +314,23 @@ static int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t va
 
 	return r82xx_write(priv, reg, &val, 1);
 }
+
+static int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
+				uint8_t bit_mask, const char * func_name)
+{
+#if USE_R82XX_ENV_VARS
+	if (priv->printI2C) {
+		fprintf(stderr, "%s: setting I2C register %02X: old value = %02X, new value: %02X with mask %02X\n"
+			, func_name, reg
+			, r82xx_read_cache_reg(priv, reg)
+			, val, bit_mask );
+	}
+#endif
+	int r = r82xx_write_reg_mask(priv, reg, val, bit_mask);
+	return r;
+}
+
+
 
 static uint8_t r82xx_bitrev(uint8_t byte)
 {
@@ -680,7 +698,7 @@ static int r82xx_sysfreq_sel(struct r82xx_priv *priv, uint32_t freq,
 	rc = r82xx_write_reg_mask(priv, 0x17, div_buf_cur, 0x30);
 	if (rc < 0)
 		return rc;
-	rc = r82xx_write_reg_mask(priv, 0x0a, filter_cur, 0x60);
+	rc = r82xx_write_reg_mask_ext(priv, 0x0a, filter_cur, 0x60, __FUNCTION__);
 	if (rc < 0)
 		return rc;
 
@@ -826,7 +844,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 	if (need_calibration) {
 		for (i = 0; i < 2; i++) {
 			/* Set filt_cap */
-			rc = r82xx_write_reg_mask(priv, 0x0b, hp_cor, 0x60);
+			rc = r82xx_write_reg_mask_ext(priv, 0x0b, hp_cor, 0x60, __FUNCTION__);
 			if (rc < 0)
 				return rc;
 
@@ -845,14 +863,14 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 				return rc;
 
 			/* Start Trigger */
-			rc = r82xx_write_reg_mask(priv, 0x0b, 0x10, 0x10);
+			rc = r82xx_write_reg_mask_ext(priv, 0x0b, 0x10, 0x10, __FUNCTION__);
 			if (rc < 0)
 				return rc;
 
 //			usleep_range(1000, 2000);
 
 			/* Stop Trigger */
-			rc = r82xx_write_reg_mask(priv, 0x0b, 0x00, 0x10);
+			rc = r82xx_write_reg_mask_ext(priv, 0x0b, 0x00, 0x10, __FUNCTION__);
 			if (rc < 0)
 				return rc;
 
@@ -875,13 +893,13 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 			priv->fil_cal_code = 0;
 	}
 
-	rc = r82xx_write_reg_mask(priv, 0x0a,
-				  filt_q | priv->fil_cal_code, 0x1f);
+	rc = r82xx_write_reg_mask_ext(priv, 0x0a,
+				  filt_q | priv->fil_cal_code, 0x1f, __FUNCTION__);
 	if (rc < 0)
 		return rc;
 
 	/* Set BW, Filter_gain, & HP corner */
-	rc = r82xx_write_reg_mask(priv, 0x0b, hp_cor, 0xef);
+	rc = r82xx_write_reg_mask_ext(priv, 0x0b, hp_cor, 0xef, __FUNCTION__);
 	if (rc < 0)
 		return rc;
 
@@ -1156,6 +1174,10 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 	int rc;
 	unsigned int i;
 	int real_bw = 0;
+#if USE_R82XX_ENV_VARS
+	uint8_t reg_09, reg_0d, reg_0e;
+#endif
+	uint8_t reg_mask;
 	uint8_t reg_0a;
 	uint8_t reg_0b;
 
@@ -1219,16 +1241,106 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 			priv->int_freq -= real_bw / 2;
 	}
 
+#if USE_R82XX_ENV_VARS
+	// hacking RTLSDR IF-Center frequency - on environment variable
+	if ( priv->filterCenter && apply )
+	{
+		fprintf(stderr, "*** applied IF center %d\n", priv->filterCenter);
+		priv->int_freq = priv->filterCenter;
+	}
+#endif
+
 	if (!apply)
 		return 0;
 
-	rc = r82xx_write_reg_mask(priv, 0x0a, reg_0a, 0x10);
-	if (rc < 0)
-		return rc;
+#if USE_R82XX_ENV_VARS
+	/* Register 0x9 = R9: IF Filter Power/Current */
+	if ( priv->haveR9 )
+	{
+		fprintf(stderr, "*** in function %s: PREV I2C register %02X value: %02X\n", __FUNCTION__, 0x09, r82xx_read_cache_reg(priv, 0x09) );
+		reg_09 = priv->valR9 << 6;
+		reg_mask = 0xC0;	// 1100 0000
+		fprintf(stderr, "*** read R9 from environment: %d\n", priv->valR9);
+		rc = r82xx_write_reg_mask(priv, 0x09, reg_09, 0xc0);
+		if (rc < 0)
+			fprintf(stderr, "ERROR setting I2C register 0x09 to value %02X with mask %02X\n", (unsigned)reg_09, (unsigned)reg_mask);
+	}
+#endif
 
-	rc = r82xx_write_reg_mask(priv, 0x0b, reg_0b, 0xef);
-	if (rc < 0)
+	/* Register 0xA = R10 */
+	reg_mask = 0x10;	// default: 0001 0000
+#if USE_R82XX_ENV_VARS
+	if ( priv->haveR10H ) {
+		reg_0a = ( reg_0a & ~0xf0 ) | ( priv->valR10H << 4 );
+		reg_mask = 0xf0;
+	}
+	if ( priv->haveR10L ) {
+		reg_0a = ( reg_0a & ~0x0f ) | priv->valR10L;
+		reg_mask |= 0x0f;
+	}
+#endif
+
+	rc = r82xx_write_reg_mask_ext(priv, 0x0a, reg_0a, reg_mask, __FUNCTION__);
+	if (rc < 0) {
+		fprintf(stderr, "ERROR setting I2C register 0x0A to value %02X with mask %02X\n", (unsigned)reg_0a, (unsigned)reg_mask);
 		return rc;
+	}
+
+	/* Register 0xB = R11 with undocumented Bit 7 for filter bandwidth for Hi-part FILT_BW */
+	reg_mask = 0xEF;	// default: 1110 1111
+#if USE_R82XX_ENV_VARS
+	if ( priv->haveR11H ) {
+		reg_0b = ( reg_0b & ~0xE0 ) | ( priv->valR11H << 5 );
+	}
+	if ( priv->haveR11L ) {
+		reg_0b = ( reg_0b & ~0x0F ) | priv->valR11L;
+	}
+#endif
+	rc = r82xx_write_reg_mask_ext(priv, 0x0b, reg_0b, reg_mask, __FUNCTION__);
+	if (rc < 0) {
+		fprintf(stderr, "ERROR setting I2C register 0x0B to value %02X with mask %02X\n"
+			, (unsigned)reg_0b, (unsigned)reg_mask);
+		return rc;
+	}
+
+
+	/* Register 0xD = R13: LNA agc power detector voltage threshold high + low setting */
+	reg_mask = 0x00;	// default: 0000 0000
+#if USE_R82XX_ENV_VARS
+	if ( priv->haveR13H ) {
+		reg_0d = ( reg_0d & ~0xf0 ) | ( priv->valR13H << 4 );
+		reg_mask |= 0xF0;
+	}
+	if ( priv->haveR13L ) {
+		reg_0d = ( reg_0d & ~0x0f ) | priv->valR13L;
+		reg_mask |= 0x0F;
+	}
+	if ( reg_mask ) {
+		rc = r82xx_write_reg_mask_ext(priv, 0x0d, reg_0d, reg_mask, __FUNCTION__);
+		if (rc < 0)
+			fprintf(stderr, "ERROR setting I2C register 0x0D to value %02X with mask %02X\n"
+				, (unsigned)reg_0d, (unsigned)reg_mask);
+	}
+#endif
+
+	/* Register 0xE = R14: MIXER agc power detector voltage threshold high + low setting */
+	reg_mask = 0x00;	// default: 0000 0000
+#if USE_R82XX_ENV_VARS
+	if ( priv->haveR14H ) {
+		reg_0e = ( reg_0e & ~0xf0 ) | ( priv->valR14H << 4 );
+		reg_mask |= 0xF0;
+	}
+	if ( priv->haveR14L ) {
+		reg_0e = ( reg_0e & ~0x0f ) | priv->valR14L;
+		reg_mask |= 0x0F;
+	}
+	if ( reg_mask ) {
+		rc = r82xx_write_reg_mask_ext(priv, 0x0e, reg_0e, reg_mask, __FUNCTION__);
+		if (rc < 0)
+			fprintf(stderr, "%s: ERROR setting I2C register 0x0E to value %02X with mask %02X\n"
+			, __FUNCTION__, (unsigned)reg_0e, (unsigned)reg_mask);
+	}
+#endif
 
 	return priv->int_freq;
 }
@@ -1397,7 +1509,140 @@ int r82xx_init(struct r82xx_priv *priv)
 
 	rc = r82xx_sysfreq_sel(priv, 0, TUNER_DIGITAL_TV, SYS_DVBT);
 
+#if USE_R82XX_ENV_VARS
+	priv->printI2C = 0;
+	priv->filterCenter = 0;
+	priv->haveR9 = priv->valR9 = 0;
+	priv->haveR10L = priv->valR10L = 0;
+	priv->haveR10H = priv->valR10H = 0;
+	priv->haveR11L = priv->valR11L = 0;
+	priv->haveR11H = priv->valR11H = 0;
+	priv->haveR13L = priv->valR13L = 0;
+	priv->haveR13H = priv->valR13H = 0;
+	priv->haveR14L = priv->valR14L = 0;
+	priv->haveR14H = priv->valR14H = 0;
+#endif
+
 	priv->init_done = 1;
+
+#if USE_R82XX_ENV_VARS
+	// read environment variables
+	if (1) {
+		char *pacPrintI2C;
+		char *pacFilterCenter, *pacR9;
+		char *pacR10Hi, *pacR10Lo, *pacR11Hi, *pacR11Lo;
+		char *pacR13Hi, *pacR13Lo, *pacR14Hi, *pacR14Lo;
+
+		pacPrintI2C = getenv("RTL_R820_PRINT_I2C");
+		if ( pacPrintI2C )
+			priv->printI2C = atoi(pacPrintI2C);
+
+		pacFilterCenter = getenv("RTL_R820_IF_CENTER");
+		if ( pacFilterCenter )
+			priv->filterCenter = atoi(pacFilterCenter);
+
+		pacR9 = getenv("RTL_R820_R9_76");
+		if ( pacR9 ) {
+			priv->haveR9 = 1;
+			priv->valR9 = atoi(pacR9);
+			if ( priv->valR9 > 3 ) {
+				fprintf(stderr, "*** read R9 from environment: %d - but value should be 0 - 3 for bit [7:6]\n", priv->valR9);
+				priv->haveR9 = 0;
+			}
+			fprintf(stderr, "*** read R9 from environment: %d\n", priv->valR9);
+		}
+
+		pacR10Hi = getenv("RTL_R820_R10_HI");
+		if ( pacR10Hi ) {
+			priv->haveR10H = 1;
+			priv->valR10H = atoi(pacR10Hi);
+			if ( priv->valR10H > 15 ) {
+				fprintf(stderr, "*** read R10_HI from environment: %d - but value should be 0 - 15 for bit [7:4]\n", priv->valR10H);
+				priv->haveR10H = 0;
+			}
+			fprintf(stderr, "*** read R10_HI from environment: %d\n", priv->valR10H);
+		}
+
+		pacR10Lo = getenv("RTL_R820_R10_LO");
+		if ( pacR10Lo ) {
+			priv->haveR10L = 1;
+			priv->valR10L = atoi(pacR10Lo);
+			if ( priv->valR10L > 15 ) {
+				fprintf(stderr, "*** read R10_LO from environment: %d - but value should be 0 - 15 for bit [3:0]\n", priv->valR10L);
+				priv->haveR10L = 0;
+			}
+			fprintf(stderr, "*** read R10_LO from environment: %d\n", priv->valR10L);
+		}
+
+		pacR11Hi = getenv("RTL_R820_R11_HI");
+		if ( pacR11Hi ) {
+			priv->haveR11H = 1;
+			priv->valR11H = atoi(pacR11Hi);
+			if ( priv->valR11H > 7 ) {
+				fprintf(stderr, "*** read R11_HI from environment: %d - but value should be 0 - 7 for bit [6:5]\n", priv->valR11H);
+				priv->haveR11H = 0;
+			}
+			fprintf(stderr, "*** read R11_HI from environment: %d\n", priv->valR11H);
+		}
+
+		pacR11Lo = getenv("RTL_R820_R11_LO");
+		if ( pacR11Lo ) {
+			priv->haveR11L = 1;
+			priv->valR11L = atoi(pacR11Lo);
+			if ( priv->valR11L > 15 ) {
+				fprintf(stderr, "*** read R11_LO from environment: %d - but value should be 0 - 15 for bit [3:0]\n", priv->valR11L);
+				priv->haveR11L = 0;
+			}
+			fprintf(stderr, "*** read R11_LO from environment: %d\n", priv->valR11L);
+		}
+
+
+		pacR13Hi = getenv("RTL_R820_R13_HI");
+		if ( pacR13Hi ) {
+			priv->haveR13H = 1;
+			priv->valR13H = atoi(pacR13Hi);
+			if ( priv->valR13H > 15 ) {
+				fprintf(stderr, "*** read R13_HI from environment: %d - but value should be 0 - 15 for bit [7:4]\n", priv->valR13H);
+				priv->haveR13H = 0;
+			}
+			fprintf(stderr, "*** read R13_HI from environment: %d\n", priv->valR13H);
+		}
+
+		pacR13Lo = getenv("RTL_R820_R13_LO");
+		if ( pacR13Lo ) {
+			priv->haveR13L = 1;
+			priv->valR13L = atoi(pacR13Lo);
+			if ( priv->valR13L > 15 ) {
+				fprintf(stderr, "*** read R13_LO from environment: %d - but value should be 0 - 15 for bit [3:0]\n", priv->valR13L);
+				priv->haveR13L = 0;
+			}
+			fprintf(stderr, "*** read R13_LO from environment: %d\n", priv->valR13L);
+		}
+
+
+		pacR14Hi = getenv("RTL_R820_R14_HI");
+		if ( pacR14Hi ) {
+			priv->haveR14H = 1;
+			priv->valR14H = atoi(pacR14Hi);
+			if ( priv->valR14H > 15 ) {
+				fprintf(stderr, "*** read R14_HI from environment: %d - but value should be 0 - 15 for bit [7:4]\n", priv->valR14H);
+				priv->haveR14H = 0;
+			}
+			fprintf(stderr, "*** read R14_HI from environment: %d\n", priv->valR14H);
+		}
+
+		pacR14Lo = getenv("RTL_R820_R14_LO");
+		if ( pacR14Lo ) {
+			priv->haveR14L = 1;
+			priv->valR14L = atoi(pacR14Lo);
+			if ( priv->valR14L > 15 ) {
+				fprintf(stderr, "*** read R14_LO from environment: %d - but value should be 0 - 15 for bits [3:0]\n", priv->valR14L);
+				priv->haveR14L = 0;
+			}
+			fprintf(stderr, "*** read R14_LO from environment: %d\n", priv->valR14L);
+		}
+	}
+#endif
 
 err:
 	if (rc < 0)
