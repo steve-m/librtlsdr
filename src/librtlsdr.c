@@ -22,6 +22,29 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifndef _WIN32
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#else
+#include <winsock2.h>
+#endif
+
+#ifdef _WIN32
+#pragma comment(lib, "ws2_32.lib")
+
+typedef int socklen_t;
+
+#else
+#define closesocket close
+#define SOCKADDR struct sockaddr
+#define SOCKET int
+#define SOCKET_ERROR -1
+#endif
+
 #ifndef _WIN32
 #include <unistd.h>
 #define min(a, b) (((a) < (b)) ? (a) : (b))
@@ -65,6 +88,13 @@
 #include "tuner_fc2580.h"
 #include "tuner_r82xx.h"
 
+#if 1 && defined(_WIN32)
+#define UDP_SEND_FLAGS		0
+#else
+#define UDP_SEND_FLAGS		MSG_NOSIGNAL
+#endif
+
+
 typedef struct rtlsdr_tuner_iface {
 	/* tuner interface */
 	int (*init)(void *);
@@ -75,6 +105,7 @@ typedef struct rtlsdr_tuner_iface {
 	int (*set_if_gain)(void *, int stage, int gain /* tenth dB */);
 	int (*set_gain_mode)(void *, int manual);
 	int (*set_i2c_register)(void *, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ );
+	unsigned (*get_i2c_register)(void *, int i2c_register);
 } rtlsdr_tuner_iface_t;
 
 enum rtlsdr_async_status {
@@ -186,6 +217,9 @@ struct rtlsdr_dev {
 	unsigned int xfer_errors;
 	int rc_active;
 	int verbose;
+	int dev_num;
+	uint8_t saved_27;
+	int handled;
 };
 
 void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
@@ -345,6 +379,11 @@ int r820t_set_gain_mode(void *dev, int manual) {
 	return r82xx_set_gain(&devt->r82xx_p, manual, 0, 0, 0, 0, 0);
 }
 
+
+unsigned r820t_get_i2c_register(void *dev, int reg) {
+	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+	return r82xx_read_cache_reg(&devt->r82xx_p,reg);
+}
 int r820t_set_i2c_register(void *dev, unsigned i2c_register, unsigned mask, unsigned data ) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_i2c_register(&devt->r82xx_p, i2c_register, mask, data);
@@ -354,37 +393,37 @@ int r820t_set_i2c_register(void *dev, unsigned i2c_register, unsigned mask, unsi
 /* definition order must match enum rtlsdr_tuner */
 static rtlsdr_tuner_iface_t tuners[] = {
 	{
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
 	},
 	{
 		e4000_init, e4000_exit,
 		e4000_set_freq, e4000_set_bw, e4000_set_gain, e4000_set_if_gain,
-		e4000_set_gain_mode, NULL
+		e4000_set_gain_mode, NULL, NULL
 	},
 	{
 		_fc0012_init, fc0012_exit,
 		fc0012_set_freq, fc0012_set_bw, _fc0012_set_gain, NULL,
-		fc0012_set_gain_mode, NULL
+		fc0012_set_gain_mode, NULL, NULL
 	},
 	{
 		_fc0013_init, fc0013_exit,
 		fc0013_set_freq, fc0013_set_bw, _fc0013_set_gain, NULL,
-		fc0013_set_gain_mode, NULL
+		fc0013_set_gain_mode, NULL, NULL
 	},
 	{
 		fc2580_init, fc2580_exit,
 		_fc2580_set_freq, fc2580_set_bw, fc2580_set_gain, NULL,
-		fc2580_set_gain_mode, NULL
+		fc2580_set_gain_mode, NULL, NULL
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
-		r820t_set_gain_mode, r820t_set_i2c_register
+		r820t_set_gain_mode, r820t_set_i2c_register, r820t_get_i2c_register
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
-		r820t_set_gain_mode, r820t_set_i2c_register
+		r820t_set_gain_mode, r820t_set_i2c_register, r820t_get_i2c_register
 	},
 };
 
@@ -1092,6 +1131,13 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 		dev->freq = freq;
 	else
 		dev->freq = 0;
+
+	// restore filters
+	if (dev->handled) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		dev->tuner->set_i2c_register(dev, 27, 255, dev->saved_27);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	}
 
 	return r;
 }
@@ -1932,6 +1978,175 @@ int rtlsdr_get_index_by_serial(const char *serial)
 	return -3;
 }
 
+int parse(char *message, rtlsdr_dev_t *dev, int fd)
+{
+    char *str1, *token;
+    char response[128];
+    char *saveptr;
+    int comm;
+    uint8_t mask,reg=0,val=0;
+    str1 = message;
+
+    str1[100] = 0;
+    str1[strlen(str1)-1] = 0;
+
+    token = strtok_r(str1, " ", &saveptr);
+    if ((token == NULL)||(strlen(token)>1)||((token[0]!='g')&&(token[0]!='s')))
+    {
+        sprintf(response,"?");
+        if (send(fd, response, 2, 0) < 0) 
+        {
+//            perror("send");
+            return -1;
+        }
+        return 0;
+    }
+    if (token[0]=='g') comm = 0;
+    if (token[0]=='s') comm = 1;
+
+    token = strtok_r(NULL, " ", &saveptr);
+    if ((token == NULL)||(atoi(token)<5)||(atoi(token)>32))
+    {
+        sprintf(response,"?");
+        if (send(fd, response, 2, 0) < 0) 
+        {
+//            perror("send");
+            return -1;
+        }
+        return 0;
+    }
+    reg = (uint8_t)atoi(token);
+
+    if (token) token = strtok_r(NULL, " ", &saveptr);
+    if ((token == NULL)&&(comm==1))
+    {
+        sprintf(response,"?");
+        if (send(fd, response, 2, 0) < 0) 
+        {
+//            perror("send");
+            return -1;
+        }
+        return 0;
+    }
+    else if (comm==1) 
+    {
+        val = (uint8_t)atoi(token);
+    }
+
+
+    if (token) token = strtok_r(NULL, " ", &saveptr);
+    if (token==NULL) 
+    {
+        mask = 0xff;
+    }
+    else 
+    {
+        mask = (uint8_t)atoi(token);
+    }
+
+
+
+    if (comm==0)
+    {
+        val = dev->tuner->get_i2c_register(dev, reg);
+        sprintf(response,"! %d",val);
+        val = send(fd, response, strlen(response), UDP_SEND_FLAGS);
+
+        if (val<0)
+        {
+            printf("error sending\n");
+            return -1;
+        }
+    }
+    else if (comm==1)
+    {
+        dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
+        rtlsdr_set_i2c_repeater(dev, 1);
+        val = dev->tuner->set_i2c_register(dev, reg, mask, val);
+        rtlsdr_set_i2c_repeater(dev, 0);
+        sprintf(response,"! %d",val);
+        if (send(fd, response, strlen(response), UDP_SEND_FLAGS) < 0)
+        {
+            printf("error sending\n");
+            return -1;
+        }
+    }
+
+    else
+    {
+        sprintf(response,"?\n");
+        send(fd, response, strlen(response), 0);
+    }
+    return 0;
+
+}
+
+
+void * srv_server(void *dev)
+{
+    int s, s2, t, len, num;
+    struct sockaddr_un local, remote;
+    char str[128];
+    char sock_path[64];
+    rtlsdr_dev_t *dev_i = (rtlsdr_dev_t*)dev;
+
+
+
+    num = dev_i->dev_num;
+
+    if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        exit(1);
+    }
+
+    sprintf(sock_path,"/var/tmp/rtlsdr%d",num);
+    local.sun_family = AF_UNIX;
+    strcpy(local.sun_path, sock_path);
+    unlink(local.sun_path);
+    len = strlen(local.sun_path) + sizeof(local.sun_family);
+
+    if (bind(s, (struct sockaddr *)&local, len) == -1) 
+    {
+        perror("bind");
+        return NULL;
+    }
+
+    if (listen(s, 5) == -1) {
+        perror("listen");
+        return NULL;
+    }
+
+
+    printf("%d\n",dev_i->handled);
+    while (dev_i->handled) 
+    {
+        int done, n;
+        t = sizeof(remote);
+        if ((s2 = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t)) == -1) {
+            perror("accept");
+            return NULL;
+        }
+
+        done = 0;
+        while (!done)
+        {
+            n = recv(s2, str, 100, 0);
+            if (n <= 0) 
+            {
+//                if (n < 0) perror("recv");
+                done = 1;
+            }
+            if (parse(str, dev_i, s2)<0)
+            done = 1;
+        }
+        close(s2);
+    }
+    return NULL;
+}
+
+
+
+
 int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 {
 	int r;
@@ -1943,6 +2158,8 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	struct libusb_device_descriptor dd;
 	uint8_t reg;
 	ssize_t cnt;
+	pthread_t srv_thread;
+
 
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
@@ -2138,6 +2355,16 @@ found:
 
 	*out_dev = dev;
 
+	if (dev->tuner_type==RTLSDR_TUNER_R820T) {
+		dev->handled = 1;
+		dev->saved_27 = dev->tuner->get_reg(dev,27);
+		dev->dev_num = index;
+		signal(SIGPIPE, SIG_IGN);
+		if ( pthread_create(&srv_thread, NULL, srv_server, dev) ) {
+			fprintf(stderr, "Error creating thread\n");
+		}
+	}
+
 	return 0;
 err:
 	if (dev) {
@@ -2194,6 +2421,10 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 	libusb_close(dev->devh);
 
 	libusb_exit(dev->ctx);
+
+	if (dev->handled) {
+		dev->handled = 0;
+	}
 
 	free(dev);
 

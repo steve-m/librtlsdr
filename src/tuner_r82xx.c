@@ -302,8 +302,7 @@ static int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg)
 		return -1;
 }
 
-static int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
-				uint8_t bit_mask)
+int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val, uint8_t bit_mask)
 {
 	int rc = r82xx_read_cache_reg(priv, reg);
 
@@ -315,8 +314,8 @@ static int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t va
 	return r82xx_write(priv, reg, &val, 1);
 }
 
-static int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
-				uint8_t bit_mask, const char * func_name)
+int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
+	uint8_t bit_mask, const char * func_name)
 {
 #if USE_R82XX_ENV_VARS
 	if (priv->printI2C) {

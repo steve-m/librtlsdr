@@ -134,5 +134,9 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain, int e
 int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned mask, unsigned data);
 
 int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate, uint32_t * applied_bw, int apply);
+int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg);
+int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val,uint8_t bit_mask);
+int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val, uint8_t bit_mask, const char * func_name);
 
 #endif
+
