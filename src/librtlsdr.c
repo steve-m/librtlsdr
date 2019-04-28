@@ -17,6 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef _WIN32
+#include <winsock2.h>
+
+#pragma comment(lib, "ws2_32.lib")
+#endif
+
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
@@ -29,20 +35,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#else
-#include <winsock2.h>
 #endif
 
 #ifdef _WIN32
 #pragma comment(lib, "ws2_32.lib")
-
-typedef int socklen_t;
-
-#else
-#define closesocket close
-#define SOCKADDR struct sockaddr
-#define SOCKET int
-#define SOCKET_ERROR -1
 #endif
 
 #ifndef _WIN32
@@ -88,11 +84,14 @@ typedef int socklen_t;
 #include "tuner_fc2580.h"
 #include "tuner_r82xx.h"
 
-#if 1 && defined(_WIN32)
-#define UDP_SEND_FLAGS		0
-#else
-#define UDP_SEND_FLAGS		MSG_NOSIGNAL
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#ifndef _WIN32
+	#include <sys/socket.h>
+	#include <sys/un.h>
 #endif
+#include <signal.h>
 
 
 typedef struct rtlsdr_tuner_iface {
@@ -1978,14 +1977,25 @@ int rtlsdr_get_index_by_serial(const char *serial)
 	return -3;
 }
 
-int parse(char *message, rtlsdr_dev_t *dev, int fd)
+// UDP controller server
+#define BUFLEN   128
+#define UDP_PORT 32323
+SOCKET s;
+struct sockaddr_in server, si_other;
+int slen, recv_len;
+char buf[BUFLEN];
+WSADATA wsa;
+
+int parse(char *message, rtlsdr_dev_t *dev)
 {
     char *str1, *token;
-    char response[128];
+    char response[BUFLEN];
     char *saveptr;
     int comm;
     uint8_t mask,reg=0,val=0;
     str1 = message;
+
+	memset(response,'\0', BUFLEN);
 
     str1[100] = 0;
     str1[strlen(str1)-1] = 0;
@@ -1993,10 +2003,10 @@ int parse(char *message, rtlsdr_dev_t *dev, int fd)
     token = strtok_r(str1, " ", &saveptr);
     if ((token == NULL)||(strlen(token)>1)||((token[0]!='g')&&(token[0]!='s')))
     {
-        sprintf(response,"?");
-        if (send(fd, response, 2, 0) < 0) 
+        sprintf(response,"?\n");
+		if (sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
         {
-//            perror("send");
+			// perror("send");
             return -1;
         }
         return 0;
@@ -2007,10 +2017,10 @@ int parse(char *message, rtlsdr_dev_t *dev, int fd)
     token = strtok_r(NULL, " ", &saveptr);
     if ((token == NULL)||(atoi(token)<5)||(atoi(token)>32))
     {
-        sprintf(response,"?");
-        if (send(fd, response, 2, 0) < 0) 
-        {
-//            perror("send");
+        sprintf(response,"?\n");
+		if (sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
+	    {
+			// perror("send");
             return -1;
         }
         return 0;
@@ -2020,10 +2030,10 @@ int parse(char *message, rtlsdr_dev_t *dev, int fd)
     if (token) token = strtok_r(NULL, " ", &saveptr);
     if ((token == NULL)&&(comm==1))
     {
-        sprintf(response,"?");
-        if (send(fd, response, 2, 0) < 0) 
+        sprintf(response,"?\n");
+		if (sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
         {
-//            perror("send");
+			// perror("send");
             return -1;
         }
         return 0;
@@ -2045,16 +2055,14 @@ int parse(char *message, rtlsdr_dev_t *dev, int fd)
     }
 
 
-
-    if (comm==0)
+	if (comm==0)
     {
         val = dev->tuner->get_i2c_register(dev, reg);
-        sprintf(response,"! %d",val);
-        val = send(fd, response, strlen(response), UDP_SEND_FLAGS);
-
+        sprintf(response,"! %d\n",val);
+        val = sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen);
         if (val<0)
         {
-            printf("error sending\n");
+            // printf("error sending\n");
             return -1;
         }
     }
@@ -2062,12 +2070,16 @@ int parse(char *message, rtlsdr_dev_t *dev, int fd)
     {
         dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
         rtlsdr_set_i2c_repeater(dev, 1);
-        val = dev->tuner->set_i2c_register(dev, reg, mask, val);
+		val = dev->tuner->set_i2c_register(dev, reg, val, mask);
         rtlsdr_set_i2c_repeater(dev, 0);
-        sprintf(response,"! %d",val);
-        if (send(fd, response, strlen(response), UDP_SEND_FLAGS) < 0)
+        sprintf(response,"! %d\n", val);
+
+		// printf("%d %d %d\n", reg, val, mask);
+		
+		val = sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen);
+		if ( val < 0 )
         {
-            printf("error sending\n");
+            // printf("error sending\n");
             return -1;
         }
     }
@@ -2075,76 +2087,68 @@ int parse(char *message, rtlsdr_dev_t *dev, int fd)
     else
     {
         sprintf(response,"?\n");
-        send(fd, response, strlen(response), 0);
+		sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen);
     }
+
     return 0;
-
 }
-
 
 void * srv_server(void *dev)
 {
-    int s, s2, t, len, num;
-    struct sockaddr_un local, remote;
-    char str[128];
-    char sock_path[64];
-    rtlsdr_dev_t *dev_i = (rtlsdr_dev_t*)dev;
+	rtlsdr_dev_t *dev_i = (rtlsdr_dev_t*)dev;
 
+	slen = sizeof(si_other);
 
-
-    num = dev_i->dev_num;
-
-    if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        perror("socket");
-        exit(1);
-    }
-
-    sprintf(sock_path,"/var/tmp/rtlsdr%d",num);
-    local.sun_family = AF_UNIX;
-    strcpy(local.sun_path, sock_path);
-    unlink(local.sun_path);
-    len = strlen(local.sun_path) + sizeof(local.sun_family);
-
-    if (bind(s, (struct sockaddr *)&local, len) == -1) 
+	//Initialise winsock
+    if (WSAStartup(MAKEWORD(2,2),&wsa) != 0)
     {
-        perror("bind");
-        return NULL;
+        // printf("Failed. Error Code : %d",WSAGetLastError());
+        exit(EXIT_FAILURE);
     }
-
-    if (listen(s, 5) == -1) {
-        perror("listen");
-        return NULL;
-    }
-
-
-    printf("%d\n",dev_i->handled);
-    while (dev_i->handled) 
+     
+    //Create a socket
+    if((s = socket(AF_INET , SOCK_DGRAM , IPPROTO_UDP )) == INVALID_SOCKET)
     {
-        int done, n;
-        t = sizeof(remote);
-        if ((s2 = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t)) == -1) {
-            perror("accept");
-            return NULL;
-        }
+        // printf("Could not create socket : %d" , WSAGetLastError());
+		exit(EXIT_FAILURE);
+    }
+     
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons( UDP_PORT );
+    
+    if( bind(s, (struct sockaddr *)&server , sizeof(server)) == SOCKET_ERROR)
+    {
+        // printf("Bind failed with error code : %d" , WSAGetLastError());
+        exit(EXIT_FAILURE);
+    }
 
-        done = 0;
-        while (!done)
+	//keep listening for data
+    while(1)
+    {        
+        //clear the buffer by filling null, it might have previously received data
+        memset(buf,'\0', BUFLEN);
+         
+        //try to receive some data, this is a blocking call
+        if ((recv_len = recvfrom(s, buf, BUFLEN-1, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
         {
-            n = recv(s2, str, 100, 0);
-            if (n <= 0) 
-            {
-//                if (n < 0) perror("recv");
-                done = 1;
-            }
-            if (parse(str, dev_i, s2)<0)
-            done = 1;
+            // printf("recvfrom() failed with error code : %d" , WSAGetLastError());
+            exit(EXIT_FAILURE);
         }
-        close(s2);
+
+		// printf("received udp: %s\n", buf);
+		parse( buf, dev_i );
+
+        //print details of the client/peer and the data received
+        // printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
+        // printf("Data: %s\n" , buf);
     }
+ 
+    closesocket(s);
+    WSACleanup();
+     
     return NULL;
 }
-
-
 
 
 int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
@@ -2357,10 +2361,10 @@ found:
 
 	if (dev->tuner_type==RTLSDR_TUNER_R820T) {
 		dev->handled = 1;
-		dev->saved_27 = dev->tuner->get_reg(dev,27);
+		dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
 		dev->dev_num = index;
-		signal(SIGPIPE, SIG_IGN);
-		if ( pthread_create(&srv_thread, NULL, srv_server, dev) ) {
+		// signal(SIGPIPE, SIG_IGN);
+		if(pthread_create(&srv_thread, NULL, srv_server, dev)) {
 			fprintf(stderr, "Error creating thread\n");
 		}
 	}

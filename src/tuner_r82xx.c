@@ -292,7 +292,7 @@ static int r82xx_write_reg(struct r82xx_priv *priv, uint8_t reg, uint8_t val)
 	return r82xx_write(priv, reg, &val, 1);
 }
 
-static int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg)
+int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg)
 {
 	reg -= REG_SHADOW_START;
 
@@ -434,7 +434,7 @@ static int r82xx_set_mux(struct r82xx_priv *priv, uint32_t freq)
 static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 {
 	int rc, i;
-	unsigned sleep_time = 10000;
+	//unsigned sleep_time = 10000;
 	uint64_t vco_freq;
 	uint64_t vco_div;
 	uint32_t vco_min = 1770000; /* kHz */
@@ -944,7 +944,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 
 	return 0;
 }
-
+/*
 static int r82xx_read_gain(struct r82xx_priv *priv)
 {
 	uint8_t data[4];
@@ -956,7 +956,7 @@ static int r82xx_read_gain(struct r82xx_priv *priv)
 
 	return ((data[3] & 0x0f) << 1) + ((data[3] & 0xf0) >> 4);
 }
-
+*/
 /* measured with a Racal 6103E GSM test set at 928 MHz with -60 dBm
  * input power, for raw results see:
  * http://steve-m.de/projects/rtl-sdr/gain_measurement/r820t/
@@ -975,75 +975,6 @@ static const int r82xx_mixer_gain_steps[]  = {
 	0, 5, 10, 10, 19, 9, 10, 25, 17, 10, 8, 16, 13, 6, 3, -8
 };
 
-int r82xx_set_gain_old(struct r82xx_priv *priv, int set_manual_gain, int gain)
-{
-	int rc;
-
-	if (set_manual_gain) {
-		int i, total_gain = 0;
-		uint8_t mix_index = 0, lna_index = 0;
-		uint8_t data[4];
-
-		/* LNA auto off */
-		rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
-		if (rc < 0)
-			return rc;
-
-		 /* Mixer auto off */
-		rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
-		if (rc < 0)
-			return rc;
-
-		rc = r82xx_read(priv, 0x00, data, sizeof(data));
-		if (rc < 0)
-			return rc;
-
-		/* set fixed VGA gain for now (16.3 dB) */
-		rc = r82xx_write_reg_mask(priv, 0x0c, 0x08, 0x9f);
-		if (rc < 0)
-			return rc;
-
-		for (i = 0; i < 15; i++) {
-			if (total_gain >= gain)
-				break;
-
-			total_gain += r82xx_lna_gain_steps[++lna_index];
-
-			if (total_gain >= gain)
-				break;
-
-			total_gain += r82xx_mixer_gain_steps[++mix_index];
-		}
-
-		/* set LNA gain */
-		rc = r82xx_write_reg_mask(priv, 0x05, lna_index, 0x0f);
-		if (rc < 0)
-			return rc;
-
-		/* set Mixer gain */
-		rc = r82xx_write_reg_mask(priv, 0x07, mix_index, 0x0f);
-		if (rc < 0)
-			return rc;
-	} else {
-		/* LNA */
-		rc = r82xx_write_reg_mask(priv, 0x05, 0, 0x10);
-		if (rc < 0)
-			return rc;
-
-		/* Mixer */
-		rc = r82xx_write_reg_mask(priv, 0x07, 0x10, 0x10);
-		if (rc < 0)
-			return rc;
-
-		/* set fixed VGA gain for now (26.5 dB) */
-		rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f);
-		if (rc < 0)
-			return rc;
-	}
-
-	return 0;
-}
-
 int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
   int extended_mode, int lna_gain, int mixer_gain, int vga_gain)
 {
@@ -1054,22 +985,6 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
   uint8_t data[4];
 
   if (extended_mode) {
-	/*
-	// LNA auto off
-	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
-	if (rc < 0)
-	  return rc;
-
-	// Mixer auto off
-	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
-	if (rc < 0)
-	  return rc;
-
-	rc = r82xx_read(priv, 0x00, data, sizeof(data));
-	if (rc < 0)
-	  return rc;
-	*/
-
 	/* Set LNA */
 	rc = r82xx_write_reg_mask(priv, 0x05, lna_gain, 0x0f);
 	if (rc < 0)

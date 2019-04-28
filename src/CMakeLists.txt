@@ -61,7 +61,11 @@ ENDIF(MSVC)
 # Setup shared library variant
 ########################################################################
 add_library(rtlsdr_shared SHARED ${rtlsdr_srcs})
+if(NOT WIN32)
 target_link_libraries(rtlsdr_shared ${LIBUSB_LIBRARIES})
+else()
+target_link_libraries(rtlsdr_shared ws2_32 ${LIBUSB_LIBRARIES})
+endif()
 set_target_properties(rtlsdr_shared PROPERTIES DEFINE_SYMBOL "rtlsdr_EXPORTS")
 set_target_properties(rtlsdr_shared PROPERTIES OUTPUT_NAME rtlsdr)
 set_target_properties(rtlsdr_shared PROPERTIES SOVERSION ${MAJOR_VERSION})
@@ -71,7 +75,12 @@ set_target_properties(rtlsdr_shared PROPERTIES VERSION ${LIBVER})
 # Setup static library variant
 ########################################################################
 add_library(rtlsdr_static STATIC ${rtlsdr_srcs})
+if(NOT WIN32)
 target_link_libraries(rtlsdr_static ${LIBUSB_LIBRARIES})
+else()
+target_link_libraries(rtlsdr_static ws2_32 ${LIBUSB_LIBRARIES})
+endif()
+
 set_property(TARGET rtlsdr_static APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
 if(NOT WIN32)
 # Force same library filename for static and shared variants of the library
