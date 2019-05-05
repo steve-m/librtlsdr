@@ -104,6 +104,7 @@ typedef struct rtlsdr_tuner_iface {
 	int (*set_if_gain)(void *, int stage, int gain /* tenth dB */);
 	int (*set_gain_mode)(void *, int manual);
 	int (*set_i2c_register)(void *, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ );
+	int (*set_i2c_override)(void *, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ );
 	unsigned (*get_i2c_register)(void *, int i2c_register);
 } rtlsdr_tuner_iface_t;
 
@@ -209,6 +210,22 @@ struct rtlsdr_dev {
 	struct r82xx_priv r82xx_p;
 	/* soft tuner agc */
 	struct softagc_state softagc;
+
+	/* UDP controller server */
+#define UDP_TX_BUFLEN   128
+	unsigned udpPortNo;		/* default: 32323 */
+	int      override_if_freq;
+	int      override_if_flag;
+	int      last_if_freq;
+	pthread_t srv_thread;
+	SOCKET   udpS;
+	struct sockaddr_in server;
+	struct sockaddr_in si_other;
+	int      srv_started;
+	int      slen;
+	int      recv_len;
+	char     buf[UDP_TX_BUFLEN];
+	WSADATA  wsa;
 
 	/* status */
 	int dev_lost;
@@ -387,42 +404,46 @@ int r820t_set_i2c_register(void *dev, unsigned i2c_register, unsigned mask, unsi
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_i2c_register(&devt->r82xx_p, i2c_register, mask, data);
 }
+int r820t_set_i2c_override(void *dev, unsigned i2c_register, unsigned mask, unsigned data ) {
+	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+	return r82xx_set_i2c_override(&devt->r82xx_p, i2c_register, mask, data);
+}
 
 
 /* definition order must match enum rtlsdr_tuner */
 static rtlsdr_tuner_iface_t tuners[] = {
 	{
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
 	},
 	{
 		e4000_init, e4000_exit,
 		e4000_set_freq, e4000_set_bw, e4000_set_gain, e4000_set_if_gain,
-		e4000_set_gain_mode, NULL, NULL
+		e4000_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		_fc0012_init, fc0012_exit,
 		fc0012_set_freq, fc0012_set_bw, _fc0012_set_gain, NULL,
-		fc0012_set_gain_mode, NULL, NULL
+		fc0012_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		_fc0013_init, fc0013_exit,
 		fc0013_set_freq, fc0013_set_bw, _fc0013_set_gain, NULL,
-		fc0013_set_gain_mode, NULL, NULL
+		fc0013_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		fc2580_init, fc2580_exit,
 		_fc2580_set_freq, fc2580_set_bw, fc2580_set_gain, NULL,
-		fc2580_set_gain_mode, NULL, NULL
+		fc2580_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
-		r820t_set_gain_mode, r820t_set_i2c_register, r820t_get_i2c_register
+		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
-		r820t_set_gain_mode, r820t_set_i2c_register, r820t_get_i2c_register
+		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register
 	},
 };
 
@@ -884,6 +905,16 @@ static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq)
 	if (rtlsdr_get_xtal_freq(dev, &rtl_xtal, NULL))
 		return -2;
 
+	dev->last_if_freq = freq;
+	if ( dev->override_if_flag ) {
+		if ( dev->verbose )
+			fprintf(stderr, "overriding rtlsdr_set_if_freq(): modifying %u to %d Hz\n"
+					, freq, dev->override_if_freq );
+		freq = dev->override_if_freq;
+		if ( dev->override_if_flag == 1 )
+			dev->override_if_flag = 0;
+	}
+
 	if_freq = ((freq * TWO_POW(22)) / rtl_xtal) * (-1);
 
 	tmp = (if_freq >> 16) & 0x3f;
@@ -1312,7 +1343,7 @@ int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw, uint32_t 
 {
 	int r = 0;
 
-		*applied_bw = 0;		/* unknown */
+	*applied_bw = 0;		/* unknown */
 
 	if (!dev || !dev->tuner)
 		return -1;
@@ -1479,6 +1510,29 @@ int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsi
 	if (dev->tuner->set_i2c_register) {
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = dev->tuner->set_i2c_register((void *)dev, i2c_register, mask, data);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	}
+	return r;
+}
+
+int rtlsdr_set_tuner_i2c_override(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ )
+{
+	int r = 0;
+
+	#ifdef _ENABLE_RPC
+	if (rtlsdr_rpc_is_enabled())
+	{
+		/* TODO */
+		return -1;
+	}
+	#endif
+
+	if (!dev || !dev->tuner)
+		return -1;
+
+	if (dev->tuner->set_i2c_override) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = dev->tuner->set_i2c_override((void *)dev, i2c_register, mask, data);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 	return r;
@@ -1977,177 +2031,307 @@ int rtlsdr_get_index_by_serial(const char *serial)
 	return -3;
 }
 
-// UDP controller server
-#define BUFLEN   128
-#define UDP_PORT 32323
-SOCKET s;
-struct sockaddr_in server, si_other;
-int slen, recv_len;
-char buf[BUFLEN];
-WSADATA wsa;
+/* UDP controller server */
+#if 0
+unsigned udpPortNo;		/* default: 32323 */
+#endif
 
-int parse(char *message, rtlsdr_dev_t *dev)
-{
-    char *str1, *token;
-    char response[BUFLEN];
-    char *saveptr;
-    int comm;
-    uint8_t mask,reg=0,val=0;
-    str1 = message;
+static int parseNum(const char * pacNum) {
+	int numBase = 10;			/* assume decimal */
+	int sgn = 1;				/* sign: +/- 1 */
+	int val = 0;
+	const char * pac = pacNum + 1;
+	if ( !pacNum || !pacNum[0] )
+		return 0;
 
-	memset(response,'\0', BUFLEN);
+	if ( pacNum[0] == 'd' )			/* decimal system */
+		numBase = 10;
+	else if ( pacNum[0] == 'x' )		/* hexadecimal system */
+		numBase = 16;
+	else if ( pacNum[0] == 'b' )	/* binary system */
+		numBase = 2;
+	else
+		pac = pacNum;
 
-    str1[100] = 0;
-    str1[strlen(str1)-1] = 0;
+	if ( *pac == '-' ) {
+		sgn = -1;
+		++pac;
+	}
 
-    token = strtok_r(str1, " ", &saveptr);
-    if ((token == NULL)||(strlen(token)>1)||((token[0]!='g')&&(token[0]!='s')))
-    {
-        sprintf(response,"?\n");
-		if (sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
-        {
-			// perror("send");
-            return -1;
-        }
-        return 0;
-    }
-    if (token[0]=='g') comm = 0;
-    if (token[0]=='s') comm = 1;
+	while ( *pac )
+	{
+		int digitValue = ( '0' <= *pac && *pac <= '9' ) ? (*pac - '0')
+			: ( 'A' <= *pac && *pac <= 'F' ) ? (*pac + 10 - 'A') : (*pac + 10 - 'a');
+		if ( digitValue >= 0 && digitValue < numBase ) {
+			val = val * numBase + digitValue;
+			++pac;
+			continue;
+		}
+		else if ( *pac == '\'' || *pac == '.' || *pac == '_' ) {	/* ignore some delimiter chars */
+			++pac;
+			continue;
+		}
+		else
+			break;
+	}
 
-    token = strtok_r(NULL, " ", &saveptr);
-    if ((token == NULL)||(atoi(token)<5)||(atoi(token)>32))
-    {
-        sprintf(response,"?\n");
-		if (sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
-	    {
-			// perror("send");
-            return -1;
-        }
-        return 0;
-    }
-    reg = (uint8_t)atoi(token);
-
-    if (token) token = strtok_r(NULL, " ", &saveptr);
-    if ((token == NULL)&&(comm==1))
-    {
-        sprintf(response,"?\n");
-		if (sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
-        {
-			// perror("send");
-            return -1;
-        }
-        return 0;
-    }
-    else if (comm==1) 
-    {
-        val = (uint8_t)atoi(token);
-    }
-
-
-    if (token) token = strtok_r(NULL, " ", &saveptr);
-    if (token==NULL) 
-    {
-        mask = 0xff;
-    }
-    else 
-    {
-        mask = (uint8_t)atoi(token);
-    }
-
-
-	if (comm==0)
-    {
-        val = dev->tuner->get_i2c_register(dev, reg);
-        sprintf(response,"! %d\n",val);
-        val = sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen);
-        if (val<0)
-        {
-            // printf("error sending\n");
-            return -1;
-        }
-    }
-    else if (comm==1)
-    {
-        dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
-        rtlsdr_set_i2c_repeater(dev, 1);
-		val = dev->tuner->set_i2c_register(dev, reg, val, mask);
-        rtlsdr_set_i2c_repeater(dev, 0);
-        sprintf(response,"! %d\n", val);
-
-		// printf("%d %d %d\n", reg, val, mask);
-		
-		val = sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen);
-		if ( val < 0 )
-        {
-            // printf("error sending\n");
-            return -1;
-        }
-    }
-
-    else
-    {
-        sprintf(response,"?\n");
-		sendto(s, response, strlen(response), 0, (struct sockaddr*) &si_other, slen);
-    }
-
-    return 0;
+	return val * sgn;
 }
 
-void * srv_server(void *dev)
+static double parseFreq(char *s)
+/* standard suffixes */
 {
-	rtlsdr_dev_t *dev_i = (rtlsdr_dev_t*)dev;
+	char last;
+	int len;
+	double suff = 1.0;
+	len = strlen(s);
+	/* allow formatting spaces from .csv command file */
+	while ( len > 1 && isspace(s[len-1]) )	--len;
+	last = s[len-1];
+	s[len-1] = '\0';
+	switch (last) {
+		case 'g':
+		case 'G':
+			suff *= 1e3;
+			/* fall-through */
+		case 'm':
+		case 'M':
+			suff *= 1e3;
+			/* fall-through */
+		case 'k':
+		case 'K':
+			suff *= 1e3;
+			suff *= atof(s);
+			s[len-1] = last;
+			return suff;
+	}
+	s[len-1] = last;
+	return atof(s);
+}
 
-	slen = sizeof(si_other);
+
+static const char * formatInHex(char * buf, int v, int num_digits) {
+	static const char tab[] = "0123456789ABCDEF";
+	int nibbleVal, nibbleNo, off = 0;
+	buf[off++] = 'x';
+	for ( nibbleNo = num_digits -1; nibbleNo >= 0; --nibbleNo ) {
+		if ( (nibbleNo % 4) == 3 && nibbleNo != num_digits -1 )
+			buf[off++] = '\'';
+		nibbleVal = ( ((uint32_t)v) >> (nibbleNo * 4) ) & 0x0f;
+		buf[off++] = tab[nibbleVal];
+	}
+	buf[off++] = 0;
+	return buf;
+}
+
+static const char * formatInBin(char * buf, int v, int num_digits) {
+	static const char tab[] = "01";
+	int bitVal, bitNo, off = 0;
+	buf[off++] = 'b';
+	for ( bitNo = num_digits -1; bitNo >= 0; --bitNo ) {
+		if ( (bitNo % 4) == 3 && bitNo != num_digits -1 )
+			buf[off++] = '\'';
+		bitVal = ( ((uint32_t)v) >> bitNo ) & 1;
+		buf[off++] = tab[bitVal];
+	}
+	buf[off++] = 0;
+	return buf;
+}
+
+static int parse(char *message, rtlsdr_dev_t *dev)
+{
+	char binBufA[64], binBufB[64];
+	char hexBufA[16], hexBufB[16];
+	char *str1, *token, *saveptr;
+	char response[UDP_TX_BUFLEN];
+	double freqVal = -1;
+	int comm = 0, parsedVal = 0, iVal = 0;
+	int val = 0;
+	uint32_t applied_bw = 0;
+	uint8_t mask = 0xff, reg=0;
+
+	str1 = message;
+	memset(response,'\0', UDP_TX_BUFLEN);
+
+	str1[100] = 0;
+	str1[strlen(str1)-1] = 0;
+
+	/* first token == command */
+	token = strtok_r(str1, " \t", &saveptr);
+	if ( !token )
+	{
+		sprintf(response,"?\n");
+		sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
+		return 0;
+	}
+	/* commands with register args: 64 | x */
+	if (!strcmp(token, "g")) comm = 64 + 1;
+	if (!strcmp(token, "s")) comm = 64 + 2;
+	if (!strcmp(token, "S")) comm = 64 + 3;
+	if (!strcmp(token, "i")) comm = 128 + 1;
+	if (!strcmp(token, "I")) comm = 128 + 2;
+
+	if ( comm & 64 ) {
+		token = strtok_r(NULL, " \t", &saveptr);
+		parsedVal = parseNum(token);
+		if ( (!token) || (comm >= (64+2) && parsedVal < 5) || (parsedVal > 32) ) {
+			sprintf(response,"?\n");
+			if (sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen) == SOCKET_ERROR) {
+				// perror("send");
+				return -1;
+			}
+			return 0;
+		}
+		reg = (uint8_t)parsedVal;	/* 1st arg: register address */
+		if ( dev->verbose )
+			fprintf(stderr, "parsed register %d from token '%s'\n", reg, token);
+
+		if (token)
+			token = strtok_r(NULL, " \t", &saveptr);
+		if ( (!token) && (comm >= 64+2)) {	/* set requires additional parameter: the value */
+			sprintf(response,"?\n");
+			if (sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen) == SOCKET_ERROR) {
+				// perror("send");
+				return -1;
+			}
+			return 0;
+		} else if (comm >= 64+2) {
+			parsedVal = parseNum(token);		/* set: 2nd arg: value */
+			iVal = parsedVal;
+			if ( dev->verbose )
+				fprintf(stderr, "parsed value %d = %03X from token '%s'\n", iVal, iVal, token);
+		}
+
+		if (token)
+			token = strtok_r(NULL, " \t", &saveptr);
+		if (!token) {
+			mask = 0xff;		/* default mask */
+		} else  {
+			parsedVal = parseNum(token);		/* set: 3rd optional arg: mask */
+			mask = (uint8_t)( parsedVal & 0xff );
+			if ( dev->verbose )
+				fprintf(stderr, "parsed mask %d = %02X from token '%s'\n", parsedVal, parsedVal, token);
+		}
+
+		if (comm == 64 + 1) {
+			val = dev->tuner->get_i2c_register(dev, reg);
+			sprintf(response,"! %d = %s = %s\n", val
+				, formatInHex(hexBufA, val, 2)
+				, formatInBin(binBufA, val, 8) );
+			if ( dev->verbose )
+			{
+				fprintf(stderr, "parsed 'get i2c register %d = x%02X'\n", reg, reg);
+				fprintf(stderr, "\tresponse: %s\n", response);
+			}
+			val = sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
+			if (val<0) {
+				// printf("error sending\n");
+				return -1;
+			}
+		} else if (comm == 64 +2 || comm == 64 +3 ) {
+			dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
+			if ( dev->tuner->set_i2c_register && dev->tuner->set_i2c_override ) {
+				rtlsdr_set_i2c_repeater(dev, 1);
+				if (comm == 64 +2)
+					val = dev->tuner->set_i2c_register(dev, reg, iVal, mask);
+				else
+					val = dev->tuner->set_i2c_override(dev, reg, iVal, mask);
+				rtlsdr_set_i2c_repeater(dev, 0);
+			}
+			sprintf(response,"! %d\n", (int)val);
+			// printf("%d %d %d\n", reg, val, mask);
+			if ( dev->verbose )
+			{
+				fprintf(stderr, "parsed 'set i2c register %s %d = x%02X  value %d = %s = %s  with mask %s = %s'\n"
+						, ( comm == (64 +3) ? (iVal > 255 ? "override clear " : "override ") : "" )
+						, reg, reg
+						, val, formatInHex(hexBufA, iVal, 3), formatInBin(binBufA, iVal, 12)
+						, formatInHex(hexBufB, (int)mask, 2), formatInBin(binBufB, (int)mask, 8) );
+				fprintf(stderr, "\tresponse: %s\n", response);
+			}
+			val = sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
+			if ( val < 0 ) {
+				// printf("error sending\n");
+				return -1;
+			}
+		} else {
+			sprintf(response,"?\n");
+			if ( dev->verbose )
+			{
+				fprintf(stderr, "parsed unknown command!\n");
+				fprintf(stderr, "\tresponse: %s\n", response);
+			}
+			sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
+		}
+	}
+	else if ( comm & 128 ) {
+		token = strtok_r(NULL, " \t", &saveptr);
+		freqVal = parseFreq(token);
+		if ( freqVal < 0 ) {
+			dev->override_if_freq = 0;
+			dev->override_if_flag = 0;
+		}
+		else
+		{
+			dev->override_if_freq = (int)freqVal;
+			dev->override_if_flag = ( comm == (128 + 1) ) ? 1 : 2;
+		}
+		/* set last bandwidth .. which also has to set the IF frequency */
+		rtlsdr_set_and_get_tuner_bandwidth(dev, dev->bw, &applied_bw, 1 );
+		rtlsdr_set_center_freq(dev, dev->freq);
+	}
+	{
+		sprintf(response,"?\n");
+		sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
+	}
+	return 0;
+}
+
+void * srv_server(void *vdev)
+{
+	rtlsdr_dev_t * dev = (rtlsdr_dev_t *)vdev;
+	dev->slen = sizeof(dev->si_other);
 
 	//Initialise winsock
-    if (WSAStartup(MAKEWORD(2,2),&wsa) != 0)
-    {
-        // printf("Failed. Error Code : %d",WSAGetLastError());
-        exit(EXIT_FAILURE);
-    }
-     
-    //Create a socket
-    if((s = socket(AF_INET , SOCK_DGRAM , IPPROTO_UDP )) == INVALID_SOCKET)
-    {
-        // printf("Could not create socket : %d" , WSAGetLastError());
+	if (WSAStartup(MAKEWORD(2,2),&dev->wsa) != 0) {
+		// printf("Failed. Error Code : %d",WSAGetLastError());
 		exit(EXIT_FAILURE);
-    }
-     
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons( UDP_PORT );
-    
-    if( bind(s, (struct sockaddr *)&server , sizeof(server)) == SOCKET_ERROR)
-    {
-        // printf("Bind failed with error code : %d" , WSAGetLastError());
-        exit(EXIT_FAILURE);
-    }
+	}
+	//Create a socket
+	if((dev->udpS = socket(AF_INET , SOCK_DGRAM , IPPROTO_UDP )) == INVALID_SOCKET) {
+		// printf("Could not create socket : %d" , WSAGetLastError());
+		exit(EXIT_FAILURE);
+	}
+
+	dev->server.sin_family = AF_INET;
+	dev->server.sin_addr.s_addr = INADDR_ANY;
+	dev->server.sin_port = htons( dev->udpPortNo );
+
+	if( bind(dev->udpS, (struct sockaddr *)&dev->server , sizeof(dev->server)) == SOCKET_ERROR) {
+		// printf("Bind failed with error code : %d" , WSAGetLastError());
+		exit(EXIT_FAILURE);
+	}
 
 	//keep listening for data
-    while(1)
-    {        
-        //clear the buffer by filling null, it might have previously received data
-        memset(buf,'\0', BUFLEN);
-         
-        //try to receive some data, this is a blocking call
-        if ((recv_len = recvfrom(s, buf, BUFLEN-1, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
-        {
-            // printf("recvfrom() failed with error code : %d" , WSAGetLastError());
-            exit(EXIT_FAILURE);
-        }
+	while(1) {
+		//clear the buffer by filling null, it might have previously received data
+		memset(dev->buf,'\0', UDP_TX_BUFLEN);
+		//try to receive some data, this is a blocking call
+		if ((dev->recv_len = recvfrom(dev->udpS, dev->buf, UDP_TX_BUFLEN-1, 0, (struct sockaddr *) &dev->si_other, &dev->slen)) == SOCKET_ERROR) {
+			// printf("recvfrom() failed with error code : %d" , WSAGetLastError());
+			exit(EXIT_FAILURE);
+		}
 
-		// printf("received udp: %s\n", buf);
-		parse( buf, dev_i );
-
-        //print details of the client/peer and the data received
-        // printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
-        // printf("Data: %s\n" , buf);
-    }
- 
-    closesocket(s);
-    WSACleanup();
-     
-    return NULL;
+		if ( dev->verbose )
+			fprintf(stderr, "received udp: %s\n", dev->buf);
+		parse( dev->buf, dev );
+		//print details of the client/peer and the data received
+		// printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
+		// printf("Data: %s\n" , buf);
+	}
+	closesocket(dev->udpS);
+	WSACleanup();
+	return NULL;
 }
 
 
@@ -2162,8 +2346,6 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	struct libusb_device_descriptor dd;
 	uint8_t reg;
 	ssize_t cnt;
-	pthread_t srv_thread;
-
 
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
@@ -2194,7 +2376,13 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->softagc.deadTimeSps = 0;
 	dev->softagc.rpcNumGains = 0;
 	dev->softagc.rpcGainValues = NULL;
+	
+	/* UDP controller server */
+	dev->udpPortNo = 0;	/* default port 32323 .. but deactivated - by default */
+	dev->override_if_freq = 0;
+	dev->override_if_flag = 0;
 
+	dev->dev_num = index;
 	dev->dev_lost = 1;
 
 	cnt = libusb_get_device_list(dev->ctx, &list);
@@ -2358,16 +2546,6 @@ found:
 	rtlsdr_set_i2c_repeater(dev, 0);
 
 	*out_dev = dev;
-
-	if (dev->tuner_type==RTLSDR_TUNER_R820T) {
-		dev->handled = 1;
-		dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
-		dev->dev_num = index;
-		// signal(SIGPIPE, SIG_IGN);
-		if(pthread_create(&srv_thread, NULL, srv_server, dev)) {
-			fprintf(stderr, "Error creating thread\n");
-		}
-	}
 
 	return 0;
 err:
@@ -3217,6 +3395,19 @@ int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on)
 }
 
 
+const char * rtlsdr_get_opt_help(int longInfo)
+{
+	if ( longInfo )
+		return
+		"\t[-O\tset RTL options string seperated with ':' ]\n"
+		"\t\tf=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
+		"\t\tdagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"\t\tport=<udp_port default with 1>\n";
+	else
+		return
+		"\t[-O\tset RTL options string seperated with ':' ]\n";
+}
+
 int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 {
 	char * optStr, * optPart;
@@ -3301,6 +3492,14 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed soft agc dead time %f ms\n", d);
 			dev->softagc.deadTimeMs = d;
 		}
+		else if (!strncmp(optPart, "port=", 5)) {
+			int udpPortNo = atoi(optPart +5);
+			if ( udpPortNo == 1 )
+				udpPortNo = 32323;
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): UDP control server port\n", udpPortNo);
+			dev->udpPortNo = udpPortNo;
+		}
 		else {
 			if (verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed unknown option '%s'\n", optPart);
@@ -3315,6 +3514,19 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 
 	if ( dev->softagc.agcState != SOFTSTATE_OFF )
 		softagc_init(dev);
+
+	if (dev->udpPortNo && dev->srv_started == 0 && dev->tuner_type==RTLSDR_TUNER_R820T) {
+		dev->handled = 1;
+		dev->saved_27 = dev->tuner->get_i2c_register(dev,27);		/* highest/lowest corner for LPNF and LPF */
+		// signal(SIGPIPE, SIG_IGN);
+		if(pthread_create(&dev->srv_thread, NULL, srv_server, dev)) {
+			fprintf(stderr, "Error creating thread\n");
+		}
+		else {
+			dev->srv_started = 1;
+			fprintf(stderr, "UDP server started on port %u\n", dev->udpPortNo);
+		}
+	}
 
 	free(optStr);
 	return retAll;

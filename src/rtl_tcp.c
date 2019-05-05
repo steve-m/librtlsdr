@@ -109,11 +109,13 @@ void usage(void)
 		"\t[-w rtlsdr tuner bandwidth [Hz] (for R820T and E4000 tuners)]\n"
 		"\t[-d device index or serial (default: 0)]\n"
 		"\t[-P ppm_error (default: 0)]\n"
+		"%s"
 		"\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n"
 
 		"\t[-D direct_sampling_mode (default: 0, 1 = I, 2 = Q, 3 = I below threshold, 4 = Q below threshold)]\n"
 		"\t[-D direct_sampling_threshold_frequency (default: 0 use tuner specific frequency threshold for 3 and 4)]\n"
-		"\t[-v increase verbosity (default: 0)]\n");
+		"\t[-v increase verbosity (default: 0)]\n"
+		, rtlsdr_get_opt_help(1) );
 	exit(1);
 }
 
@@ -388,6 +390,16 @@ static void *command_worker(void *arg)
 			printf("set tuner bandwidth to %i Hz\n", bandwidth);
 			verbose_set_bandwidth(dev, bandwidth);
 			break;
+		case SET_I2C_TUNER_REGISTER:
+			tmp = ntohl(cmd.param);
+			printf("set i2c register x%03X to x%03X with mask x%02X\n", (tmp >> 20) & 0xfff, tmp & 0xfff, (tmp >> 12) & 0xff );
+			rtlsdr_set_tuner_i2c_register(dev, (tmp >> 20) & 0xfff, (tmp >> 12) & 0xff, tmp & 0xfff);
+			break;
+		case SET_I2C_TUNER_OVERRIDE:
+			tmp = ntohl(cmd.param);
+			printf("set i2c override register x%03X to x%03X with mask x%02X\n", (tmp >> 20) & 0xfff, tmp & 0xfff, (tmp >> 12) & 0xff );
+			rtlsdr_set_tuner_i2c_override(dev, (tmp >> 20) & 0xfff, (tmp >> 12) & 0xff, tmp & 0xfff);
+			break;
 		default:
 			break;
 		}
@@ -492,6 +504,7 @@ int main(int argc, char **argv)
 	 *   512 samples @  8 kHz  = 64 ms
 	 */
 	uint32_t buf_len = 32 * 512;
+	const char * rtlOpts = NULL;
 	int dev_index = 0;
 	int dev_given = 0;
 	int gain = 0;
@@ -514,7 +527,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:TI:W:l:w:D:v")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:O:TI:W:l:w:D:v")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -552,6 +565,9 @@ int main(int argc, char **argv)
 			break;
 		case 'P':
 			ppm_error = atoi(optarg);
+			break;
+		case 'O':
+			rtlOpts = optarg;
 			break;
 		case 'T':
 			enable_biastee = 1;
@@ -607,6 +623,10 @@ int main(int argc, char **argv)
 #else
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) sighandler, TRUE );
 #endif
+
+	if (rtlOpts) {
+		rtlsdr_set_opt_string(dev, rtlOpts, verbosity);
+	}
 
 	/* Set the tuner error */
 	verbose_ppm_set(dev, ppm_error);

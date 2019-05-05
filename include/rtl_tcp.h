@@ -55,7 +55,12 @@ enum RTL_TCP_COMMANDS {
 #endif
     UDP_ESTABLISH             = 0x41,
     UDP_TERMINATE             = 0x42,
-    SET_I2C_TUNER_REGISTER    = 0x43   /* for experiments: data: 31 .. 16: register; 15 .. 8: mask; 7 .. 0: data */
+    SET_I2C_TUNER_REGISTER    = 0x43,   /* for experiments: 32 bit data word:
+                                         * 31 .. 20: register (12 bits)
+                                         * 19 .. 12: mask (8 bits)
+                                         * 11 ..  0: data (12 bits) */
+    SET_I2C_TUNER_OVERRIDE    = 0x44    /* encoding as with SET_I2C_TUNER_REGISTER
+                                         * data (bits 11 .. 0) > 255 removes override */
 };
 
 #ifdef __cplusplus

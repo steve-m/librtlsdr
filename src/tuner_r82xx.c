@@ -250,10 +250,10 @@ static void shadow_store(struct r82xx_priv *priv, uint8_t reg, const uint8_t *va
 	memcpy(&priv->regs[r], val, len);
 }
 
-static int r82xx_write(struct r82xx_priv *priv, uint8_t reg, const uint8_t *val,
+static int r82xx_write_arr(struct r82xx_priv *priv, uint8_t reg, const uint8_t *val,
 			   unsigned int len)
 {
-	int rc, size, pos = 0;
+	int rc, size, k, regOff, regIdx, bufIdx, pos = 0;
 
 	/* Store the shadow registers */
 	shadow_store(priv, reg, val, len);
@@ -267,6 +267,17 @@ static int r82xx_write(struct r82xx_priv *priv, uint8_t reg, const uint8_t *val,
 		/* Fill I2C buffer */
 		priv->buf[0] = reg;
 		memcpy(&priv->buf[1], &val[pos], size);
+
+		/* override data in buffer */
+		for ( k = 0; k < size; ++k ) {
+			regOff = pos + k;
+			regIdx = reg - REG_SHADOW_START + regOff;
+			if ( priv->override_mask[regIdx] ) {
+				bufIdx = 1 + k;
+				priv->buf[bufIdx] = ( priv->buf[bufIdx] & ~ priv->override_mask[regIdx] )
+								| ( priv->override_mask[regIdx] & priv->override_data[regIdx] );
+			}
+		}
 
 		rc = rtlsdr_i2c_write_fn(priv->rtl_dev, priv->cfg->i2c_addr,
 					 priv->buf, size + 1);
@@ -289,7 +300,7 @@ static int r82xx_write(struct r82xx_priv *priv, uint8_t reg, const uint8_t *val,
 
 static int r82xx_write_reg(struct r82xx_priv *priv, uint8_t reg, uint8_t val)
 {
-	return r82xx_write(priv, reg, &val, 1);
+	return r82xx_write_arr(priv, reg, &val, 1);
 }
 
 int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg)
@@ -311,7 +322,7 @@ int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val, uint
 
 	val = (rc & ~bit_mask) | (val & bit_mask);
 
-	return r82xx_write(priv, reg, &val, 1);
+	return r82xx_write_arr(priv, reg, &val, 1);
 }
 
 int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
@@ -434,7 +445,6 @@ static int r82xx_set_mux(struct r82xx_priv *priv, uint32_t freq)
 static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 {
 	int rc, i;
-	//unsigned sleep_time = 10000;
 	uint64_t vco_freq;
 	uint64_t vco_div;
 	uint32_t vco_min = 1770000; /* kHz */
@@ -913,7 +923,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 		return rc;
 
 	/* channel filter extension */
-	rc = r82xx_write_reg_mask(priv, 0x1e, ext_enable, 0x60);
+	rc = r82xx_write_reg_mask_ext(priv, 0x1e, ext_enable, 0x60, __FUNCTION__);
 	if (rc < 0)
 		return rc;
 
@@ -944,19 +954,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 
 	return 0;
 }
-/*
-static int r82xx_read_gain(struct r82xx_priv *priv)
-{
-	uint8_t data[4];
-	int rc;
 
-	rc = r82xx_read(priv, 0x00, data, sizeof(data));
-	if (rc < 0)
-		return rc;
-
-	return ((data[3] & 0x0f) << 1) + ((data[3] & 0xf0) >> 4);
-}
-*/
 /* measured with a Racal 6103E GSM test set at 928 MHz with -60 dBm
  * input power, for raw results see:
  * http://steve-m.de/projects/rtl-sdr/gain_measurement/r820t/
@@ -1005,12 +1003,12 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 
   if (set_manual_gain) {
 
-	/* LNA auto off */
+	/* LNA auto off == manual */
 	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
 	if (rc < 0)
 	  return rc;
 
-	 /* Mixer auto off */
+	 /* Mixer auto off == manual mode */
 	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
 	if (rc < 0)
 	  return rc;
@@ -1075,6 +1073,28 @@ int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsig
 	return r82xx_write_reg_mask(priv, reg, reg_val, reg_mask);
 }
 
+int r82xx_set_i2c_override(struct r82xx_priv *priv, unsigned i2c_register, unsigned mask, unsigned data)
+{
+	uint8_t reg = i2c_register & 0xFF;
+	uint8_t reg_mask = mask & 0xFF;
+	uint8_t reg_val = data & 0xFF;
+	if ( REG_SHADOW_START <= reg && reg < REG_SHADOW_START + NUM_REGS ) {
+		if ( data & ~0xFF ) {
+			priv->override_mask[reg - REG_SHADOW_START] &= ~reg_mask;
+			priv->override_data[reg - REG_SHADOW_START] &= ~reg_mask;
+			fprintf(stderr, "%s: subtracted override mask for register %02X. new mask is %02X\n"
+					, __FUNCTION__, i2c_register, priv->override_mask[reg - REG_SHADOW_START] );
+		} else {
+			priv->override_mask[reg - REG_SHADOW_START] |= reg_mask;
+			priv->override_data[reg - REG_SHADOW_START] |= (reg_mask & reg_val);
+			fprintf(stderr, "%s: added override mask for register %02X. new mask is %02X\n"
+					, __FUNCTION__, i2c_register, priv->override_mask[reg - REG_SHADOW_START] );
+		}
+		return r82xx_write_reg_mask_ext(priv, reg, 0, 0, __FUNCTION__);
+	}
+	else
+		return -1;
+}
 
 /* Bandwidth contribution by low-pass filter. */
 static const int r82xx_if_low_pass_bw_table[] = {
@@ -1420,8 +1440,12 @@ int r82xx_init(struct r82xx_priv *priv)
 	/* TODO: R828D might need r82xx_xtal_check() */
 	priv->xtal_cap_sel = XTAL_HIGH_CAP_0P;
 
+	/* Initialize override registers */
+	memset( &(priv->override_data[0]), 0, NUM_REGS * sizeof(uint8_t) );
+	memset( &(priv->override_mask[0]), 0, NUM_REGS * sizeof(uint8_t) );
+
 	/* Initialize registers */
-	rc = r82xx_write(priv, 0x05,
+	rc = r82xx_write_arr(priv, 0x05,
 			 r82xx_init_array, sizeof(r82xx_init_array));
 
 	rc = r82xx_set_tv_standard(priv, 3, TUNER_DIGITAL_TV, 0);
