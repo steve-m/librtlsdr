@@ -853,6 +853,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 			return rc;
 //		usleep_range(1000, 2000);
 	}
+	priv->if_band_center_freq = 0;
 	priv->int_freq = if_khz * 1000;
 
 	/* Check if standard changed. If so, filter calibration is needed */
@@ -1336,10 +1337,22 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 #undef FILT_HP_BW1
 #undef FILT_HP_BW2
 
+int r82xx_set_bw_center(struct r82xx_priv *priv, int32_t if_band_center_freq)
+{
+	priv->if_band_center_freq = if_band_center_freq;
+	return priv->int_freq;
+}
+
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 {
 	int rc = -1;
-	uint32_t lo_freq = freq + priv->int_freq;
+	uint32_t lo_freq = freq + priv->int_freq + priv->if_band_center_freq;
+#if 0
+	fprintf(stderr, "%s(freq = %u) --> intfreq %u, ifcenter %d --> f %u\n"
+			, __FUNCTION__, (unsigned)freq
+			, (unsigned)priv->int_freq, (int)priv->if_band_center_freq
+			, (unsigned)lo_freq );
+#endif
 	uint8_t air_cable1_in;
 
 	rc = r82xx_set_mux(priv, lo_freq);
@@ -1487,6 +1500,8 @@ int r82xx_init(struct r82xx_priv *priv)
 
 	/* TODO: R828D might need r82xx_xtal_check() */
 	priv->xtal_cap_sel = XTAL_HIGH_CAP_0P;
+
+  priv->if_band_center_freq = 0;
 
 	/* Initialize override registers */
 	memset( &(priv->override_data[0]), 0, NUM_REGS * sizeof(uint8_t) );

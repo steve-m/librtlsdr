@@ -241,6 +241,16 @@ RTLSDR_API int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw
 
 RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw );
 
+/*!
+ * Sets the center of the filtered tuner band(width)
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param if_band_center_freq in Hz. Zero means, that band center shall be at zero (=default).
+ *    set if_band_center_freq = +samplerate/4 to have the filtered band centered at output's right half.
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_center_freq );
+
 
 /*!
  * Get actual gain the device is configured to.

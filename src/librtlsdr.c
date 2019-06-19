@@ -100,6 +100,7 @@ typedef struct rtlsdr_tuner_iface {
 	int (*exit)(void *);
 	int (*set_freq)(void *, uint32_t freq /* Hz */);
 	int (*set_bw)(void *, int bw /* Hz */, uint32_t *applied_bw /* configured bw in Hz */, int apply /* 1 == configure it!, 0 == deliver applied_bw */);
+	int (*set_bw_center)(void *, int32_t if_band_center_freq);
 	int (*set_gain)(void *, int gain /* tenth dB */);
 	int (*set_if_gain)(void *, int stage, int gain /* tenth dB */);
 	int (*set_gain_mode)(void *, int manual);
@@ -201,6 +202,7 @@ struct rtlsdr_dev {
 	uint32_t freq; /* Hz */
 	uint32_t bw;
 	uint32_t offs_freq; /* Hz */
+	int32_t  if_band_center_freq; /* Hz - rtlsdr_set_tuner_band_center() */
 	int corr; /* ppm */
 	int gain; /* tenth dB */
 	enum rtlsdr_ds_mode direct_sampling_mode;
@@ -366,21 +368,47 @@ int r820t_set_freq(void *dev, uint32_t freq) {
 	return r82xx_set_freq(&devt->r82xx_p, freq);
 }
 
+#define BWC_MUL_SIGN		+
+
 int r820t_set_bw(void *dev, int bw, uint32_t *applied_bw, int apply) {
-	int r;
+	int r, iffreq;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 
-	r = r82xx_set_bandwidth(&devt->r82xx_p, bw, devt->rate, applied_bw, apply);
+	iffreq = r82xx_set_bandwidth(&devt->r82xx_p, bw, devt->rate, applied_bw, apply);
 	if(!apply)
 		return 0;
-	if(r < 0)
+	if(iffreq < 0) {
+		r = iffreq;
 		return r;
+	}
 
-	r = rtlsdr_set_if_freq(devt, r);
+	iffreq = iffreq BWC_MUL_SIGN devt->if_band_center_freq;
+	r = rtlsdr_set_if_freq(devt, iffreq );
 	if (r)
 		return r;
+
 	return rtlsdr_set_center_freq(devt, devt->freq);
 }
+
+int r820t_set_bw_center(void *dev, int32_t if_band_center_freq) {
+	int r, iffreq;
+	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+
+	iffreq = r82xx_set_bw_center(&devt->r82xx_p, if_band_center_freq);
+	if(iffreq < 0) {
+		r = iffreq;
+		return r;
+	}
+
+	devt->if_band_center_freq = if_band_center_freq;
+	iffreq = iffreq BWC_MUL_SIGN devt->if_band_center_freq;
+	r = rtlsdr_set_if_freq(devt, iffreq );
+	if (r)
+		return r;
+
+	return rtlsdr_set_center_freq(devt, devt->freq);
+}
+
 
 int r820t_set_gain(void *dev, int gain) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
@@ -415,39 +443,40 @@ int r820t_set_i2c_override(void *dev, unsigned i2c_register, unsigned data, unsi
 /* definition order must match enum rtlsdr_tuner */
 static rtlsdr_tuner_iface_t tuners[] = {
 	{
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
 	},
 	{
 		e4000_init, e4000_exit,
-		e4000_set_freq, e4000_set_bw, e4000_set_gain, e4000_set_if_gain,
+		e4000_set_freq, e4000_set_bw, NULL, e4000_set_gain, e4000_set_if_gain,
 		e4000_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		_fc0012_init, fc0012_exit,
-		fc0012_set_freq, fc0012_set_bw, _fc0012_set_gain, NULL,
+		fc0012_set_freq, fc0012_set_bw, NULL, _fc0012_set_gain, NULL,
 		fc0012_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		_fc0013_init, fc0013_exit,
-		fc0013_set_freq, fc0013_set_bw, _fc0013_set_gain, NULL,
+		fc0013_set_freq, fc0013_set_bw, NULL, _fc0013_set_gain, NULL,
 		fc0013_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		fc2580_init, fc2580_exit,
-		_fc2580_set_freq, fc2580_set_bw, fc2580_set_gain, NULL,
+		_fc2580_set_freq, fc2580_set_bw, NULL, fc2580_set_gain, NULL,
 		fc2580_set_gain_mode, NULL, NULL, NULL
 	},
 	{
 		r820t_init, r820t_exit,
-		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
+		r820t_set_freq, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
 		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register
 	},
 	{
 		r820t_init, r820t_exit,
-		r820t_set_freq, r820t_set_bw, r820t_set_gain, NULL,
+		r820t_set_freq, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
 		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register
 	},
 };
+
 
 typedef struct rtlsdr_dongle {
 	uint16_t vid;
@@ -1378,6 +1407,13 @@ int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw )
 	return rtlsdr_set_and_get_tuner_bandwidth(dev, bw, &applied_bw, 1 /* =apply_bw */ );
 }
 
+int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_center_freq )
+{
+	int r = -1;
+	if (!dev || !dev->tuner || !dev->tuner->set_bw_center)
+		return -1;
+	return dev->tuner->set_bw_center(dev, if_band_center_freq);
+}
 
 
 int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
@@ -3410,8 +3446,9 @@ const char * rtlsdr_get_opt_help(int longInfo)
 	if ( longInfo )
 		return
 		"\t[-O\tset RTL options string seperated with ':' ]\n"
-		"\t\tf=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
-		"\t\tdagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>\n"
+		"\t\tagc=<tuner_gain_mode>:gain=<tenth_dB>:dagc=<rtl_agc>\n"
+		"\t\tds=<direct_sampling_mode>:T=<bias_tee>\n"
 #ifdef WITH_UDP_SERVER
 		"\t\tport=<udp_port default with 1>\n"
 #endif
@@ -3455,6 +3492,12 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			if (verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed bandwidth %u\n", (unsigned)bw);
 			ret = rtlsdr_set_tuner_bandwidth(dev, bw);
+		}
+		else if (!strncmp(optPart, "bc=", 3)) {
+			int32_t if_band_center_freq = (int32_t)(atoi(optPart +3));
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed band center %d\n", (int)if_band_center_freq);
+			ret = rtlsdr_set_tuner_band_center(dev, if_band_center_freq );
 		}
 		else if (!strncmp(optPart, "agc=", 4)) {
 			int manual = 1 - atoi(optPart +4);	/* invert logic */

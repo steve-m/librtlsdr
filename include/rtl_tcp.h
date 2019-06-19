@@ -59,8 +59,11 @@ enum RTL_TCP_COMMANDS {
                                          * 31 .. 20: register (12 bits)
                                          * 19 .. 12: mask (8 bits)
                                          * 11 ..  0: data (12 bits) */
-    SET_I2C_TUNER_OVERRIDE    = 0x44    /* encoding as with SET_I2C_TUNER_REGISTER
+    SET_I2C_TUNER_OVERRIDE    = 0x44,   /* encoding as with SET_I2C_TUNER_REGISTER
                                          * data (bits 11 .. 0) > 255 removes override */
+    SET_TUNER_BW_IF_CENTER    = 0x45,   /* freq from SET_FREQUENCY stays in center;
+                                         * the bandwidth (from SET_TUNER_BANDWIDTH)
+                                         * is set to be centered at given IF frequency */
 };
 
 #ifdef __cplusplus

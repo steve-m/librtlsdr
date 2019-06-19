@@ -288,9 +288,7 @@ void usage(void)
 		"\t	deemp:  enable de-emphasis filter\n"
 		"\t	direct: enable direct sampling (bypasses tuner, uses rtl2832 xtal)\n"
 		"\t	offset: enable offset tuning (only e4000 tuner)\n"
-		"\t[-O set RTL options string seperated with ':' ]\n"
-		"\t	f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
-		"\t	dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"%s"
 		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\t[-n disables demodulation output to stdout/file]\n"
 		"\t[-H write wave Header to file (default: off)]\n"
@@ -315,7 +313,8 @@ void usage(void)
 		"\trtl_fm ... | play -t raw -r 24k -es -b 16 -c 1 -V1 -\n"
 		"\t		   | aplay -r 24k -f S16_LE -t raw -c 1\n"
 		"\t  -M wbfm  | play -r 32k ... \n"
-		"\t  -s 22050 | multimon -t raw /dev/stdin\n\n");
+		"\t  -s 22050 | multimon -t raw /dev/stdin\n\n"
+		, rtlsdr_get_opt_help(1) );
 	exit(1);
 }
 

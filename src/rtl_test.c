@@ -91,15 +91,14 @@ void usage(void)
 		"Usage:\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-d device_index or serial (default: 0)]\n"
-		"\t[-O set RTL options string seperated with ':' ]\n"
-		"\t	f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
-		"\t	dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"%s"
 		"\t[-t enable Elonics E4000 tuner benchmark]\n"
 #ifndef _WIN32
 		"\t[-p[seconds] enable PPM error measurement (default: 10 seconds)]\n"
 #endif
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
-		"\t[-S force sync output (default: async)]\n");
+		"\t[-S force sync output (default: async)]\n"
+		, rtlsdr_get_opt_help(1) );
 	exit(1);
 }
 

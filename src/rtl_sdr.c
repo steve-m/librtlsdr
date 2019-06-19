@@ -54,14 +54,13 @@ void usage(void)
 		"\t[-d device_index or serial (default: 0)]\n"
 		"\t[-g gain (default: 0 for auto)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
-		"\t[-O set RTL options string seperated with ':' ]\n"
-		"\t	f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
-		"\t	dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"%s"
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
 		"\t[-n number of samples to read (default: 0, infinite)]\n"
 		"\t[-S force sync output (default: async)]\n"
 		"\t[-H write wave Header to file (default: off)]\n"
-		"\tfilename (a '-' dumps samples to stdout)\n\n");
+		"\tfilename (a '-' dumps samples to stdout)\n\n"
+		, rtlsdr_get_opt_help(1) );
 	exit(1);
 }
 
