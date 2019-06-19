@@ -103,8 +103,8 @@ typedef struct rtlsdr_tuner_iface {
 	int (*set_gain)(void *, int gain /* tenth dB */);
 	int (*set_if_gain)(void *, int stage, int gain /* tenth dB */);
 	int (*set_gain_mode)(void *, int manual);
-	int (*set_i2c_register)(void *, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ );
-	int (*set_i2c_override)(void *, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ );
+	int (*set_i2c_register)(void *, unsigned i2c_register, unsigned data /* byte */, unsigned mask /* byte */ );
+	int (*set_i2c_override)(void *, unsigned i2c_register, unsigned data /* byte */, unsigned mask /* byte */ );
 	unsigned (*get_i2c_register)(void *, int i2c_register);
 } rtlsdr_tuner_iface_t;
 
@@ -212,6 +212,7 @@ struct rtlsdr_dev {
 	struct softagc_state softagc;
 
 	/* UDP controller server */
+#ifdef WITH_UDP_SERVER
 #define UDP_TX_BUFLEN   128
 	unsigned udpPortNo;		/* default: 32323 */
 	int      override_if_freq;
@@ -226,6 +227,7 @@ struct rtlsdr_dev {
 	int      recv_len;
 	char     buf[UDP_TX_BUFLEN];
 	WSADATA  wsa;
+#endif
 
 	/* status */
 	int dev_lost;
@@ -400,13 +402,13 @@ unsigned r820t_get_i2c_register(void *dev, int reg) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_read_cache_reg(&devt->r82xx_p,reg);
 }
-int r820t_set_i2c_register(void *dev, unsigned i2c_register, unsigned mask, unsigned data ) {
+int r820t_set_i2c_register(void *dev, unsigned i2c_register, unsigned data, unsigned mask ) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_i2c_register(&devt->r82xx_p, i2c_register, mask, data);
+	return r82xx_set_i2c_register(&devt->r82xx_p, i2c_register, data, mask);
 }
-int r820t_set_i2c_override(void *dev, unsigned i2c_register, unsigned mask, unsigned data ) {
+int r820t_set_i2c_override(void *dev, unsigned i2c_register, unsigned data, unsigned mask ) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_i2c_override(&devt->r82xx_p, i2c_register, mask, data);
+	return r82xx_set_i2c_override(&devt->r82xx_p, i2c_register, data, mask);
 }
 
 
@@ -905,6 +907,7 @@ static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq)
 	if (rtlsdr_get_xtal_freq(dev, &rtl_xtal, NULL))
 		return -2;
 
+#ifdef WITH_UDP_SERVER
 	dev->last_if_freq = freq;
 	if ( dev->override_if_flag ) {
 		if ( dev->verbose )
@@ -914,6 +917,7 @@ static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq)
 		if ( dev->override_if_flag == 1 )
 			dev->override_if_flag = 0;
 	}
+#endif
 
 	if_freq = ((freq * TWO_POW(22)) / rtl_xtal) * (-1);
 
@@ -1165,7 +1169,7 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 	// restore filters
 	if (dev->handled) {
 		rtlsdr_set_i2c_repeater(dev, 1);
-		dev->tuner->set_i2c_register(dev, 27, 255, dev->saved_27);
+		dev->tuner->set_i2c_register(dev, 27, dev->saved_27, 255);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 
@@ -1509,7 +1513,7 @@ int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsi
 
 	if (dev->tuner->set_i2c_register) {
 		rtlsdr_set_i2c_repeater(dev, 1);
-		r = dev->tuner->set_i2c_register((void *)dev, i2c_register, mask, data);
+		r = dev->tuner->set_i2c_register((void *)dev, i2c_register, data, mask);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 	return r;
@@ -1532,7 +1536,7 @@ int rtlsdr_set_tuner_i2c_override(rtlsdr_dev_t *dev, unsigned i2c_register, unsi
 
 	if (dev->tuner->set_i2c_override) {
 		rtlsdr_set_i2c_repeater(dev, 1);
-		r = dev->tuner->set_i2c_override((void *)dev, i2c_register, mask, data);
+		r = dev->tuner->set_i2c_override((void *)dev, i2c_register, data, mask);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 	return r;
@@ -2032,9 +2036,7 @@ int rtlsdr_get_index_by_serial(const char *serial)
 }
 
 /* UDP controller server */
-#if 0
-unsigned udpPortNo;		/* default: 32323 */
-#endif
+#ifdef WITH_UDP_SERVER
 
 static int parseNum(const char * pacNum) {
 	int numBase = 10;			/* assume decimal */
@@ -2230,16 +2232,6 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 			}
 		} else if (comm == 64 +2 || comm == 64 +3 ) {
 			dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
-			if ( dev->tuner->set_i2c_register && dev->tuner->set_i2c_override ) {
-				rtlsdr_set_i2c_repeater(dev, 1);
-				if (comm == 64 +2)
-					val = dev->tuner->set_i2c_register(dev, reg, iVal, mask);
-				else
-					val = dev->tuner->set_i2c_override(dev, reg, iVal, mask);
-				rtlsdr_set_i2c_repeater(dev, 0);
-			}
-			sprintf(response,"! %d\n", (int)val);
-			// printf("%d %d %d\n", reg, val, mask);
 			if ( dev->verbose )
 			{
 				fprintf(stderr, "parsed 'set i2c register %s %d = x%02X  value %d = %s = %s  with mask %s = %s'\n"
@@ -2249,6 +2241,20 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 						, formatInHex(hexBufB, (int)mask, 2), formatInBin(binBufB, (int)mask, 8) );
 				fprintf(stderr, "\tresponse: %s\n", response);
 			}
+			if ( dev->tuner->set_i2c_register && dev->tuner->set_i2c_override ) {
+				rtlsdr_set_i2c_repeater(dev, 1);
+				if (comm == 64 +2) {
+					fprintf(stderr, "calling tuner->set_i2c_register( reg %d, value %02X, mask %02X)\n", reg, iVal, mask);
+					val = dev->tuner->set_i2c_register(dev, reg, iVal, mask);
+				}
+				else {
+					fprintf(stderr, "calling tuner->set_i2c_override( reg %d, value %02X, mask %02X)\n", reg, iVal, mask);
+					val = dev->tuner->set_i2c_override(dev, reg, iVal, mask);
+				}
+				rtlsdr_set_i2c_repeater(dev, 0);
+			}
+			sprintf(response,"! %d\n", (int)val);
+			// printf("%d %d %d\n", reg, val, mask);
 			val = sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
 			if ( val < 0 ) {
 				// printf("error sending\n");
@@ -2334,6 +2340,8 @@ void * srv_server(void *vdev)
 	return NULL;
 }
 
+#endif
+
 
 int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 {
@@ -2376,11 +2384,13 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->softagc.deadTimeSps = 0;
 	dev->softagc.rpcNumGains = 0;
 	dev->softagc.rpcGainValues = NULL;
-	
+
 	/* UDP controller server */
+#ifdef WITH_UDP_SERVER
 	dev->udpPortNo = 0;	/* default port 32323 .. but deactivated - by default */
 	dev->override_if_freq = 0;
 	dev->override_if_flag = 0;
+#endif
 
 	dev->dev_num = index;
 	dev->dev_lost = 1;
@@ -3402,7 +3412,10 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t[-O\tset RTL options string seperated with ':' ]\n"
 		"\t\tf=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
 		"\t\tdagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
-		"\t\tport=<udp_port default with 1>\n";
+#ifdef WITH_UDP_SERVER
+		"\t\tport=<udp_port default with 1>\n"
+#endif
+		;
 	else
 		return
 		"\t[-O\tset RTL options string seperated with ':' ]\n";
@@ -3492,6 +3505,7 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed soft agc dead time %f ms\n", d);
 			dev->softagc.deadTimeMs = d;
 		}
+#ifdef WITH_UDP_SERVER
 		else if (!strncmp(optPart, "port=", 5)) {
 			int udpPortNo = atoi(optPart +5);
 			if ( udpPortNo == 1 )
@@ -3500,6 +3514,7 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): UDP control server port\n", udpPortNo);
 			dev->udpPortNo = udpPortNo;
 		}
+#endif
 		else {
 			if (verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed unknown option '%s'\n", optPart);
@@ -3515,6 +3530,7 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 	if ( dev->softagc.agcState != SOFTSTATE_OFF )
 		softagc_init(dev);
 
+#ifdef WITH_UDP_SERVER
 	if (dev->udpPortNo && dev->srv_started == 0 && dev->tuner_type==RTLSDR_TUNER_R820T) {
 		dev->handled = 1;
 		dev->saved_27 = dev->tuner->get_i2c_register(dev,27);		/* highest/lowest corner for LPNF and LPF */
@@ -3527,6 +3543,7 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			fprintf(stderr, "UDP server started on port %u\n", dev->udpPortNo);
 		}
 	}
+#endif
 
 	free(optStr);
 	return retAll;

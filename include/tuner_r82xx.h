@@ -108,6 +108,8 @@ struct r82xx_priv {
 	unsigned int haveR13H, valR13H;
 	unsigned int haveR14L, valR14L;
 	unsigned int haveR14H, valR14H;
+	unsigned int haveR30H, valR30H;
+	unsigned int haveR30L, valR30L;
 #endif
 };
 
@@ -133,8 +135,8 @@ int r82xx_init(struct r82xx_priv *priv);
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq);
 //int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain);
 int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain, int extended_mode, int lna_gain, int mixer_gain, int vga_gain);
-int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned mask, unsigned data);
-int r82xx_set_i2c_override(struct r82xx_priv *priv, unsigned i2c_register, unsigned mask, unsigned data);
+int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask);
+int r82xx_set_i2c_override(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask);
 
 int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate, uint32_t * applied_bw, int apply);
 int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg);

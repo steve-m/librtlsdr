@@ -273,9 +273,18 @@ static int r82xx_write_arr(struct r82xx_priv *priv, uint8_t reg, const uint8_t *
 			regOff = pos + k;
 			regIdx = reg - REG_SHADOW_START + regOff;
 			if ( priv->override_mask[regIdx] ) {
+				uint8_t oldBuf = priv->buf[1 + k];
 				bufIdx = 1 + k;
-				priv->buf[bufIdx] = ( priv->buf[bufIdx] & ~ priv->override_mask[regIdx] )
+				priv->buf[bufIdx] = ( priv->buf[bufIdx] & (~ priv->override_mask[regIdx]) )
 								| ( priv->override_mask[regIdx] & priv->override_data[regIdx] );
+				fprintf(stderr, "override writing register %d = x%02X value x%02X  by data x%02X mask x%02X => new value x%02X\n"
+						, regIdx + REG_SHADOW_START
+						, regIdx + REG_SHADOW_START
+						, oldBuf
+						, priv->override_data[regIdx]
+						, priv->override_mask[regIdx]
+						, priv->buf[bufIdx]
+						);
 			}
 		}
 
@@ -1065,7 +1074,7 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 
 
 /* expose/permit tuner specific i2c register hacking! */
-int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned mask, unsigned data)
+int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask)
 {
 	uint8_t reg = i2c_register & 0xFF;
 	uint8_t reg_mask = mask & 0xFF;
@@ -1073,28 +1082,50 @@ int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsig
 	return r82xx_write_reg_mask(priv, reg, reg_val, reg_mask);
 }
 
-int r82xx_set_i2c_override(struct r82xx_priv *priv, unsigned i2c_register, unsigned mask, unsigned data)
+int r82xx_set_i2c_override(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask)
 {
 	uint8_t reg = i2c_register & 0xFF;
 	uint8_t reg_mask = mask & 0xFF;
 	uint8_t reg_val = data & 0xFF;
+	fprintf(stderr, "%s: register %d = %02X. mask %02X, data %03X\n"
+			, __FUNCTION__, i2c_register, i2c_register, mask, data );
+
 	if ( REG_SHADOW_START <= reg && reg < REG_SHADOW_START + NUM_REGS ) {
+		uint8_t oldMask = priv->override_mask[reg - REG_SHADOW_START];
+		uint8_t oldData = priv->override_data[reg - REG_SHADOW_START];
 		if ( data & ~0xFF ) {
 			priv->override_mask[reg - REG_SHADOW_START] &= ~reg_mask;
 			priv->override_data[reg - REG_SHADOW_START] &= ~reg_mask;
-			fprintf(stderr, "%s: subtracted override mask for register %02X. new mask is %02X\n"
-					, __FUNCTION__, i2c_register, priv->override_mask[reg - REG_SHADOW_START] );
-		} else {
+			fprintf(stderr, "%s: subtracted override mask for register %02X. old mask %02X, old data %02X. new mask is %02X, new data %02X\n"
+					, __FUNCTION__
+					, i2c_register
+					, oldMask, oldData
+					, priv->override_mask[reg - REG_SHADOW_START]
+					, priv->override_data[reg - REG_SHADOW_START]
+					);
+		}
+		else
+		{
 			priv->override_mask[reg - REG_SHADOW_START] |= reg_mask;
+			priv->override_data[reg - REG_SHADOW_START] &= (~reg_mask);
+
+			fprintf(stderr, "override_data[] &= ( ~(mask %02X) = %02X ) => %02X\n", reg_mask, ~reg_mask, priv->override_data[reg - REG_SHADOW_START] );
 			priv->override_data[reg - REG_SHADOW_START] |= (reg_mask & reg_val);
-			fprintf(stderr, "%s: added override mask for register %02X. new mask is %02X\n"
-					, __FUNCTION__, i2c_register, priv->override_mask[reg - REG_SHADOW_START] );
+			fprintf(stderr, "override_data[] |= ( mask %02X & val %02X )\n", reg_mask, reg_val );
+			fprintf(stderr, "%s: added override mask for register %d = %02X. old mask %02X, old data %02X. new mask is %02X, new data %02X\n"
+					, __FUNCTION__
+					, i2c_register, i2c_register
+					, oldMask, oldData
+					, priv->override_mask[reg - REG_SHADOW_START]
+					, priv->override_data[reg - REG_SHADOW_START]
+					);
 		}
 		return r82xx_write_reg_mask_ext(priv, reg, 0, 0, __FUNCTION__);
 	}
 	else
 		return -1;
 }
+
 
 /* Bandwidth contribution by low-pass filter. */
 static const int r82xx_if_low_pass_bw_table[] = {
@@ -1134,6 +1165,7 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 	uint8_t reg_mask;
 	uint8_t reg_0a;
 	uint8_t reg_0b;
+	uint8_t reg_1e = 0x60;		/* default: Enable Filter extension under weak signal */
 
 	if (bw > 7000000) {
 		// BW: 8 MHz
@@ -1282,6 +1314,22 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 			, __FUNCTION__, (unsigned)reg_0e, (unsigned)reg_mask);
 	}
 #endif
+
+	/* channel filter extension */
+	reg_mask = 0x60;
+#if USE_R82XX_ENV_VARS
+	if ( priv->haveR30H ) {
+		reg_1e = ( priv->valR30H << 4 );
+	}
+	if ( priv->haveR30L ) {
+		reg_1e = reg_1e | priv->valR30L;
+		reg_mask = reg_mask | 0x1F;
+	}
+#endif
+	rc = r82xx_write_reg_mask_ext(priv, 0x1e, reg_1e, reg_mask, __FUNCTION__);
+	if (rc < 0)
+		fprintf(stderr, "%s: ERROR setting I2C register 0x1E to value %02X with mask %02X\n"
+		, __FUNCTION__, (unsigned)reg_1e, (unsigned)reg_mask);
 
 	return priv->int_freq;
 }
@@ -1466,6 +1514,8 @@ int r82xx_init(struct r82xx_priv *priv)
 	priv->haveR13H = priv->valR13H = 0;
 	priv->haveR14L = priv->valR14L = 0;
 	priv->haveR14H = priv->valR14H = 0;
+	priv->haveR30H = priv->valR30H = 0;
+	priv->haveR30L = priv->valR30L = 0;
 #endif
 
 	priv->init_done = 1;
@@ -1477,6 +1527,7 @@ int r82xx_init(struct r82xx_priv *priv)
 		char *pacFilterCenter, *pacR9;
 		char *pacR10Hi, *pacR10Lo, *pacR11Hi, *pacR11Lo;
 		char *pacR13Hi, *pacR13Lo, *pacR14Hi, *pacR14Lo;
+		char *pacR30Hi, *pacR30Lo;
 
 		pacPrintI2C = getenv("RTL_R820_PRINT_I2C");
 		if ( pacPrintI2C )
@@ -1586,6 +1637,29 @@ int r82xx_init(struct r82xx_priv *priv)
 			}
 			fprintf(stderr, "*** read R14_LO from environment: %d\n", priv->valR14L);
 		}
+
+		pacR30Hi = getenv("RTL_R820_R30_HI");
+		if ( pacR30Hi ) {
+			priv->haveR30H = 1;
+			priv->valR30H = atoi(pacR30Hi) & 0x06;
+			if ( priv->valR30H > 6 || priv->valR30H < 0 ) {
+				fprintf(stderr, "*** read R30_HI from environment: %d - but value should be 2 - 6 for bit [6:5]\n", priv->valR30H);
+				priv->haveR30H = 0;
+			}
+			fprintf(stderr, "*** read R30_HI from environment: %d\n", priv->valR30H);
+		}
+
+		pacR30Lo = getenv("RTL_R820_R30_LO");
+		if ( pacR30Lo ) {
+			priv->haveR30L = 1;
+			priv->valR30L = atoi(pacR30Lo);
+			if ( priv->valR30L < 0 || priv->valR30L > 31 ) {
+				fprintf(stderr, "*** read R30_LO from environment: %d - but value should be 0 - 31 for bit [4:0]\n", priv->valR30L);
+				priv->haveR30L = 0;
+			}
+			fprintf(stderr, "*** read R30_LO from environment: %d\n", priv->valR30L);
+		}
+
 	}
 #endif
 
