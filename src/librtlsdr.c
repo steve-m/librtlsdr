@@ -1520,6 +1520,10 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	r = libusb_claim_interface(dev->devh, 0);
 	if (r < 0) {
 		fprintf(stderr, "usb_claim_interface error %d\n", r);
+		if (dev) 
+		{
+        	libusb_close(dev->devh);
+		}
 		goto err;
 	}
 
