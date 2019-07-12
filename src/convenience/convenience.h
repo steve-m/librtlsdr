@@ -18,7 +18,11 @@
 #define __CONVENIENCE_H
 
 #include <stdint.h>
+#include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* a collection of user friendly tools */
 
@@ -173,7 +177,10 @@ void executeInBackground( char * file, char * args, char * searchStr[], char * r
 
 extern uint32_t	waveDataSize;
 void waveWriteHeader(unsigned samplerate, unsigned freq, int bitsPerSample, int numChannels, FILE * f);
-void waveFinalizeHeader();
+void waveFinalizeHeader(FILE * f);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*__CONVENIENCE_H*/
