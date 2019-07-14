@@ -195,6 +195,7 @@ struct rtlsdr_dev {
 	uint32_t rtl_xtal; /* Hz */
 	int fir[FIR_LEN];
 	int direct_sampling;
+	int rtl_vga_control;
 	/* tuner context */
 	enum rtlsdr_tuner tuner_type;
 	rtlsdr_tuner_iface_t *tuner;
@@ -215,7 +216,7 @@ struct rtlsdr_dev {
 
 	/* UDP controller server */
 #ifdef WITH_UDP_SERVER
-#define UDP_TX_BUFLEN   128
+#define UDP_TX_BUFLEN   1024
 	unsigned udpPortNo;		/* default: 32323 */
 	int      override_if_freq;
 	int      override_if_flag;
@@ -243,6 +244,7 @@ struct rtlsdr_dev {
 };
 
 void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
+static int rtlsdr_demod_write_reg(rtlsdr_dev_t *dev, uint8_t page, uint16_t addr, uint16_t val, uint8_t len);
 static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq);
 static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq);
 
@@ -409,20 +411,51 @@ int r820t_set_bw_center(void *dev, int32_t if_band_center_freq) {
 	return rtlsdr_set_center_freq(devt, devt->freq);
 }
 
+int rtlsdr_vga_control( rtlsdr_dev_t* devt, int rc, int rtl_vga_control ) {
+	if (rc < 0)
+		return rc;
+	if ( rtl_vga_control != devt->rtl_vga_control ) {
+		/* enable/disable RF AGC loop */
+
+		rc = rtlsdr_demod_write_reg(devt, 1, 0x04, rtl_vga_control ? 0x80 : 0x00, 1);
+		if ( devt->verbose )
+			fprintf(stderr, "rtlsdr_vga_control(%s) returned %d\n"
+				, rtl_vga_control ? "activate" : "deactivate", rc );
+		devt->rtl_vga_control = rtl_vga_control;
+	}
+	return rc;
+}
 
 int r820t_set_gain(void *dev, int gain) {
+	int rc, rtl_vga_control = 0;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_gain(&devt->r82xx_p, 1, gain, 0, 0, 0, 0);
+	rc = r82xx_set_gain(&devt->r82xx_p, 1, gain, 0, 0, 0, 0, &rtl_vga_control);
+	rc = rtlsdr_vga_control(devt, rc, rtl_vga_control);
+	return rc;
 }
 
 int r820t_set_gain_ext(void *dev, int lna_gain, int mixer_gain, int vga_gain) {
+	int rc, rtl_vga_control = 0;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_gain(&devt->r82xx_p, 0, 0, 1, lna_gain, mixer_gain, vga_gain);
+	rc = r82xx_set_gain(&devt->r82xx_p, 0, 0, 1, lna_gain, mixer_gain, vga_gain, &rtl_vga_control);
+	rc = rtlsdr_vga_control(devt, rc, rtl_vga_control);
+	return rc;
+}
+
+int r820t_set_agc_mode(void *dev, int agc_variant) {
+	int rc, rtl_vga_control = 0;
+	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+	rc = r82xx_set_agc_mode(&devt->r82xx_p, agc_variant, &rtl_vga_control);
+	rc = rtlsdr_vga_control(devt, rc, rtl_vga_control);
+	return rc;
 }
 
 int r820t_set_gain_mode(void *dev, int manual) {
+	int rc, rtl_vga_control = 0;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_gain(&devt->r82xx_p, manual, 0, 0, 0, 0, 0);
+	rc = r82xx_set_gain(&devt->r82xx_p, manual, 0, 0, 0, 0, 0, &rtl_vga_control);
+	rc = rtlsdr_vga_control(devt, rc, rtl_vga_control);
+	return rc;
 }
 
 
@@ -888,6 +921,7 @@ void rtlsdr_init_baseband(rtlsdr_dev_t *dev)
 
 	/* disable RF and IF AGC loop */
 	rtlsdr_demod_write_reg(dev, 1, 0x04, 0x00, 1);
+	dev->rtl_vga_control = 0;
 
 	/* disable PID filter (enable_PID = 0) */
 	rtlsdr_demod_write_reg(dev, 0, 0x61, 0x60, 1);
@@ -1448,7 +1482,7 @@ int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, i
 {
 	int r = 0;
 
-	if (!dev || !dev->tuner)
+	if (!dev || ( dev->tuner_type != RTLSDR_TUNER_R820T && dev->tuner_type != RTLSDR_TUNER_R828D ) )
 		return -1;
 
 	if (dev->tuner->set_gain) {
@@ -1464,6 +1498,23 @@ int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, i
 
 	return r;
 }
+
+int rtlsdr_set_tuner_agc_mode(rtlsdr_dev_t *dev, int agc_variant)
+{
+	int r = 0;
+
+	if (!dev || ( dev->tuner_type != RTLSDR_TUNER_R820T && dev->tuner_type != RTLSDR_TUNER_R828D ) )
+		return -1;
+
+	if (dev->tuner->set_gain) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = r820t_set_agc_mode((void *)dev, agc_variant);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	}
+
+	return r;
+}
+
 
 int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
 {
@@ -2072,6 +2123,7 @@ int rtlsdr_get_index_by_serial(const char *serial)
 }
 
 /* UDP controller server */
+#define WITH_UDP_SERVER 1
 #ifdef WITH_UDP_SERVER
 
 static int parseNum(const char * pacNum) {
@@ -2187,6 +2239,9 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	int val = 0;
 	uint32_t applied_bw = 0;
 	uint8_t mask = 0xff, reg=0;
+	uint32_t freq;
+	int32_t bandcenter;
+	int retCode;
 
 	str1 = message;
 	memset(response,'\0', UDP_TX_BUFLEN);
@@ -2202,12 +2257,56 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 		sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
 		return 0;
 	}
+
+	/* commands:
+	 * g <register>            # get tuner i2c register
+	 * s <register> <value> [<mask>] # set tuner i2c register once
+	 * S <register> <value> [<mask>]   # set tuner i2c register permanent
+	 * 
+	 * i <IFfrequency>         # set tuner IF frequency once. value in [ 0 .. 28 800 000 ] or < 0 for reset
+	 * I <IFfrequency>         # set tuner IF frequency permanent
+	 * 
+	 * f <RFfrequency>         # set rtl center frequency
+	 * b <bandwidth>           # set tuner bandwidth
+	 * c <frequency>           # set tuner bandwidth center in output. value in [ -1 600 000 .. 1 600 000 ]
+	 * 
+	 * a <tunerAgcVariant>     #  0: LNA/Mixer = auto; VGA = fixed 26.5 dB
+	 *                         # -1: LNA/Mixer = last value from prev rtlsdr_set_tuner_gain; VGA = auto
+	 *                         # >0: LNA/Mixer = from rtlsdr_set_tuner_gain(tunerAgcMode); VGA = auto
+	 * m <gain>                # set tuner gain
+	 * 
+	 * M <gainMode>            # 0 : tuner agc off; digital rtl agc off
+	 *                         # 1 : tuner agc on ; digital rtl agc off
+	 *                         # 2 : tuner agc off; digital rtl agc on
+	 *                         # 3 : tuner agc on ; digital rtl agc on
+	 * 
+	 * 
+	 * ********** not implemented yet
+	 * 
+	 * e <lna> <mixer> <vga>   # set extended tuner gain - for R820 tuner
+
+	 * RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
+	 * RTLSDR_API int rtlsdr_set_agc_mode(rtlsdr_dev_t *dev, int on);
+	 * 
+	 * RTLSDR_API int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, int vga_gain);
+	 * RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
+	 * RTLSDR_API int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain);
+	 * 
+	 */
+
 	/* commands with register args: 64 | x */
 	if (!strcmp(token, "g")) comm = 64 + 1;
 	if (!strcmp(token, "s")) comm = 64 + 2;
 	if (!strcmp(token, "S")) comm = 64 + 3;
 	if (!strcmp(token, "i")) comm = 128 + 1;
 	if (!strcmp(token, "I")) comm = 128 + 2;
+	if (!strcmp(token, "f")) comm = 256 + 1;
+	if (!strcmp(token, "b")) comm = 256 + 2;
+	if (!strcmp(token, "c")) comm = 256 + 3;
+	if (!strcmp(token, "a")) comm = 512 + 1;
+	if (!strcmp(token, "m")) comm = 512 + 2;
+	if (!strcmp(token, "M")) comm = 512 + 3;
+	if (!strcmp(token, "h")) comm = 1024;
 
 	if ( comm & 64 ) {
 		token = strtok_r(NULL, " \t", &saveptr);
@@ -2322,6 +2421,96 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 		rtlsdr_set_and_get_tuner_bandwidth(dev, dev->bw, &applied_bw, 1 );
 		rtlsdr_set_center_freq(dev, dev->freq);
 	}
+	else if ( comm & 256 ) {
+		token = strtok_r(NULL, " \t", &saveptr);
+		freqVal = parseFreq(token);
+		retCode = -1;
+		switch (comm & 63) {
+		case 1: /* frequency */
+			freq = (uint32_t)freqVal;
+			if ( dev->verbose )
+				fprintf(stderr, "parsed RF frequency = %u Hz from token '%s'\n", (unsigned)freq, token);
+			retCode = rtlsdr_set_center_freq(dev, freq);
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_center_freq() returned %d\n", retCode);
+			break;
+		case 2: /* bandwidth */
+			freq = (uint32_t)freqVal;
+			if ( dev->verbose )
+				fprintf(stderr, "parsed bandwidth = %u Hz from token '%s'\n", (unsigned)freq, token);
+			retCode = rtlsdr_set_and_get_tuner_bandwidth(dev, freq, &applied_bw, 1);
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_and_get_tuner_bandwidth() returned %d and bw %u\n", retCode, applied_bw);
+			break;
+		case 3: /* band center */
+			bandcenter = (int32_t)freqVal;
+			if ( dev->verbose )
+				fprintf(stderr, "parsed bandcenter = %d Hz from token '%s'\n", (int)bandcenter, token);
+			retCode = rtlsdr_set_tuner_band_center(dev, bandcenter);
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_tuner_band_center() returned %d\n", retCode);
+			break;
+		default:
+			break;
+		}
+	}
+	else if ( comm & 512 ) {
+		token = strtok_r(NULL, " \t", &saveptr);
+		parsedVal = parseNum(token);
+		if ( !token ) {
+			sprintf(response,"?\n");
+			if (sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen) == SOCKET_ERROR) {
+				// perror("send");
+				return -1;
+			}
+			return 0;
+		}
+		switch (comm & 63) {
+		case 1: /* agc variant */
+			if ( dev->verbose )
+				fprintf(stderr, "parsed agc variant %d from token '%s'\n", parsedVal, token);
+			retCode = rtlsdr_set_tuner_agc_mode(dev, parsedVal);
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_tuner_agc_mode() returned %d\n", retCode);
+			break;
+		case 2: /* manual gain */
+			if ( dev->verbose )
+				fprintf(stderr, "parsed tuner gain %d tenth dB from token '%s'\n", parsedVal, token);
+			retCode = rtlsdr_set_tuner_gain(dev, parsedVal);
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_tuner_gain() returned %d\n", retCode);
+			break;
+		case 3: /* gainMode */
+			if ( dev->verbose )
+				fprintf(stderr, "parsed gainMode %d with tuner AGC '%s' and RTL AGC '%s' from token '%s'\n"
+						, parsedVal
+						, ( (parsedVal & 1) == 1 ) ? "on" : "off"
+						, ( (parsedVal & 2) == 2 ) ? "on" : "off"
+						, token );
+			retCode = rtlsdr_set_tuner_gain_mode(dev, ( (parsedVal & 1) == 0 ) ? 1 : 0 );
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_tuner_gain_mode() returned %d\n", retCode);
+			retCode = rtlsdr_set_agc_mode(dev, ( (parsedVal & 2) == 2 ) ? 1 : 0 );
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_agc_mode() returned %d\n", retCode);
+			break;
+		}
+	}
+	else if ( comm & 1024 ) {
+		sprintf(response,
+			"g <register>\n"
+			"s <register> <value> [<mask>]\n"
+			"i <IFfrequency>\n"
+			"f <RFfrequency>\n"
+			"b <bandwidth>\n"
+			"c <frequency>\n"
+			"a <tunerAgcVariant>\n"
+			"m <tuner gain>\n"
+			"M <gainMode>\n" );
+		sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
+		fprintf(stderr, "udp server command help:\n%s\n", response);
+	}
+
 	{
 		sprintf(response,"?\n");
 		sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
@@ -2410,6 +2599,8 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 		free(dev);
 		return -1;
 	}
+
+	dev->rtl_vga_control = 0;
 
 	/* dev->softagc.command_thread; */
 	dev->softagc.agcState = SOFTSTATE_OFF;
@@ -3447,7 +3638,7 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		return
 		"\t[-O\tset RTL options string seperated with ':' ]\n"
 		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>\n"
-		"\t\tagc=<tuner_gain_mode>:gain=<tenth_dB>:dagc=<rtl_agc>\n"
+		"\t\tagc=<tuner_gain_mode>:agcv=<>:gain=<tenth_dB>:dagc=<rtl_agc>\n"
 		"\t\tds=<direct_sampling_mode>:T=<bias_tee>\n"
 #ifdef WITH_UDP_SERVER
 		"\t\tport=<udp_port default with 1>\n"
@@ -3510,6 +3701,12 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			if (verbose)
 				fprintf(stderr, "rtlsdr_set_opt_string(): parsed tuner gain = %d /10 dB\n", gain);
 			ret = rtlsdr_set_tuner_gain(dev, gain);
+		}
+		else if (!strncmp(optPart, "agcv=", 5)) {
+			int agcv = atoi(optPart +5);
+			if (verbose)
+				fprintf(stderr, "rtlsdr_set_opt_string(): parsed tuner agc variant = %d\n", agcv);
+			ret = rtlsdr_set_tuner_agc_mode(dev, agcv);
 		}
 		else if (!strncmp(optPart, "dagc=", 5)) {
 			int on = atoi(optPart +5);

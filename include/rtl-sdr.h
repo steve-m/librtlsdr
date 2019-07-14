@@ -264,9 +264,10 @@ RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
  * Set LNA / Mixer / VGA Device Gain for R820T device is configured to.
  *
  * \param dev the device handle given by rtlsdr_open()
- * \param lna_gain in tenths of a dB, -30 means -3.0 dB.
- * \param mixer_gain in tenths of a dB, -30 means -3.0 dB.
- * \param vga_gain in tenths of a dB, -30 means -3.0 dB.
+ * \param lna_gain index in 0 .. 15: 0 == min;   see tuner_r82xx.c table r82xx_lna_gain_steps[]
+ * \param mixer_gain index in 0 .. 15: 0 == min; see tuner_r82xx.c table r82xx_mixer_gain_steps[]
+ * \param vga_gain index in 0 .. 15: 0 == -12 dB; 15 == 40.5 dB; => 3.5 dB/step;
+ *     see tuner_r82xx.c table r82xx_vga_gain_steps[]
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, int vga_gain);
@@ -290,6 +291,20 @@ RTLSDR_API int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain);
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
+
+
+/*!
+ * Set the agc_variant for automatic gain mode for the device.
+ * Automatic gain mode must be enabled for the gain setter function to work.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param agc variant:  0 for automatic LNA/Mixer; fixed VGA
+ *                      -1 for LNA/Mixer = last value from prev rtlsdr_set_tuner_gain; VGA = auto
+ *                      >0: gain := agc_variant for rtlsdr_set_tuner_gain() for LNA/Mixer; VGA = auto
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_agc_mode(rtlsdr_dev_t *dev, int agc_variant);
+
 
 /*!
  * Set the sample rate for the device, also selects the baseband filters

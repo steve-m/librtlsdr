@@ -307,6 +307,7 @@ static void *command_worker(void *arg)
 	struct timeval tv= {1, 0};
 	int r = 0;
 	uint32_t tmp;
+	int32_t itmp;
 	int32_t if_band_center_freq;
 
 	while(1) {
@@ -405,6 +406,11 @@ static void *command_worker(void *arg)
 			if_band_center_freq = ntohl(cmd.param);
 			printf("set tuner band to IF frequency %i Hz from center\n", if_band_center_freq);
 			rtlsdr_set_tuner_band_center(dev, if_band_center_freq );
+			break;
+		case SET_TUNER_AGC_VARIANT:
+			itmp = ntohl(cmd.param);
+			printf("set tuner agc variant to %i\n", itmp);
+			rtlsdr_set_tuner_agc_mode(dev, itmp);
 			break;
 		default:
 			break;

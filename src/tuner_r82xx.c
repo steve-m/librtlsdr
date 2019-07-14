@@ -30,6 +30,9 @@
 #include "rtlsdr_i2c.h"
 #include "tuner_r82xx.h"
 
+#define WITH_ASYM_FILTER	1
+
+
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define MHZ(x)		((x)*1000*1000)
 #define KHZ(x)		((x)*1000)
@@ -983,96 +986,134 @@ static const int r82xx_mixer_gain_steps[]  = {
 	0, 5, 10, 10, 19, 9, 10, 25, 17, 10, 8, 16, 13, 6, 3, -8
 };
 
-int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
-  int extended_mode, int lna_gain, int mixer_gain, int vga_gain)
+static void r82xx_get_gain_index(int gain, int *ptr_lna_index, int *ptr_mix_index)
 {
-  int rc;
-
-  int i, total_gain = 0;
-  uint8_t mix_index = 0, lna_index = 0;
-  uint8_t data[4];
-
-  if (extended_mode) {
-	/* Set LNA */
-	rc = r82xx_write_reg_mask(priv, 0x05, lna_gain, 0x0f);
-	if (rc < 0)
-	  return rc;
-
-	/* Set Mixer */
-	rc = r82xx_write_reg_mask(priv, 0x07, mixer_gain, 0x0f);
-	if (rc < 0)
-	  return rc;
-
-	/* Set VGA */
-	rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain, 0x9f);
-	if (rc < 0)
-	  return rc;
-
-	return 0;
-  }
-
-  if (set_manual_gain) {
-
-	/* LNA auto off == manual */
-	rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
-	if (rc < 0)
-	  return rc;
-
-	 /* Mixer auto off == manual mode */
-	rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
-	if (rc < 0)
-	  return rc;
-
-	rc = r82xx_read(priv, 0x00, data, sizeof(data));
-	if (rc < 0)
-	  return rc;
-
-	/* set fixed VGA gain for now (16.3 dB) */
-	rc = r82xx_write_reg_mask(priv, 0x0c, 0x08, 0x9f);
-	if (rc < 0)
-	  return rc;
+	int i, total_gain = 0;
+	int mix_index = 0, lna_index = 0;
 
 	for (i = 0; i < 15; i++) {
-	  if (total_gain >= gain)
-		break;
-
-	  total_gain += r82xx_lna_gain_steps[++lna_index];
-
-	  if (total_gain >= gain)
-		break;
-
-	  total_gain += r82xx_mixer_gain_steps[++mix_index];
+		if (total_gain >= gain)
+			break;
+		total_gain += r82xx_lna_gain_steps[++lna_index];
+		if (total_gain >= gain)
+			break;
+		total_gain += r82xx_mixer_gain_steps[++mix_index];
 	}
 
-	/* set LNA gain */
-	rc = r82xx_write_reg_mask(priv, 0x05, lna_index, 0x0f);
-	if (rc < 0)
-	  return rc;
-
-	/* set Mixer gain */
-	rc = r82xx_write_reg_mask(priv, 0x07, mix_index, 0x0f);
-	if (rc < 0)
-	  return rc;
-  } else {
-	/* LNA */
-	rc = r82xx_write_reg_mask(priv, 0x05, 0, 0x10);
-	if (rc < 0)
-	  return rc;
-
-	/* Mixer */
-	rc = r82xx_write_reg_mask(priv, 0x07, 0x10, 0x10);
-	if (rc < 0)
-	  return rc;
-
-	/* set fixed VGA gain for now (26.5 dB) */
-	rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f);
-	if (rc < 0)
-	  return rc;
-  }
-
-  return 0;
+	*ptr_lna_index = lna_index;
+	*ptr_mix_index = mix_index;
 }
 
+int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
+  int extended_mode, int lna_gain, int mixer_gain, int vga_gain, int *rtl_vga_control)
+{
+	int rc, i, new_agc_state = 0;
+	uint8_t data[4];
+
+	if (rtl_vga_control)
+		*rtl_vga_control = 0;
+
+	if ( !extended_mode && !set_manual_gain ) {
+		new_agc_state = 1;
+		/* map some agc modes to extended_mode */
+		if ( priv->agc_mode == -1 ) {
+			/* LNA/Mixer = last value from prev rtlsdr_set_tuner_gain; VGA = auto */
+			lna_gain = priv->last_LNA_value;
+			mixer_gain = priv->last_Mixer_value;
+			vga_gain = priv->last_VGA_value | 0x10;  /* should activate AGC */
+			extended_mode = 1;
+		}
+		else if ( priv->agc_mode > 0 ) {
+			/* LNA/Mixer = from rtlsdr_set_tuner_gain(tunerAgcMode); VGA = auto */
+			r82xx_get_gain_index(priv->agc_mode, &lna_gain, &mixer_gain);
+			vga_gain = priv->last_VGA_value | 0x10;  /* should activate AGC */
+			extended_mode = 1;
+		}
+	}
+	else if ( !extended_mode && set_manual_gain ) {
+		/* map set_manual_gain to extended_mode */
+		r82xx_get_gain_index(gain, &lna_gain, &mixer_gain);
+		vga_gain = 0x08;  /* = fixed 16.3 dB == -12 dB + 8 * 3.5 dB */
+		extended_mode = 1;
+	}
+
+	if (extended_mode) {
+		/* LNA auto off == manual */
+		rc = r82xx_write_reg_mask(priv, 0x05, 0x10, 0x10);
+		if (rc < 0)
+			return rc;
+
+		/* Mixer auto off == manual mode */
+		rc = r82xx_write_reg_mask(priv, 0x07, 0, 0x10);
+		if (rc < 0)
+			return rc;
+
+		rc = r82xx_read(priv, 0x00, data, sizeof(data));
+		if (rc < 0)
+			return rc;
+
+		/* Set LNA */
+		rc = r82xx_write_reg_mask(priv, 0x05, lna_gain, 0x0f);
+		if (rc < 0)
+			return rc;
+		priv->last_LNA_value = lna_gain;
+
+		/* Set Mixer */
+		rc = r82xx_write_reg_mask(priv, 0x07, mixer_gain, 0x0f);
+		if (rc < 0)
+			return rc;
+		priv->last_Mixer_value = mixer_gain;
+
+		/* Set VGA */
+		rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain, 0x9f);
+		if (rc < 0)
+			return rc;
+		priv->last_VGA_value = vga_gain & 0x0f;
+		priv->last_AGC_state = new_agc_state;
+		if ( (vga_gain & 0x10) && rtl_vga_control )
+			*rtl_vga_control = 1;
+	}
+	else
+	{
+		/* agc_mode == 0: LNA/Mixer = auto; VGA = fixed 26.5 dB ==> auto */
+
+		/* LNA auto on = AGC */
+		rc = r82xx_write_reg_mask(priv, 0x05, 0, 0x10);
+		if (rc < 0)
+			return rc;
+
+		/* Mixer auto on = AGC */
+		rc = r82xx_write_reg_mask(priv, 0x07, 0x10, 0x10);
+		if (rc < 0)
+			return rc;
+
+		/* set fixed VGA gain for now (26.5 dB == -12 dB + 0x0b * 3.5 dB) */
+		/* rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f); */
+		/* set VGA gain auto */
+		rc = r82xx_write_reg_mask(priv, 0x0c, 0x1b, 0x9f);
+		if (rc < 0)
+			return rc;
+
+		priv->last_AGC_state = new_agc_state;
+		if ( rtl_vga_control )
+			*rtl_vga_control = 1;
+	}
+
+	return 0;
+}
+
+int r82xx_set_agc_mode(struct r82xx_priv *priv, int agc_mode, int *rtl_vga_control)
+{
+	int rc = 0;
+	priv->agc_mode = agc_mode;
+	*rtl_vga_control = 0;
+	if ( priv->last_AGC_state )
+		rc = r82xx_set_gain(priv, 0, 0, 0
+			, priv->last_LNA_value, priv->last_Mixer_value
+			, priv->last_VGA_value
+			, rtl_vga_control);
+	return rc;
+}
 
 /* expose/permit tuner specific i2c register hacking! */
 int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask)
@@ -1134,23 +1175,92 @@ static const int r82xx_if_low_pass_bw_table[] = {
 };
 
 
-#if 0
-static const int r82xx_bw_tablen = 17;
-/* Hayati:                          0        1        2        3        4        5        6        7        8        9        10       11       12       13       14       15       16 */
-/*                                  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  centered centered centered centered ?!       */
-static const int r82xx_bws[]=     { 200000,  300000,  400000,  500000,  600000,  700000,  800000,  900000,  1000000, 1100000, 1200000, 1300000, 1400000, 1550000, 1700000, 1900000, 2200000 };
-static const uint8_t r82xx_0xb[]= { 0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xCF,    0xAF,    0x8F,    0x51 };
-static const int r82xx_if[]  =    { 1900000, 1850000, 1800000, 1750000, 1700000, 1650000, 1600000, 1550000, 1500000, 1450000, 1400000, 1350000, 1300000, 1400000, 1450000, 1600000, 4700000};
-#else
+struct IFinfo
+{
+	int	sharpCorner;	/* 1 = at LSB (lower side band); 2 = at USB (upper side band); 3 = both LSB+USB */
+	int	bw;				/* 3-dB bandwidth in kHz - available around IF frequency, which becomes center frequency */
+	int	fif;			/* IF frequency in kHz for the RTL2832 */
+	int	fc;				/* IF frequency correction in kHz */
+	uint8_t reg10Lo;	/* low-part of I2C register 0x0A */
+	uint8_t	reg11;		/* content of I2C register 0x0B */
+	uint8_t	reg30Hi;		/* R30 = 0x1E: channel filter extension "on weak signal" */
+};
 
-static const int r82xx_bw_tablen = 24;
+/* narrowest IF bandpass with reg10/reg11/reg30 = 0x0F, 0xEF, 0x60:
+ *   539 .. 2002 kHz (mirrored from tuner)
+ * calculate IF center frequency from that bandpass edges
+ */
+#define IFA(BW)		(2002 - BW / 2)
+#define IFB(BW)		(539 + BW / 2)
+
 /* duplicated lower bandwidths to allow "sideband" selection: which is filtered with help of IF corner */
-/* Hayati:                          0        1        2        3        4        5        6        7        8        9        10       11       12       13       14       15       16       17       18       19       20       21       22       23 */
-/*                                  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  shifted  centered centered centered centered ?!       */
-static const int r82xx_bws[]=     { 200000,  200400,  300000,  300400,  400000,  400400,  500000,  500400,  600000,  600400,  700000,  700400,  800000,  800400,  900000,  1000000, 1100000, 1200000, 1300000, 1400000, 1550000, 1700000, 1900000, 2200000 };
-static const uint8_t r82xx_0xb[]= { 0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xEF,    0xCF,    0xAF,    0x8F,    0x51 };
-static const int r82xx_if[]  =    { 1900000,  700000, 1850000,  750000, 1800000,  800000, 1750000,  850000, 1700000,  900000, 1650000,  950000, 1600000, 1000000, 1550000, 1500000, 1450000, 1400000, 1350000, 1300000, 1400000, 1450000, 1600000, 4700000};
+static const struct IFinfo IFi[] = {
+#if (WITH_ASYM_FILTER)
+	{ 1,  200+1, IFA( 200),  33, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  200+2, IFB( 200),   3, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
 #endif
+
+	{ 3,  290+0,      1950, -25, 0x0F, 0xE7, 0x00 },	/* centered with hpf - high pass filter */
+#if (WITH_ASYM_FILTER)
+	{ 1,  290+1, IFA( 290),  26, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  290+2, IFB( 290),   2, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3,  375+0,      1870, -13, 0x0F, 0xE8, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1,  375+1, IFA( 375),  23, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  375+2, IFB( 375),   3, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3,  420+0,      2100,  21, 0x0F, 0xD7, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1,  420+1, IFA( 420),  23, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  420+2, IFB( 420),   3, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3,  470+0,      1800, -12, 0x0F, 0xE9, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1,  470+1, IFA( 470),  18, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  470+2, IFB( 470),   2, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3,  600+0,      1700,   6, 0x0F, 0xEA, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1,  600+1, IFA( 600),  16, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  600+2, IFB( 600),   3, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3,  860+0,      1550,   8, 0x0F, 0xEB, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1,  860+1, IFA( 860),  17, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  860+2, IFB( 860), -12, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3,  950+0,      2200,   5, 0x0F, 0x88, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1,  950+1, IFA( 950),   6, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2,  950+2, IFB( 950),   0, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3, 1100+0,      2100,  25, 0x0F, 0x89, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1, 1100+1, IFA(1100),  24, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2, 1100+2, IFB(1100),   0, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3, 1300+0,      2050,  -7, 0x0F, 0x8A, 0x00 },	/* centered with hpf */
+#if (WITH_ASYM_FILTER)
+	{ 1, 1300+1, IFA(1300),  26, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
+	{ 2, 1300+2, IFB(1300),   0, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
+#endif
+
+	{ 3, 1500+3,      1300, -24, 0x0F, 0xEF, 0x60 },
+	{ 3, 1600+0,      1900,   0, 0x0F, 0x8B, 0x00 },	/* centered with hpf */
+	{ 3, 1750+3,      1400,  12, 0x0F, 0xCF, 0x60 },	/* 20 */
+	{ 3, 1950+3,      1500,  30, 0x0F, 0x8F, 0x60 }
+};
+
+static const int r82xx_bw_tablen = sizeof(IFi) / sizeof(IFi[0]);
 
 
 #define FILT_HP_BW1 350000
@@ -1190,28 +1300,30 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 		if (apply)
 			priv->int_freq = 3570000;
 	} else {
-
 		for(i=0; i < r82xx_bw_tablen-1; ++i) {
+			const int bwnext = IFi[i+1].bw * 1000 + ( IFi[i+1].sharpCorner == 2 ? 400 : 0 );
+			const int bwcurr = IFi[i].bw * 1000 + ( IFi[i].sharpCorner == 2 ? 400 : 0 );
 			/* bandwidth is compared to median of the current and next available bandwidth in the table */
-			if (bw < (r82xx_bws[i+1] + r82xx_bws[i])/2)
+			if (bw < (bwnext + bwcurr)/2)
 				break;
 		}
 
-		reg_0a = 0x0F;
-		reg_0b = r82xx_0xb[i];
-		real_bw = ( r82xx_bws[i] / 1000 ) * 1000;   /* round on kHz */
+		reg_0a = IFi[i].reg10Lo;
+		reg_0b = IFi[i].reg11;
+		reg_1e = IFi[i].reg30Hi;
+		real_bw = IFi[i].bw * 1000;   /* kHz part */
 #if 0
 		fprintf(stderr, "%s: selected idx %d: R10 = %02X, R11 = %02X, Bw %d, IF %d\n"
 			, __FUNCTION__, i
 			, (unsigned)reg_0a
 			, (unsigned)reg_0b
 			, real_bw
-			, r82xx_if[i]
+			, IFi[i].fif * 1000 + IFi[i].fc
 			);
 #endif
 		*applied_bw = real_bw;
 		if (apply)
-			priv->int_freq = r82xx_if[i];
+			priv->int_freq = ( IFi[i].fif + IFi[i].fc ) * 1000;
 	}
 
 #if USE_R82XX_ENV_VARS
@@ -1501,7 +1613,12 @@ int r82xx_init(struct r82xx_priv *priv)
 	/* TODO: R828D might need r82xx_xtal_check() */
 	priv->xtal_cap_sel = XTAL_HIGH_CAP_0P;
 
-  priv->if_band_center_freq = 0;
+	priv->if_band_center_freq = 0;
+
+	priv->agc_mode = 0;
+	priv->last_AGC_state = 0;
+	priv->last_LNA_value = 0;
+	priv->last_Mixer_value = 0;
 
 	/* Initialize override registers */
 	memset( &(priv->override_data[0]), 0, NUM_REGS * sizeof(uint8_t) );

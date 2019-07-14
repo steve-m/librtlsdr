@@ -64,6 +64,7 @@ enum RTL_TCP_COMMANDS {
     SET_TUNER_BW_IF_CENTER    = 0x45,   /* freq from SET_FREQUENCY stays in center;
                                          * the bandwidth (from SET_TUNER_BANDWIDTH)
                                          * is set to be centered at given IF frequency */
+    SET_TUNER_AGC_VARIANT     = 0x46,   /* set tuner agc algorithm/variant */
 };
 
 #ifdef __cplusplus
