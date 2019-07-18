@@ -33,6 +33,7 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/wavewrite.h"
 
 #define DEFAULT_SAMPLE_RATE		2048000
 #define DEFAULT_BANDWIDTH		0	/* automatic bandwidth */
@@ -97,13 +98,16 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			rtlsdr_cancel_async(dev);
 		}
 
-		if (fwrite(buf, 1, len, (FILE*)ctx) != len) {
-			fprintf(stderr, "Short write, samples lost, exiting!\n");
-			rtlsdr_cancel_async(dev);
-		}
-		else
-		{
-			waveDataSize += len;
+		if ( (FILE*)ctx == stdout ) {
+			if (fwrite(buf, 1, len, (FILE*)ctx) != len) {
+				fprintf(stderr, "Short write, samples lost, exiting!\n");
+				rtlsdr_cancel_async(dev);
+			}
+		} else {
+			if ( waveWriteSamples((FILE*)ctx, buf, len/2, 0) ) {
+				fprintf(stderr, "Short write, samples lost, exiting!\n");
+				rtlsdr_cancel_async(dev);
+			}
 		}
 
 		if (bytes_to_read > 0)
@@ -279,11 +283,17 @@ int main(int argc, char **argv)
 				do_exit = 1;
 			}
 
-			if (fwrite(buffer, 1, n_read, file) != (size_t)n_read) {
-				fprintf(stderr, "Short write, samples lost, exiting!\n");
-				break;
+			if ( file == stdout) {
+				if (fwrite(buffer, 1, n_read, file) != (size_t)n_read) {
+					fprintf(stderr, "Short write, samples lost, exiting!\n");
+					break;
+				}
+			} else {
+				if ( waveWriteSamples(file, buffer, n_read/2, 0) ) {
+					fprintf(stderr, "Short write, samples lost, exiting!\n");
+					break;
+				}
 			}
-			waveDataSize += n_read;
 
 			if ((uint32_t)n_read < out_block_size) {
 				fprintf(stderr, "Short read, samples lost, exiting!\n");

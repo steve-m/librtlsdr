@@ -102,7 +102,7 @@ endif()
 # Setup libraries used in executables
 ########################################################################
 add_library(convenience_static STATIC
-    convenience/convenience.c
+    convenience/convenience.c  convenience/wavewrite.c
 )
 
 if(WIN32)

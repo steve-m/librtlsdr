@@ -83,6 +83,7 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/wavewrite.h"
 
 #define DEFAULT_SAMPLE_RATE		24000
 #define DEFAULT_BUF_LENGTH		(1 * 16384)
@@ -111,6 +112,8 @@ static int printLevelNo = 1;
 static int levelMax = 0;
 static int levelMaxMax = 0;
 static double levelSum = 0.0;
+static int32_t prev_if_band_center_freq = 0;
+
 
 enum trigExpr { crit_IN =0, crit_OUT, crit_LT, crit_GT };
 char * aCritStr[] = { "in", "out", "<", ">" };
@@ -213,6 +216,7 @@ struct output_state
 	pthread_t thread;
 	FILE	 *file;
 	char	 *filename;
+	char	 *tempfilename;
 	int16_t  result[MAXIMUM_BUF_LENGTH];
 	int	  result_len;
 	int	  rate;
@@ -1386,13 +1390,23 @@ static void *demod_thread_fn(void *arg)
 static void *output_thread_fn(void *arg)
 {
 	struct output_state *s = arg;
-	while (!do_exit) {
-		// use timedwait and pad out under runs
-		safe_cond_wait(&s->ready, &s->ready_m);
-		pthread_rwlock_rdlock(&s->rw);
-		fwrite(s->result, 2, s->result_len, s->file);
-		waveDataSize += 2 * s->result_len;
-		pthread_rwlock_unlock(&s->rw);
+	if ( s->file == stdout ) {
+		while (!do_exit) {
+			/* use timedwait and pad out under runs */
+			safe_cond_wait(&s->ready, &s->ready_m);
+			pthread_rwlock_rdlock(&s->rw);
+			fwrite(s->result, 2, s->result_len, s->file);
+			pthread_rwlock_unlock(&s->rw);
+		}
+	} else {
+		while (!do_exit) {
+			/* use timedwait and pad out under runs */
+			safe_cond_wait(&s->ready, &s->ready_m);
+			pthread_rwlock_rdlock(&s->rw);
+			/* distinguish for endianness: wave requires little endian */
+			waveWriteSamples(s->file, s->result, s->result_len, 0);
+			pthread_rwlock_unlock(&s->rw);
+		}
 	}
 	return 0;
 }
@@ -1442,6 +1456,7 @@ static void *controller_thread_fn(void *arg)
 	// thoughts for multiple dongles
 	// might be no good using a controller thread if retune/rate blocks
 	int i, r, execWaitHop = 1;
+	int32_t if_band_center_freq = 0;
 	struct controller_state *s = arg;
 	struct cmd_state *c = s->cmd;
 
@@ -1485,6 +1500,20 @@ static void *controller_thread_fn(void *arg)
 	verbose_set_sample_rate(dongle.dev, dongle.rate);
 	fprintf(stderr, "Output at %u Hz.\n", demod.rate_in/demod.post_downsample);
 
+	if ( dongle.bandwidth ) {
+		if_band_center_freq = dongle.userFreq - dongle.freq;
+		if ( prev_if_band_center_freq != if_band_center_freq ) {
+			r = rtlsdr_set_tuner_band_center(dongle.dev, if_band_center_freq );
+			if (r)
+				fprintf(stderr, "WARNING: Failed to set band center.\n");
+			else {
+				prev_if_band_center_freq = if_band_center_freq;
+				if (verbosity)
+					fprintf(stderr, "rtlsdr_set_tuner_band_center(%.0f Hz) successful\n", (double)if_band_center_freq);
+			}
+		}
+	}
+
 	while (!do_exit) {
 		if (execWaitHop)
 			safe_cond_wait(&s->hop, &s->hop_m);
@@ -1497,9 +1526,22 @@ static void *controller_thread_fn(void *arg)
 			s->freq_now = (s->freq_now + 1) % s->freq_len;
 			optimal_settings(s->freqs[s->freq_now], demod.rate_in);
 			rtlsdr_set_center_freq(dongle.dev, dongle.freq);
+			if ( dongle.bandwidth ) {
+				if_band_center_freq = dongle.userFreq - dongle.freq;
+				if ( prev_if_band_center_freq != if_band_center_freq ) {
+					r = rtlsdr_set_tuner_band_center(dongle.dev, if_band_center_freq );
+					if (r)
+						fprintf(stderr, "WARNING: Failed to set band center.\n");
+					else {
+						prev_if_band_center_freq = if_band_center_freq;
+						if (verbosity)
+							fprintf(stderr, "rtlsdr_set_tuner_band_center(%.0f Hz) successful\n", (double)if_band_center_freq);
+					}
+				}
+			}
 			dongle.mute = DEFAULT_BUFFER_DUMP;
 		} else {
-			dongle.mute = 2 * 3200000; /* over a second - until parametrized the dongle */
+			dongle.mute = 2 * dongle.rate; /* over a second - until parametrized the dongle */
 			c->numSummed = 0;
 
 			toNextCmdLine(c);
@@ -1538,7 +1580,21 @@ static void *controller_thread_fn(void *arg)
 				if (r < 0)
 					fprintf(stderr, "WARNING: Failed to set bandwidth.\n");
 				else
-					c->prevBandwidth != dongle.bandwidth;
+					c->prevBandwidth = dongle.bandwidth;
+			}
+			/*  */
+			if ( dongle.bandwidth ) {
+				if_band_center_freq = dongle.userFreq - dongle.freq;
+				if ( prev_if_band_center_freq != if_band_center_freq ) {
+					r = rtlsdr_set_tuner_band_center(dongle.dev, if_band_center_freq );
+					if (r)
+						fprintf(stderr, "WARNING: Failed to set band center.\n");
+					else {
+						prev_if_band_center_freq = if_band_center_freq;
+						if (verbosity)
+							fprintf(stderr, "rtlsdr_set_tuner_band_center(%.0f Hz) successful\n", (double)if_band_center_freq);
+					}
+				}
 			}
 			/* 4- Set ADC samplerate *
 			r = rtlsdr_set_sample_rate(dongle.dev, dongle.rate);
@@ -1972,14 +2028,17 @@ int main(int argc, char **argv)
 		_setmode(_fileno(output.file), _O_BINARY);
 #endif
 	} else {
-		output.file = fopen(output.filename, "wb");
+		output.tempfilename = malloc( strlen(output.filename)+8 );
+		strcpy(output.tempfilename, output.filename);
+		strcat(output.tempfilename, ".tmp");
+		output.file = fopen(output.tempfilename, "wb");
 		if (!output.file) {
-			fprintf(stderr, "Failed to open %s\n", output.filename);
+			fprintf(stderr, "Failed to open %s\n", output.tempfilename);
 			exit(1);
 		}
 		else
 		{
-			fprintf(stderr, "Open %s for write\n", output.filename);
+			fprintf(stderr, "Open %s for write\n", output.tempfilename);
 			if (writeWav) {
 				int nChan = (demod.mode_demod == &raw_demod) ? 2 : 1;
 				int srate = (demod.rate_out2 > 0) ? demod.rate_out2 : demod.rate_out;
@@ -2033,10 +2092,16 @@ int main(int argc, char **argv)
 	}
 
 	if (output.file != stdout) {
+		int r;
 		if (writeWav) {
 			waveFinalizeHeader(output.file);
 		}
-		fclose(output.file);}
+		fclose(output.file);
+		r = rename( output.tempfilename, output.filename );	// #include <stdio.h>
+		if ( r )
+			fprintf( stderr, "%s: error %d '%s' renaming'%s' to '%s'\n"
+				, argv[0], errno, strerror(errno), output.tempfilename, output.filename );
+	}
 
 	rtlsdr_close(dongle.dev);
 	return r >= 0 ? r : -r;

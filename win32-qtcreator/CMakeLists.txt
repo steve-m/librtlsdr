@@ -50,6 +50,8 @@ SET( RTLLIBFILES
 
     ../src/convenience/convenience.c
     ../src/convenience/convenience.h
+    ../src/convenience/wavewrite.c
+    ../src/convenience/wavewrite.h
 
     ../src/getopt/getopt.c
     ../src/getopt/getopt.h
