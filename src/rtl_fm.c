@@ -1308,7 +1308,7 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 		s->sampleMax = sampleMax;
 	}
 	if (c->checkADCrms ) {
-		while ( len >= 16384 * step )
+		while ( (int)len >= 16384 * step )
 			step += 2;
 		for (i=0; i<(int)len; i+= step) {
 			sampleP  = ( (int)buf[i]   -127 ) * ( (int)buf[i]   -127 );  /* I^2 */

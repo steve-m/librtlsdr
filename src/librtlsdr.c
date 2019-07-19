@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #ifndef _WIN32
 #include <arpa/inet.h>
@@ -2123,7 +2124,6 @@ int rtlsdr_get_index_by_serial(const char *serial)
 }
 
 /* UDP controller server */
-#define WITH_UDP_SERVER 1
 #ifdef WITH_UDP_SERVER
 
 static int parseNum(const char * pacNum) {

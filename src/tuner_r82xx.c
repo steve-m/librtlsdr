@@ -340,6 +340,7 @@ int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val, uint
 int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
 	uint8_t bit_mask, const char * func_name)
 {
+	int r;
 #if USE_R82XX_ENV_VARS
 	if (priv->printI2C) {
 		fprintf(stderr, "%s: setting I2C register %02X: old value = %02X, new value: %02X with mask %02X\n"
@@ -348,7 +349,7 @@ int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val,
 			, val, bit_mask );
 	}
 #endif
-	int r = r82xx_write_reg_mask(priv, reg, val, bit_mask);
+	r = r82xx_write_reg_mask(priv, reg, val, bit_mask);
 	return r;
 }
 
@@ -1271,7 +1272,7 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 	unsigned int i;
 	int real_bw = 0;
 #if USE_R82XX_ENV_VARS
-	uint8_t reg_09, reg_0d, reg_0e;
+	uint8_t reg_09, reg_0d =0, reg_0e =0;
 #endif
 	uint8_t reg_mask;
 	uint8_t reg_0a;
@@ -1774,7 +1775,7 @@ int r82xx_init(struct r82xx_priv *priv)
 		if ( pacR30Hi ) {
 			priv->haveR30H = 1;
 			priv->valR30H = atoi(pacR30Hi) & 0x06;
-			if ( priv->valR30H > 6 || priv->valR30H < 0 ) {
+			if ( priv->valR30H > 6 ) {
 				fprintf(stderr, "*** read R30_HI from environment: %d - but value should be 2 - 6 for bit [6:5]\n", priv->valR30H);
 				priv->haveR30H = 0;
 			}
@@ -1785,7 +1786,7 @@ int r82xx_init(struct r82xx_priv *priv)
 		if ( pacR30Lo ) {
 			priv->haveR30L = 1;
 			priv->valR30L = atoi(pacR30Lo);
-			if ( priv->valR30L < 0 || priv->valR30L > 31 ) {
+			if ( priv->valR30L > 31 ) {
 				fprintf(stderr, "*** read R30_LO from environment: %d - but value should be 0 - 31 for bit [4:0]\n", priv->valR30L);
 				priv->haveR30L = 0;
 			}
