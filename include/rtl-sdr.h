@@ -24,10 +24,6 @@
 extern "C" {
 #endif
 
-#ifndef WIN32
-#define _ENABLE_RPC
-#endif
-
 
 #include <stdint.h>
 #include <stddef.h>

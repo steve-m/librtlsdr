@@ -41,6 +41,8 @@ OPTION(LINK_RTLTOOLS_AGAINST_STATIC_LIB "Link rtl-tools statically against librt
 
 OPTION(PROVIDE_UDP_SERVER "Provide UDP server for tests" OFF)
 
+OPTION(WITH_RPC "RPC for non-Windows" OFF)
+
 # Set the version information here
 set(VERSION_INFO_MAJOR_VERSION 0) # increment major on api compatibility changes
 set(VERSION_INFO_MINOR_VERSION 7) # increment minor on feature-level changes
@@ -48,7 +50,7 @@ set(VERSION_INFO_PATCH_VERSION git) # increment patch for bug fixes and docs
 include(Version) # setup version info
 
 if(PROVIDE_UDP_SERVER AND WIN32)
-	add_definitions(-DWITH_UDP_SERVER)
+    add_definitions(-DWITH_UDP_SERVER)
 endif()
 
 ########################################################################
