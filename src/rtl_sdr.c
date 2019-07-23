@@ -98,9 +98,11 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			rtlsdr_cancel_async(dev);
 		}
 
-		if ( (FILE*)ctx == stdout ) {
-			if (fwrite(buf, 1, len, (FILE*)ctx) != len) {
-				fprintf(stderr, "Short write, samples lost, exiting!\n");
+		if (!waveHdrStarted) {
+			size_t wr = fwrite(buf, 1, len, (FILE*)ctx);
+			if ( wr != len) {
+				fprintf(stderr, "Short write (wrote %ld of %ld bytes), samples lost, exiting!\n"
+						, (long)wr, (long)len );
 				rtlsdr_cancel_async(dev);
 			}
 		} else {
@@ -283,9 +285,11 @@ int main(int argc, char **argv)
 				do_exit = 1;
 			}
 
-			if ( file == stdout) {
-				if (fwrite(buffer, 1, n_read, file) != (size_t)n_read) {
-					fprintf(stderr, "Short write, samples lost, exiting!\n");
+			if (!waveHdrStarted) {
+				size_t wr = fwrite(buffer, 1, n_read, file);
+				if (wr != (size_t)n_read) {
+					fprintf(stderr, "Short write (wrote %ld of %ld bytes), samples lost, exiting!\n"
+							, (long)wr, (long)n_read );
 					break;
 				}
 			} else {

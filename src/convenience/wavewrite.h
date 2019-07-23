@@ -24,6 +24,8 @@
 extern "C" {
 #endif
 
+int	waveHdrStarted;
+
 /*!
  * helper functions to write and finalize wave headers
  *   with compatibility to some SDR programs - showing frequency:

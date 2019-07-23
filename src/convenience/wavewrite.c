@@ -94,7 +94,7 @@ static waveFileHeader waveHdr;
 
 
 static uint32_t	waveDataSize = 0;
-static int	waveHdrStarted = 0;
+int	waveHdrStarted = 0;
 
 void waveSetTime(Wind_SystemTime *p)
 {

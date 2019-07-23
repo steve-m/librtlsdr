@@ -1390,7 +1390,7 @@ static void *demod_thread_fn(void *arg)
 static void *output_thread_fn(void *arg)
 {
 	struct output_state *s = arg;
-	if ( s->file == stdout ) {
+	if (!waveHdrStarted) {
 		while (!do_exit) {
 			/* use timedwait and pad out under runs */
 			safe_cond_wait(&s->ready, &s->ready_m);
