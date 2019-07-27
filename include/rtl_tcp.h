@@ -65,6 +65,9 @@ enum RTL_TCP_COMMANDS {
                                          * the bandwidth (from SET_TUNER_BANDWIDTH)
                                          * is set to be centered at given IF frequency */
     SET_TUNER_AGC_VARIANT     = 0x46,   /* set tuner agc algorithm/variant */
+    SET_SIDEBAND              = 0x47,   /* Mixer Sideband for R820T */
+    REPORT_I2C_REGS           = 0x48,   /* perodically report I2C registers
+                                         * - if reverse channel is enabled */
 };
 
 #ifdef __cplusplus

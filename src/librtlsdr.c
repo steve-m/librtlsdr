@@ -107,7 +107,9 @@ typedef struct rtlsdr_tuner_iface {
 	int (*set_gain_mode)(void *, int manual);
 	int (*set_i2c_register)(void *, unsigned i2c_register, unsigned data /* byte */, unsigned mask /* byte */ );
 	int (*set_i2c_override)(void *, unsigned i2c_register, unsigned data /* byte */, unsigned mask /* byte */ );
-	unsigned (*get_i2c_register)(void *, int i2c_register);
+	unsigned (*get_i2c_register)(void *, int i2c_register);  /* read single register */
+	int (*get_i2c_reg_array)(void *, unsigned char* data, int len);  /* -cs- */
+	int (*set_sideband)(void *, int sideband);
 } rtlsdr_tuner_iface_t;
 
 enum rtlsdr_async_status {
@@ -206,6 +208,8 @@ struct rtlsdr_dev {
 	uint32_t bw;
 	uint32_t offs_freq; /* Hz */
 	int32_t  if_band_center_freq; /* Hz - rtlsdr_set_tuner_band_center() */
+	int      tuner_if_freq;
+	int      tuner_sideband;
 	int corr; /* ppm */
 	int gain; /* tenth dB */
 	enum rtlsdr_ds_mode direct_sampling_mode;
@@ -215,6 +219,9 @@ struct rtlsdr_dev {
 	struct r82xx_priv r82xx_p;
 	/* soft tuner agc */
 	struct softagc_state softagc;
+
+	/* -cs- Concurrent lock for the periodic reading of I2C registers */
+	pthread_mutex_t cs_mutex;
 
 	/* UDP controller server */
 #ifdef WITH_UDP_SERVER
@@ -241,14 +248,13 @@ struct rtlsdr_dev {
 	int rc_active;
 	int verbose;
 	int dev_num;
-	uint8_t saved_27;
-	int handled;
 };
 
-void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
+static void rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
 static int rtlsdr_demod_write_reg(rtlsdr_dev_t *dev, uint8_t page, uint16_t addr, uint16_t val, uint8_t len);
 static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq);
 static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq);
+static int rtlsdr_set_spectrum_inversion(rtlsdr_dev_t *dev, int sideband);
 
 static void softagc_init(rtlsdr_dev_t *dev);
 static void softagc_uninit(rtlsdr_dev_t *dev);
@@ -310,7 +316,6 @@ int e4000_set_gain_mode(void *dev, int manual) {
 	return e4k_enable_manual_gain(&devt->e4k_s, manual);
 }
 
-int _fc0012_init(void *dev) { return fc0012_init(dev); }
 int fc0012_exit(void *dev) { return 0; }
 int fc0012_set_freq(void *dev, uint32_t freq) {
 	/* select V-band/U-band filter */
@@ -318,8 +323,10 @@ int fc0012_set_freq(void *dev, uint32_t freq) {
 	return fc0012_set_params(dev, freq, 6000000);
 }
 int fc0012_set_bw(void *dev, int bw, uint32_t *applied_bw, int apply) { return 0; }
-int _fc0012_set_gain(void *dev, int gain) { return fc0012_set_gain(dev, gain); }
 int fc0012_set_gain_mode(void *dev, int manual) { return 0; }
+int _fc0012_set_i2c_register(void *dev, unsigned i2c_register, unsigned data, unsigned mask ) {
+	return fc0012_set_i2c_register(dev, i2c_register, data);
+}
 
 int _fc0013_init(void *dev) { return fc0013_init(dev); }
 int fc0013_exit(void *dev) { return 0; }
@@ -372,7 +379,6 @@ int r820t_set_freq(void *dev, uint32_t freq) {
 	return r82xx_set_freq(&devt->r82xx_p, freq);
 }
 
-#define BWC_MUL_SIGN		+
 
 int r820t_set_bw(void *dev, int bw, uint32_t *applied_bw, int apply) {
 	int r, iffreq;
@@ -383,15 +389,27 @@ int r820t_set_bw(void *dev, int bw, uint32_t *applied_bw, int apply) {
 		return 0;
 	if(iffreq < 0) {
 		r = iffreq;
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_bw(%d): r82xx_set_bandwidth() returned error %d\n", bw, r);
+		return r;
+	}
+	devt->tuner_if_freq = iffreq;
+
+	iffreq = (devt->tuner_sideband)	/* -1 for USB; +1 for LSB */
+		? ( devt->tuner_if_freq - devt->if_band_center_freq )
+		: ( devt->tuner_if_freq + devt->if_band_center_freq );
+	r = rtlsdr_set_if_freq(devt, iffreq );
+	if (r)
+	{
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_bw(%d): rtlsdr_set_if_freq(%d) returned error %d\n", bw, iffreq, r);
 		return r;
 	}
 
-	iffreq = iffreq BWC_MUL_SIGN devt->if_band_center_freq;
-	r = rtlsdr_set_if_freq(devt, iffreq );
-	if (r)
-		return r;
-
-	return rtlsdr_set_center_freq(devt, devt->freq);
+	r = rtlsdr_set_center_freq(devt, devt->freq);
+	if ( r && devt->verbose )
+		fprintf(stderr, "r820t_set_bw(%d): rtlsdr_set_center_freq(%d) returned error %d\n", bw, devt->freq, r);
+	return r;
 }
 
 int r820t_set_bw_center(void *dev, int32_t if_band_center_freq) {
@@ -401,16 +419,28 @@ int r820t_set_bw_center(void *dev, int32_t if_band_center_freq) {
 	iffreq = r82xx_set_bw_center(&devt->r82xx_p, if_band_center_freq);
 	if(iffreq < 0) {
 		r = iffreq;
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_bw_center(%d): r82xx_set_bw_center() returned error %d\n", if_band_center_freq, r);
+		return r;
+	}
+	devt->tuner_if_freq = iffreq;
+	devt->if_band_center_freq = if_band_center_freq;
+
+	iffreq = (devt->tuner_sideband)	/* -1 for USB; +1 for LSB */
+		? ( devt->tuner_if_freq - devt->if_band_center_freq )
+		: ( devt->tuner_if_freq + devt->if_band_center_freq );
+	r = rtlsdr_set_if_freq(devt, iffreq );
+	if (r)
+	{
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_bw_center(%d): rtlsdr_set_if_freq(%d) returned error %d\n", if_band_center_freq, iffreq, r);
 		return r;
 	}
 
-	devt->if_band_center_freq = if_band_center_freq;
-	iffreq = iffreq BWC_MUL_SIGN devt->if_band_center_freq;
-	r = rtlsdr_set_if_freq(devt, iffreq );
-	if (r)
-		return r;
-
-	return rtlsdr_set_center_freq(devt, devt->freq);
+	r = rtlsdr_set_center_freq(devt, devt->freq);
+	if ( r && devt->verbose )
+		fprintf(stderr, "r820t_set_bw_center(%d): rtlsdr_set_center_freq(%d) returned error %d\n", if_band_center_freq, devt->freq, r);
+	return r;
 }
 
 int rtlsdr_vga_control( rtlsdr_dev_t* devt, int rc, int rtl_vga_control ) {
@@ -469,6 +499,49 @@ int r820t_set_i2c_register(void *dev, unsigned i2c_register, unsigned data, unsi
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_i2c_register(&devt->r82xx_p, i2c_register, data, mask);
 }
+
+
+/* -cs- */
+int r820t_get_i2c_reg_array(void *dev, unsigned char* data, int len) {
+	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+	return r82xx_get_i2c_register(&devt->r82xx_p, data, len);
+}
+
+int r820t_set_sideband(void *dev, int sideband) {
+	int r;
+	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
+
+	if ( devt->verbose )
+		fprintf(stderr, "r820t_set_sideband(%d): r82xx_set_sideband() ..\n", sideband);
+	r = r82xx_set_sideband(&devt->r82xx_p, sideband);
+	if(r < 0) {
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_sideband(%d): r82xx_set_sideband() returned %d\n", sideband, r);
+		return r;
+	}
+
+	if ( devt->verbose )
+		fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_spectrum_inversion() ..\n", sideband);
+	r = rtlsdr_set_spectrum_inversion(devt, sideband);
+	if (r) {
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_spectrum_inversion() returned %d\n", sideband, r);
+		return r;
+	}
+
+	if (!devt->freq)
+		return r;
+
+	if ( devt->verbose )
+		fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_center_freq(%d) ..\n", sideband, devt->freq);
+	r = rtlsdr_set_center_freq(devt, devt->freq);
+	if (r) {
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_center_freq(%d) returned %d\n", sideband, devt->freq, r);
+	}
+	return r;
+}
+
 int r820t_set_i2c_override(void *dev, unsigned i2c_register, unsigned data, unsigned mask ) {
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 	return r82xx_set_i2c_override(&devt->r82xx_p, i2c_register, data, mask);
@@ -478,37 +551,40 @@ int r820t_set_i2c_override(void *dev, unsigned i2c_register, unsigned data, unsi
 /* definition order must match enum rtlsdr_tuner */
 static rtlsdr_tuner_iface_t tuners[] = {
 	{
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
 	},
 	{
 		e4000_init, e4000_exit,
 		e4000_set_freq, e4000_set_bw, NULL, e4000_set_gain, e4000_set_if_gain,
-		e4000_set_gain_mode, NULL, NULL, NULL
+		e4000_set_gain_mode, NULL, NULL, NULL, NULL, NULL
 	},
+
 	{
-		_fc0012_init, fc0012_exit,
-		fc0012_set_freq, fc0012_set_bw, NULL, _fc0012_set_gain, NULL,
-		fc0012_set_gain_mode, NULL, NULL, NULL
+		fc0012_init, fc0012_exit,
+		fc0012_set_freq, fc0012_set_bw, NULL, fc0012_set_gain, NULL,
+		fc0012_set_gain_mode, _fc0012_set_i2c_register, NULL, NULL, fc0012_get_i2c_register, NULL
 	},
 	{
 		_fc0013_init, fc0013_exit,
 		fc0013_set_freq, fc0013_set_bw, NULL, _fc0013_set_gain, NULL,
-		fc0013_set_gain_mode, NULL, NULL, NULL
+		fc0013_set_gain_mode, NULL, NULL, NULL, NULL, NULL
 	},
 	{
 		fc2580_init, fc2580_exit,
 		_fc2580_set_freq, fc2580_set_bw, NULL, fc2580_set_gain, NULL,
-		fc2580_set_gain_mode, NULL, NULL, NULL
+		fc2580_set_gain_mode, NULL, NULL, NULL, NULL, NULL
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
-		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register
+		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register, r820t_get_i2c_reg_array,
+		r820t_set_sideband
 	},
 	{
 		r820t_init, r820t_exit,
 		r820t_set_freq, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
-		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register
+		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register, r820t_get_i2c_reg_array,
+		r820t_set_sideband
 	},
 };
 
@@ -848,7 +924,13 @@ void rtlsdr_set_gpio_output(rtlsdr_dev_t *dev, uint8_t gpio)
 
 void rtlsdr_set_i2c_repeater(rtlsdr_dev_t *dev, int on)
 {
+	if (on)
+		pthread_mutex_lock(&dev->cs_mutex);
+
 	rtlsdr_demod_write_reg(dev, 1, 0x01, on ? 0x18 : 0x10, 1);
+
+	if (!on)
+		pthread_mutex_unlock(&dev->cs_mutex);
 }
 
 int rtlsdr_set_fir(rtlsdr_dev_t *dev)
@@ -993,6 +1075,18 @@ static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq)
 	tmp = if_freq & 0xff;
 	r |= rtlsdr_demod_write_reg(dev, 1, 0x1b, tmp, 1);
 
+	return r;
+}
+
+static int rtlsdr_set_spectrum_inversion(rtlsdr_dev_t *dev, int sideband)
+{
+	int r;
+	if(sideband)
+		/* disable spectrum inversion */
+		r = rtlsdr_demod_write_reg(dev, 1, 0x15, 0x00, 1);
+	else
+		/* enable spectrum inversion */
+		r = rtlsdr_demod_write_reg(dev, 1, 0x15, 0x01, 1);
 	return r;
 }
 
@@ -1223,20 +1317,12 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = dev->tuner->set_freq(dev, freq - dev->offs_freq);
 		rtlsdr_set_i2c_repeater(dev, 0);
-		reactivate_softagc(dev, SOFTSTATE_RESET);
 	}
 
 	if (!r)
 		dev->freq = freq;
 	else
 		dev->freq = 0;
-
-	/* restore filters */
-	if (dev->handled) {
-		rtlsdr_set_i2c_repeater(dev, 1);
-		dev->tuner->set_i2c_register(dev, 27, dev->saved_27, 255);
-		rtlsdr_set_i2c_repeater(dev, 0);
-	}
 
 	return r;
 }
@@ -1585,6 +1671,56 @@ int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int mode)
 	return r;
 }
 
+int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband)
+{
+	int r = 0, iffreq;
+	rtlsdr_dev_t *devt = dev;
+
+	if (!dev || !dev->tuner)
+		return -1;
+
+	if (dev->tuner->set_sideband) {
+		if ( devt->verbose )
+			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): tuner.set_sideband() ..\n", sideband);
+
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = dev->tuner->set_sideband((void *)dev, sideband);
+		rtlsdr_set_i2c_repeater(dev, 0);
+
+		if (r)
+		{
+			if ( devt->verbose )
+				fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): tuner.set_sideband() returned error %d\n", sideband, r);
+			return r;
+		}
+		devt->tuner_sideband = sideband;
+
+		iffreq = (devt->tuner_sideband)	/* -1 for USB; +1 for LSB */
+			? ( devt->tuner_if_freq - devt->if_band_center_freq )
+			: ( devt->tuner_if_freq + devt->if_band_center_freq );
+		fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_if_freq(%d) ..\n", sideband, iffreq);
+		r = rtlsdr_set_if_freq(devt, iffreq );
+		if (r)
+		{
+			if ( devt->verbose )
+				fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_if_freq(%d) returned error %d\n", sideband, iffreq);
+			return r;
+		}
+
+		if (!devt->freq)
+			return r;
+		if (devt->verbose )
+			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_center_freq(%d) ..\n", sideband, devt->freq);
+		r = rtlsdr_set_center_freq(devt, devt->freq);
+		if (r && devt->verbose )
+			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_center_freq(%d) returned error %d\n", sideband, devt->freq, r);
+
+		return r;
+	}
+
+	return r;
+}
+
 int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ )
 {
 	int r = 0;
@@ -1607,6 +1743,23 @@ int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsi
 	}
 	return r;
 }
+
+/* -cs- */
+int rtlsdr_get_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned char* data, int len)
+{
+	int r = 0;
+
+	if (!dev || !dev->tuner)
+		return -1;
+
+	if (dev->tuner->get_i2c_register) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = dev->tuner->get_i2c_reg_array((void *)dev, data, len);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	}
+	return r;
+}
+
 
 int rtlsdr_set_tuner_i2c_override(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask /* byte */, unsigned data /* byte */ )
 {
@@ -2242,6 +2395,7 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	uint8_t mask = 0xff, reg=0;
 	uint32_t freq;
 	int32_t bandcenter;
+	int sideband;
 	int retCode;
 
 	str1 = message;
@@ -2270,7 +2424,8 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	 * f <RFfrequency>         # set rtl center frequency
 	 * b <bandwidth>           # set tuner bandwidth
 	 * c <frequency>           # set tuner bandwidth center in output. value in [ -1 600 000 .. 1 600 000 ]
-	 * 
+	 * v <sideband>            # set tuner sideband inversion
+	 *
 	 * a <tunerAgcVariant>     #  0: LNA/Mixer = auto; VGA = fixed 26.5 dB
 	 *                         # -1: LNA/Mixer = last value from prev rtlsdr_set_tuner_gain; VGA = auto
 	 *                         # >0: LNA/Mixer = from rtlsdr_set_tuner_gain(tunerAgcMode); VGA = auto
@@ -2304,6 +2459,7 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	if (!strcmp(token, "f")) comm = 256 + 1;
 	if (!strcmp(token, "b")) comm = 256 + 2;
 	if (!strcmp(token, "c")) comm = 256 + 3;
+	if (!strcmp(token, "v")) comm = 256 + 4;
 	if (!strcmp(token, "a")) comm = 512 + 1;
 	if (!strcmp(token, "m")) comm = 512 + 2;
 	if (!strcmp(token, "M")) comm = 512 + 3;
@@ -2367,7 +2523,6 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 				return -1;
 			}
 		} else if (comm == 64 +2 || comm == 64 +3 ) {
-			dev->saved_27 = dev->tuner->get_i2c_register(dev,27);
 			if ( dev->verbose )
 			{
 				fprintf(stderr, "parsed 'set i2c register %s %d = x%02X  value %d = %s = %s  with mask %s = %s'\n"
@@ -2451,6 +2606,15 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 			if ( dev->verbose )
 				fprintf(stderr, "  rtlsdr_set_tuner_band_center() returned %d\n", retCode);
 			break;
+		case 4: /* sideband */
+			sideband = (int32_t)freqVal;
+			if ( dev->verbose )
+				fprintf(stderr, "parsed sideband = %d = %s from token '%s'\n",
+					sideband, (sideband ? "USB" : "LSB"), token);
+			retCode = rtlsdr_set_tuner_sideband(dev, sideband);
+			if ( dev->verbose )
+				fprintf(stderr, "  rtlsdr_set_tuner_sideband() returned %d\n", retCode);
+			break;
 		default:
 			break;
 		}
@@ -2505,6 +2669,7 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 			"f <RFfrequency>\n"
 			"b <bandwidth>\n"
 			"c <frequency>\n"
+			"v <sideband>\n"
 			"a <tunerAgcVariant>\n"
 			"m <tuner gain>\n"
 			"M <gainMode>\n" );
@@ -2613,6 +2778,13 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->softagc.deadTimeSps = 0;
 	dev->softagc.rpcNumGains = 0;
 	dev->softagc.rpcGainValues = NULL;
+
+	/* -cs- */
+	#ifdef __MINGW32__
+	dev->cs_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+	#else
+	dev->cs_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+	#endif
 
 	/* UDP controller server */
 #ifdef WITH_UDP_SERVER
@@ -2745,6 +2917,8 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 		fprintf(stderr, "Found Fitipower FC0012 tuner\n");
 		rtlsdr_set_gpio_output(dev, 6);
 		dev->tuner_type = RTLSDR_TUNER_FC0012;
+		/* rtlsdr_set_gpio_output(dev, 5); */
+		/* rtlsdr_set_gpio_bit(dev, 5, 1); */
 		goto found;
 	}
 
@@ -2785,7 +2959,6 @@ found:
 	rtlsdr_set_i2c_repeater(dev, 0);
 
 	*out_dev = dev;
-
 	return 0;
 err:
 	if (dev) {
@@ -2842,10 +3015,6 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 	libusb_close(dev->devh);
 
 	libusb_exit(dev->ctx);
-
-	if (dev->handled) {
-		dev->handled = 0;
-	}
 
 	free(dev);
 
@@ -3508,7 +3677,6 @@ static int rtlsdr_read_regs(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uin
 static int rtlsdr_write_reg_mask(rtlsdr_dev_t *d, int block, uint16_t reg, uint8_t val,
 		uint8_t mask)
 {
-	int ret;
 	uint8_t tmp;
 
 	/* no need for read if whole reg is written */
@@ -3561,7 +3729,7 @@ int rtlsdr_ir_query(rtlsdr_dev_t *d, uint8_t *buf, size_t buf_len)
 			ret = rtlsdr_write_reg_mask(d, init_tab[i].block, init_tab[i].reg,
 					init_tab[i].val, init_tab[i].mask);
 			if (ret < 0) {
-				fprintf(stderr, "write %zd reg %d %.4x %.2x %.2x failed\n", i, init_tab[i].block,
+				fprintf(stderr, "write %ld reg %d %.4x %.2x %.2x failed\n", (unsigned long)i, init_tab[i].block,
 						init_tab[i].reg, init_tab[i].val, init_tab[i].mask);
 				goto err;
 			}
@@ -3639,7 +3807,7 @@ const char * rtlsdr_get_opt_help(int longInfo)
 	if ( longInfo )
 		return
 		"\t[-O\tset RTL options string seperated with ':' ]\n"
-		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>\n"
+		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>:sb=<sideband>\n"
 		"\t\tagc=<tuner_gain_mode>:agcv=<>:gain=<tenth_dB>:dagc=<rtl_agc>\n"
 		"\t\tds=<direct_sampling_mode>:T=<bias_tee>\n"
 #ifdef WITH_UDP_SERVER
@@ -3693,6 +3861,12 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			if (verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed band center %d\n", (int)if_band_center_freq);
 			ret = rtlsdr_set_tuner_band_center(dev, if_band_center_freq );
+		}
+		else if (!strncmp(optPart, "sb=", 3)) {
+			int32_t sideband = (int32_t)(atoi(optPart +3));
+			if (verbose)
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed sideband %d == %s\n", (int)sideband, (sideband ? "Upper" : "Lower") );
+			ret = rtlsdr_set_tuner_sideband(dev, sideband );
 		}
 		else if (!strncmp(optPart, "agc=", 4)) {
 			int manual = 1 - atoi(optPart +4);	/* invert logic */
@@ -3781,8 +3955,6 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 
 #ifdef WITH_UDP_SERVER
 	if (dev->udpPortNo && dev->srv_started == 0 && dev->tuner_type==RTLSDR_TUNER_R820T) {
-		dev->handled = 1;
-		dev->saved_27 = dev->tuner->get_i2c_register(dev,27);		/* highest/lowest corner for LPNF and LPF */
 		/* signal(SIGPIPE, SIG_IGN); */
 		if(pthread_create(&dev->srv_thread, NULL, srv_server, dev)) {
 			fprintf(stderr, "Error creating thread\n");

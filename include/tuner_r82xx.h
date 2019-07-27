@@ -35,7 +35,7 @@
 #define R82XX_IF_FREQ		3570000
 
 #define REG_SHADOW_START	5
-#define NUM_REGS			30
+#define NUM_REGS			32
 #define NUM_IMR				5
 #define IMR_TRIAL			9
 
@@ -89,6 +89,7 @@ struct r82xx_priv {
 	uint8_t						input;
 	int							has_lock;
 	int							init_done;
+	int							sideband;
 
 	/* Store current mode */
 	uint32_t				delsys;
@@ -140,14 +141,17 @@ enum r82xx_delivery_system {
 int r82xx_standby(struct r82xx_priv *priv);
 int r82xx_init(struct r82xx_priv *priv);
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq);
-//int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain);
 int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain, int extended_mode, int lna_gain, int mixer_gain, int vga_gain, int *rtl_vga_control);
 int r82xx_set_agc_mode(struct r82xx_priv *priv, int agc_mode, int *rtl_vga_control);
+
 int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask);
+int r82xx_get_i2c_register(struct r82xx_priv *priv, unsigned char* data, int len);
 int r82xx_set_i2c_override(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask);
 
 int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate, uint32_t * applied_bw, int apply);
 int r82xx_set_bw_center(struct r82xx_priv *priv, int32_t if_band_center_freq);
+/* Mixer Sideband:  0: lower, 1: upper */
+int r82xx_set_sideband(struct r82xx_priv *priv, int sideband);
 
 int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg);
 int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val,uint8_t bit_mask);

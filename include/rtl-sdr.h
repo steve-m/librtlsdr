@@ -254,6 +254,15 @@ RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw );
 RTLSDR_API int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_center_freq );
 
 /*!
+ * Set the mixer sideband for the device.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param sideband mixer sideband 0 means lower sideband, 1 means upper sideband.
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband);
+
+/*!
  * Get actual gain the device is configured to.
  *
  * \param dev the device handle given by rtlsdr_open()

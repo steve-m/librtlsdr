@@ -440,6 +440,15 @@ static void *command_worker(void *arg)
 			printf("set tuner agc variant to %i\n", itmp);
 			rtlsdr_set_tuner_agc_mode(dev, itmp);
 			break;
+		case SET_SIDEBAND:
+			tmp = ntohl(cmd.param);
+			if(tmp) {
+				tmp = 1;
+				printf("set to upper sideband\n");
+			} else
+				printf("set to lower sideband\n");
+			rtlsdr_set_tuner_sideband(dev, tmp);
+			break;
 		default:
 			break;
 		}

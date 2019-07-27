@@ -119,7 +119,7 @@ endif()
 # Build utility
 ########################################################################
 add_executable(rtl_sdr rtl_sdr.c)
-add_executable(rtl_tcp rtl_tcp.c)
+add_executable(rtl_tcp rtl_tcp.c controlThread.c)
 add_executable(rtl_udp rtl_udp.c)
 add_executable(rtl_test rtl_test.c)
 add_executable(rtl_fm rtl_fm.c)

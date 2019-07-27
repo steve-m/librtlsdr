@@ -61,6 +61,10 @@ typedef int socklen_t;
 #define SOCKET_ERROR -1
 #endif
 
+#include "controlThread.h"
+
+static ctrl_thread_data_t ctrldata;
+
 static SOCKET s;
 
 static pthread_t tcp_worker_thread;
@@ -108,7 +112,8 @@ void usage(void)
 		);
 
 	fprintf(stderr, "Usage:\t[-a listen address]\n"
-		"\t[-p listen port (default: 1234)]\n"
+		"\t[-p control listen port (default: 1234)]\n"
+		"\t[-r response listen port: 0 = off; 1 (=default) for On at control listen port +1; or port]\n"
 		"\t[-I infrared sensor listen port (default: 0=none)]\n"
 		"\t[-W infrared sensor query wait interval usec (default: 10000)]\n"
 		"\t[-f frequency to tune to [Hz]]\n"
@@ -434,6 +439,19 @@ static void *command_worker(void *arg)
 			printf("set tuner agc variant to %i\n", itmp);
 			rtlsdr_set_tuner_agc_mode(dev, itmp);
 			break;
+		case SET_SIDEBAND:
+			tmp = ntohl(cmd.param);
+			if(tmp)
+				tmp = 1;
+			printf("set to %s sideband\n", (tmp ? "upper" : "lower") );
+			rtlsdr_set_tuner_sideband(dev, tmp);
+			break;
+		case REPORT_I2C_REGS:
+			tmp = ntohl(cmd.param);
+			if(tmp)
+				tmp = 1;
+			ctrldata.report_i2c = tmp;  /* (de)activate reporting */
+			break;
 		default:
 			break;
 		}
@@ -521,6 +539,10 @@ int main(int argc, char **argv)
 	int port_ir = 0;
 	int wait_ir = 10000;
 	pthread_t thread_ir;
+	pthread_t thread_ctrl; /* -cs- for periodically reading the register values */
+	int port_resp = 1;
+	int report_i2c = 0;
+	int do_exit_thrd_ctrl = 0;
 
 	uint32_t frequency = 100000000, samp_rate = 2048000;
 	enum rtlsdr_ds_mode ds_mode = RTLSDR_DS_IQ;
@@ -563,7 +585,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	opt_str = "a:p:f:g:s:b:n:d:P:O:TI:W:l:w:D:v";
+	opt_str = "a:p:f:g:s:b:n:d:P:O:TI:W:l:w:D:vr:";
 	while ((opt = getopt(argc, argv, opt_str)) != -1) {
 		switch (opt) {
 		case 'd':
@@ -584,6 +606,10 @@ int main(int argc, char **argv)
 			break;
 		case 'p':
 			port = atoi(optarg);
+			break;
+		case 'r':
+			port_resp = atoi(optarg);
+			report_i2c = 0;
 			break;
 		case 'I':
 			port_ir = atoi(optarg);
@@ -724,6 +750,25 @@ int main(int argc, char **argv)
 		pthread_create(&thread_ir, NULL, &ir_thread_fn, (void *)(&data));
 	}
 
+#if 0
+	fprintf(stderr, "enabling Response channel with I2C reporting\n");
+	port_resp = 1;
+	report_i2c = 1;
+#endif
+	if ( port_resp == 1 )
+		port_resp = port + 1;
+	ctrldata.port = port_resp;
+	ctrldata.dev = dev;
+	ctrldata.addr = addr;
+	ctrldata.wait = 500000; /* = 0.5 sec */
+	ctrldata.report_i2c = report_i2c;
+	ctrldata.pDoExit = &do_exit_thrd_ctrl;
+	if ( port_resp ) {
+		fprintf(stderr, "activating Response channel on port %d with %s I2C reporting\n"
+			, port_resp, (report_i2c ? "active" : "inactive") );
+		pthread_create(&thread_ctrl, NULL, &ctrl_thread_fn, &ctrldata);
+	}
+
 	memset(&local,0,sizeof(local));
 	local.sin_family = AF_INET;
 	local.sin_port = htons(port);
@@ -824,6 +869,11 @@ out:
 	rtlsdr_close(dev);
 	closesocket(listensocket);
 	/* if (port_ir) pthread_join(thread_ir, &status); */
+
+	if ( port_resp ) {
+		do_exit_thrd_ctrl = 1;
+		pthread_join(thread_ctrl, &status);
+	}
 
 	closesocket(s);
 #ifdef _WIN32
