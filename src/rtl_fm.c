@@ -239,7 +239,7 @@ struct controller_state
 	struct cmd_state *cmd;
 };
 
-// multiple of these, eventually
+/* multiple of these, eventually */
 struct dongle_state dongle;
 struct demod_state demod;
 struct output_state output;
@@ -278,7 +278,9 @@ void usage(void)
 		"\t	output are comma separated values (csv):\n"
 		"\t	avg rms since last output, max rms since last output, overall max rms, squelch (paramed), rms, rms level, avg rms level\n"
 		"\t[-c de-emphasis_time_constant in us for wbfm. 'us' or 'eu' for 75/50 us (default: us)]\n"
-		//"\t	for fm squelch is inverted\n"
+#if 0
+		"\t	for fm squelch is inverted\n"
+#endif
 		"\t[-o oversampling (default: 1, 4 recommended)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
 		"\t[-E enable_option (default: none)]\n"
@@ -307,11 +309,13 @@ void usage(void)
 		"\t	enables low-leakage downsample filter\n"
 		"\t	size can be 0 or 9.  0 has bad roll off\n"
 		"\t[-A std/fast/lut choose atan math (default: std)]\n"
-		//"\t[-C clip_path (default: off)\n"
-		//"\t (create time stamped raw clips, requires squelch)\n"
-		//"\t (path must have '\%s' and will expand to date_time_freq)\n"
-		//"\t[-H hop_fifo (default: off)\n"
-		//"\t (fifo will contain the active frequency)\n"
+#if 0
+		"\t[-C clip_path (default: off)\n"
+		"\t (create time stamped raw clips, requires squelch)\n"
+		"\t (path must have '\%s' and will expand to date_time_freq)\n"
+		"\t[-H hop_fifo (default: off)\n"
+		"\t (fifo will contain the active frequency)\n"
+#endif
 		"\n"
 		"Produces signed 16 bit ints, use Sox or aplay to hear them.\n"
 		"\trtl_fm ... | play -t raw -r 24k -es -b 16 -c 1 -V1 -\n"
@@ -468,8 +472,8 @@ void low_pass(struct demod_state *d)
 		if (d->prev_index < d->downsample) {
 			continue;
 		}
-		d->lowpassed[i2]   = d->now_r; // * d->output_scale;
-		d->lowpassed[i2+1] = d->now_j; // * d->output_scale;
+		d->lowpassed[i2]   = d->now_r; /* * d->output_scale; */
+		d->lowpassed[i2+1] = d->now_j; /* * d->output_scale; */
 		d->prev_index = 0;
 		d->now_r = 0;
 		d->now_j = 0;
@@ -735,7 +739,7 @@ static void checkTriggerCommand(struct cmd_state *c, unsigned char adcSampleMax,
 
 
 int low_pass_simple(int16_t *signal2, int len, int step)
-// no wrap around, length must be multiple of step
+/* no wrap around, length must be multiple of step */
 {
 	int i, i2, sum;
 	for(i=0; i < len; i+=step) {
@@ -743,7 +747,7 @@ int low_pass_simple(int16_t *signal2, int len, int step)
 		for(i2=0; i2<step; i2++) {
 			sum += (int)signal2[i + i2];
 		}
-		//signal2[i/step] = (int16_t)(sum / step);
+		/* signal2[i/step] = (int16_t)(sum / step); */
 		signal2[i/step] = (int16_t)(sum);
 	}
 	signal2[i/step + 1] = signal2[i/step];
@@ -752,7 +756,7 @@ int low_pass_simple(int16_t *signal2, int len, int step)
 
 void low_pass_real(struct demod_state *s)
 /* simple square window FIR */
-// add support for upsampling?
+/* add support for upsampling? */
 {
 	int i=0, i2=0;
 	int fast = (int)s->rate_out;
@@ -850,7 +854,7 @@ int fast_atan2(int y, int x)
 /* pre scaled for int16 */
 {
 	int yabs, angle;
-	int pi4=(1<<12), pi34=3*(1<<12);  // note pi = 1<<14
+	int pi4=(1<<12), pi34=3*(1<<12);  /* note pi = 1<<14 */
 	if (x==0 && y==0) {
 		return 0;
 	}
@@ -957,20 +961,21 @@ void fm_demod(struct demod_state *fm)
 }
 
 void am_demod(struct demod_state *fm)
-// todo, fix this extreme laziness
+/* todo, fix this extreme laziness */
 {
 	int i, pcm;
 	int16_t *lp = fm->lowpassed;
 	int16_t *r  = fm->result;
 	for (i = 0; i < fm->lp_len; i += 2) {
-		// hypot uses floats but won't overflow
-		//r[i/2] = (int16_t)hypot(lp[i], lp[i+1]);
+		/* hypot uses floats but won't overflow
+		* r[i/2] = (int16_t)hypot(lp[i], lp[i+1]);
+		*/
 		pcm = lp[i] * lp[i];
 		pcm += lp[i+1] * lp[i+1];
 		r[i/2] = (int16_t)sqrt(pcm) * fm->output_scale;
 	}
 	fm->result_len = fm->lp_len/2;
-	// lowpass? (3khz)  highpass?  (dc)
+	/* lowpass? (3khz)  highpass?  (dc) */
 }
 
 void usb_demod(struct demod_state *fm)
@@ -1008,10 +1013,11 @@ void raw_demod(struct demod_state *fm)
 
 void deemph_filter(struct demod_state *fm)
 {
-	static int avg;  // cheating...
+	static int avg;  /* cheating... */
 	int i, d;
-	// de-emph IIR
-	// avg = avg * (1 - alpha) + sample * alpha;
+	/* de-emph IIR
+	 * avg = avg * (1 - alpha) + sample * alpha;
+	 */
 	for (i = 0; i < fm->result_len; i++) {
 		d = fm->result[i] - avg;
 		if (d > 0) {
@@ -1115,7 +1121,7 @@ void arbitrary_upsample(int16_t *buf1, int16_t *buf2, int len1, int len2)
 	int i = 1;
 	int j = 0;
 	int tick = 0;
-	double frac;  // use integers...
+	double frac;  /* use integers... */
 	while (j < len2) {
 		frac = (double)tick / (double)len2;
 		buf2[j] = (int16_t)(buf1[i-1]*(1-frac) + buf1[i]*frac);
@@ -1139,7 +1145,7 @@ void arbitrary_downsample(int16_t *buf1, int16_t *buf2, int len1, int len2)
 	int j = 0;
 	int tick = 0;
 	double remainder = 0;
-	double frac;  // use integers...
+	double frac;  /* use integers... */
 	buf2[0] = 0;
 	while (j < len2) {
 		frac = 1.0;
@@ -1256,7 +1262,7 @@ void full_demod(struct demod_state *d)
 		return;
 	}
 	/* todo, fm noise squelch */
-	// use nicer filter here too?
+	/* use nicer filter here too? */
 	if (d->post_downsample > 1) {
 		d->result_len = low_pass_simple(d->result, d->result_len, d->post_downsample);}
 	if (d->deemph) {
@@ -1265,7 +1271,7 @@ void full_demod(struct demod_state *d)
 		dc_block_audio_filter(d);}
 	if (d->rate_out2 > 0) {
 		low_pass_real(d);
-		//arbitrary_resample(d->result, d->result, d->result_len, d->result_len * d->rate_out2 / d->rate_out);
+		/* arbitrary_resample(d->result, d->result, d->result_len, d->result_len * d->rate_out2 / d->rate_out); */
 	}
 }
 
@@ -1413,8 +1419,9 @@ static void *output_thread_fn(void *arg)
 
 static void optimal_settings(uint32_t freq, uint32_t rate)
 {
-	// giant ball of hacks
-	// seems unable to do a single pass, 2:1
+	/* giant ball of hacks
+	 * seems unable to do a single pass, 2:1
+	 */
 	uint32_t capture_freq, capture_rate;
 	struct dongle_state *d = &dongle;
 	struct demod_state *dm = &demod;
@@ -1453,8 +1460,9 @@ static void optimal_settings(uint32_t freq, uint32_t rate)
 
 static void *controller_thread_fn(void *arg)
 {
-	// thoughts for multiple dongles
-	// might be no good using a controller thread if retune/rate blocks
+	/* thoughts for multiple dongles
+	 * might be no good using a controller thread if retune/rate blocks
+	 */
 	int i, r, execWaitHop = 1;
 	int32_t if_band_center_freq = 0;
 	struct controller_state *s = arg;
@@ -2028,17 +2036,21 @@ int main(int argc, char **argv)
 		_setmode(_fileno(output.file), _O_BINARY);
 #endif
 	} else {
-		output.tempfilename = malloc( strlen(output.filename)+8 );
-		strcpy(output.tempfilename, output.filename);
-		strcat(output.tempfilename, ".tmp");
-		output.file = fopen(output.tempfilename, "wb");
+		const char * filename_to_open = output.filename;
+		if (writeWav) {
+			output.tempfilename = malloc( strlen(output.filename)+8 );
+			strcpy(output.tempfilename, output.filename);
+			strcat(output.tempfilename, ".tmp");
+			filename_to_open = output.tempfilename;
+		}
+ 		output.file = fopen(filename_to_open, "wb");
 		if (!output.file) {
-			fprintf(stderr, "Failed to open %s\n", output.tempfilename);
+			fprintf(stderr, "Failed to open %s\n", filename_to_open);
 			exit(1);
 		}
 		else
 		{
-			fprintf(stderr, "Open %s for write\n", output.tempfilename);
+			fprintf(stderr, "Open %s for write\n", filename_to_open);
 			if (writeWav) {
 				int nChan = (demod.mode_demod == &raw_demod) ? 2 : 1;
 				int srate = (demod.rate_out2 > 0) ? demod.rate_out2 : demod.rate_out;
@@ -2077,7 +2089,7 @@ int main(int argc, char **argv)
 	safe_cond_signal(&controller.hop, &controller.hop_m);
 	pthread_join(controller.thread, NULL);
 
-	//dongle_cleanup(&dongle);
+	/* dongle_cleanup(&dongle); */
 	demod_cleanup(&demod);
 	output_cleanup(&output);
 	controller_cleanup(&controller);
@@ -2092,19 +2104,22 @@ int main(int argc, char **argv)
 	}
 
 	if (output.file != stdout) {
-		int r;
 		if (writeWav) {
+			int r;
 			waveFinalizeHeader(output.file);
+			fclose(output.file);
+			remove(output.filename);	/* delete, in case file already exists */
+			r = rename( output.tempfilename, output.filename );	/* #include <stdio.h> */
+			if ( r )
+				fprintf( stderr, "%s: error %d '%s' renaming'%s' to '%s'\n"
+					, argv[0], errno, strerror(errno), output.tempfilename, output.filename );
+		} else {
+			fclose(output.file);
 		}
-		fclose(output.file);
-		r = rename( output.tempfilename, output.filename );	// #include <stdio.h>
-		if ( r )
-			fprintf( stderr, "%s: error %d '%s' renaming'%s' to '%s'\n"
-				, argv[0], errno, strerror(errno), output.tempfilename, output.filename );
 	}
 
 	rtlsdr_close(dongle.dev);
 	return r >= 0 ? r : -r;
 }
 
-// vim: tabstop=8:softtabstop=8:shiftwidth=8:noexpandtab
+/* vim: tabstop=8:softtabstop=8:shiftwidth=8:noexpandtab */

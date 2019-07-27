@@ -123,6 +123,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact;
 #endif
 	char *filename = NULL;
+	char *tempfilename = NULL;
 	int n_read;
 	int r, opt;
 	int gain = 0;
@@ -258,9 +259,16 @@ int main(int argc, char **argv)
 		_setmode(_fileno(stdin), _O_BINARY);
 #endif
 	} else {
-		file = fopen(filename, "wb");
+		const char * filename_to_open = filename;
+		if (writeWav) {
+			tempfilename = malloc( strlen(filename)+8 );
+			strcpy(tempfilename, filename);
+			strcat(tempfilename, ".tmp");
+			filename_to_open = tempfilename;
+		}
+		file = fopen(filename_to_open, "wb");
 		if (!file) {
-			fprintf(stderr, "Failed to open %s\n", filename);
+			fprintf(stderr, "Failed to open %s\n", filename_to_open);
 			goto out;
 		}
 		if (writeWav) {
@@ -313,17 +321,25 @@ int main(int argc, char **argv)
 				      0, out_block_size);
 	}
 
-	if (writeWav) {
-		waveFinalizeHeader(file);
+	if (file != stdout) {
+		if (writeWav) {
+			waveFinalizeHeader(file);
+			fclose(file);
+			remove(filename);	/* delete, in case file already exists */
+			r = rename( tempfilename, filename );	/* #include <stdio.h> */
+			if ( r )
+				fprintf( stderr, "%s: error %d '%s' renaming'%s' to '%s'\n"
+					, argv[0], errno, strerror(errno), tempfilename, filename );
+		} else {
+			fclose(file);
+		}
+
 	}
 
 	if (do_exit)
 		fprintf(stderr, "\nUser cancel, exiting...\n");
 	else
 		fprintf(stderr, "\nLibrary error %d, exiting...\n", r);
-
-	if (file != stdout)
-		fclose(file);
 
 	rtlsdr_close(dev);
 	free (buffer);
