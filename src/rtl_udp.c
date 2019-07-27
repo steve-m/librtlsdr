@@ -47,9 +47,7 @@
 #include "rtl_tcp.h"
 #include "convenience/convenience.h"
 
-
-#define RTLTCP_VER_STRING  "Version HA-0.7 from 2019-07-21\n"
-
+#include "rtl_app_ver.h"
 
 #ifdef _WIN32
 #pragma comment(lib, "ws2_32.lib")
@@ -100,8 +98,17 @@ static volatile int do_exit = 0;
 
 void usage(void)
 {
-	printf("rtl_udp, an I/Q spectrum server for RTL2832 based DVB-T receivers\n\n"
-		"Usage:\t[-a listen address]\n"
+	fprintf(stderr, "rtl_udp, an I/Q spectrum server for RTL2832 based receivers\n");
+	fprintf(stderr, "rtl_udp version %u.%u %s (%s)\n",
+		APP_VER_MAJOR, APP_VER_MINOR,
+		APP_VER_ID, __DATE__ );
+	fprintf(stderr, "librtlsdr version %u.%u %s\n\n",
+		(unsigned)(rtlsdr_get_version() >> 16),
+		(unsigned)(rtlsdr_get_version() & 0xFFFFU),
+		rtlsdr_get_ver_id()
+		);
+
+	fprintf(stderr, "Usage:\t[-a listen address]\n"
 		"\t[-p listen port (default: 1234)]\n"
 		"\t[-I infrared sensor listen port (default: 0=none)]\n"
 		"\t[-W infrared sensor query wait interval usec (default: 10000)]\n"
@@ -559,8 +566,6 @@ int main(int argc, char **argv)
 #else
 	struct sigaction sigact, sigign;
 #endif
-
-	printf("rtl_udp, an I/Q spectrum server for RTL2832 based receivers\n" RTLTCP_VER_STRING );
 
 	while ((opt = getopt(argc, argv, "a:p:I:W:f:g:s:b:l:n:d:P:uw:D:vT")) != -1) {
 		switch (opt) {

@@ -3798,3 +3798,13 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 	return retAll;
 }
 
+
+const char * rtlsdr_get_ver_id() {
+	return RTLSDRLIB_VER_ID " (" __DATE__ ")";
+}
+
+uint32_t rtlsdr_get_version() {
+	return ((uint32_t)RTLSDRLIB_VER_MAJOR << 16 ) | ((uint32_t)RTLSDRLIB_VER_MINOR );
+}
+
+

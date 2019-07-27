@@ -29,6 +29,12 @@ extern "C" {
 #include <stddef.h>
 #include <rtl-sdr_export.h>
 
+
+#define RTLSDRLIB_VER_MAJOR	0
+#define RTLSDRLIB_VER_MINOR	7
+#define RTLSDRLIB_VER_ID		"github.com/hayguen"
+
+
 typedef struct rtlsdr_dev rtlsdr_dev_t;
 
 RTLSDR_API uint32_t rtlsdr_get_device_count(void);
@@ -246,7 +252,6 @@ RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw );
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_center_freq );
-
 
 /*!
  * Get actual gain the device is configured to.
@@ -510,6 +515,9 @@ RTLSDR_API const char * rtlsdr_get_opt_help(int longInfo);
  */
 RTLSDR_API int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask, unsigned data);
 
+/* TODO: uint8_t */
+RTLSDR_API int rtlsdr_get_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned char* data, int len);
+
 
 /*!
  * Exposes/permits hacking of Tuner-specific I2C registers: set and keep register for future
@@ -521,6 +529,22 @@ RTLSDR_API int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_reg
  * \return -1 if device is not initialized. 0 otherwise.
  */
 RTLSDR_API int rtlsdr_set_tuner_i2c_override(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask, unsigned data);
+
+
+/*!
+ * request version id string to identify source of library
+ *
+ * \return pointer to C string, e.g. "github.com/librtlsdr" or "github.com/hayguen" or .. with build date
+ *   string keeps owned by library
+ */
+RTLSDR_API const char * rtlsdr_get_ver_id();
+
+/*!
+ * request version numbers of library
+ *
+ * \return major version in upper 16 bit, minor revision in lower 16 bit
+ */
+RTLSDR_API uint32_t rtlsdr_get_version();
 
 
 #ifdef __cplusplus

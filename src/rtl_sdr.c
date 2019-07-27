@@ -35,11 +35,14 @@
 #include "convenience/convenience.h"
 #include "convenience/wavewrite.h"
 
+#include "rtl_app_ver.h"
+
 #define DEFAULT_SAMPLE_RATE		2048000
 #define DEFAULT_BANDWIDTH		0	/* automatic bandwidth */
 #define DEFAULT_BUF_LENGTH		(16 * 16384)
 #define MINIMAL_BUF_LENGTH		512
 #define MAXIMAL_BUF_LENGTH		(256 * 16384)
+
 
 static int do_exit = 0;
 static uint32_t bytes_to_read = 0;
@@ -47,8 +50,17 @@ static rtlsdr_dev_t *dev = NULL;
 
 void usage(void)
 {
+	fprintf(stderr, "rtl_sdr, an I/Q recorder for RTL2832 based receivers\n");
+	fprintf(stderr, "rtl_sdr version %u.%u %s (%s)\n",
+		APP_VER_MAJOR, APP_VER_MINOR,
+		APP_VER_ID, __DATE__ );
+	fprintf(stderr, "librtlsdr version %u.%u %s\n\n",
+		(unsigned)(rtlsdr_get_version() >> 16),
+		(unsigned)(rtlsdr_get_version() & 0xFFFFU),
+		rtlsdr_get_ver_id()
+		);
+
 	fprintf(stderr,
-		"rtl_sdr, an I/Q recorder for RTL2832 based DVB-T receivers\n\n"
 		"Usage:\t -f frequency_to_tune_to [Hz]\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-w tuner_bandwidth (default: automatic)]\n"
