@@ -26,7 +26,7 @@ extern "C" {
 typedef struct
 {
 	rtlsdr_dev_t *dev;
-	SOCKET port;
+	int port;
 	int wait;
 	int report_i2c;
 	char *addr;

@@ -1703,7 +1703,7 @@ int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband)
 		if (r)
 		{
 			if ( devt->verbose )
-				fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_if_freq(%d) returned error %d\n", sideband, iffreq);
+				fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_if_freq(%d) returned error %d\n", sideband, iffreq, r);
 			return r;
 		}
 
@@ -2779,12 +2779,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->softagc.rpcNumGains = 0;
 	dev->softagc.rpcGainValues = NULL;
 
-	/* -cs- */
-	#ifdef __MINGW32__
-	dev->cs_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
-	#else
-	dev->cs_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-	#endif
+	pthread_mutex_init(&dev->cs_mutex, NULL);
 
 	/* UDP controller server */
 #ifdef WITH_UDP_SERVER
@@ -3000,6 +2995,7 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 	}
 
 	softagc_uninit(dev);
+	pthread_mutex_destroy(&dev->cs_mutex);
 
 	libusb_release_interface(dev->devh, 0);
 

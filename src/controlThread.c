@@ -84,6 +84,7 @@ void *ctrl_thread_fn(void *arg)
 	struct linger ling = { 1,0 };
 	SOCKET listensocket;
 	SOCKET controlSocket;
+	int haveControlSocket = 0;
 	struct sockaddr_in local, remote;
 	socklen_t rlen;
 
@@ -102,6 +103,7 @@ void *ctrl_thread_fn(void *arg)
 	char *addr = data->addr;
 	int* do_exit = data->pDoExit;
 	u_long blockmode = 1;
+	int retval;
 
 
 	memset(reg_values, 0, NUM_I2C_REGISTERS);
@@ -115,9 +117,9 @@ void *ctrl_thread_fn(void *arg)
 
 	setsockopt(listensocket, SOL_SOCKET, SO_REUSEADDR, (char *)&r, sizeof(int));
 	setsockopt(listensocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
-	int retval = bind(listensocket, (struct sockaddr *)&local, sizeof(local));
+	retval = bind(listensocket, (struct sockaddr *)&local, sizeof(local));
 	if (retval == SOCKET_ERROR)
-		error = WSAGetLastError();
+		error = 1;
 #ifdef _WIN32
 	ioctlsocket(listensocket, FIONBIO, &blockmode);
 #else
@@ -129,11 +131,7 @@ void *ctrl_thread_fn(void *arg)
 		printf("listening on Control port %d...\n", port);
 		retval = listen(listensocket, 1);
 		if (retval == SOCKET_ERROR)
-#ifdef _WIN32
-			error = WSAGetLastError();
-#else
-			;
-#endif
+			error = 1;
 		while (1) {
 			FD_ZERO(&connfds);
 			FD_SET(listensocket, &connfds);
@@ -146,6 +144,7 @@ void *ctrl_thread_fn(void *arg)
 			else if (r) {
 				rlen = sizeof(remote);
 				controlSocket = accept(listensocket, (struct sockaddr *)&remote, &rlen);
+				haveControlSocket = 1;
 				break;
 			}
 		}
@@ -217,7 +216,8 @@ sleep:
 			usleep(wait);
 		}
 close:
-		closesocket(controlSocket);
+		if (haveControlSocket)
+			closesocket(controlSocket);
 		if (*do_exit)
 		{
 			closesocket(listensocket);

@@ -462,7 +462,7 @@ static void *command_worker(void *arg)
 struct ir_thread_data
 {
 	rtlsdr_dev_t *dev;
-	SOCKET port;
+	int port;
 	int wait;
 	char *addr;
 };
