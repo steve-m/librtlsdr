@@ -222,6 +222,7 @@ struct rtlsdr_dev {
 
 	/* -cs- Concurrent lock for the periodic reading of I2C registers */
 	pthread_mutex_t cs_mutex;
+	pthread_mutexattr_t cs_mutex_attr;
 
 	/* UDP controller server */
 #ifdef WITH_UDP_SERVER
@@ -2766,6 +2767,10 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 		return -1;
 	}
 
+	pthread_mutexattr_init(&dev->cs_mutex_attr);
+	pthread_mutexattr_settype(&dev->cs_mutex_attr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&dev->cs_mutex, &dev->cs_mutex_attr);
+
 	dev->rtl_vga_control = 0;
 
 	/* dev->softagc.command_thread; */
@@ -2778,8 +2783,6 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->softagc.deadTimeSps = 0;
 	dev->softagc.rpcNumGains = 0;
 	dev->softagc.rpcGainValues = NULL;
-
-	pthread_mutex_init(&dev->cs_mutex, NULL);
 
 	/* UDP controller server */
 #ifdef WITH_UDP_SERVER
