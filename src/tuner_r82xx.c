@@ -1074,6 +1074,13 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 			vga_gain = priv->last_VGA_value | 0x10;  /* should activate AGC */
 			extended_mode = 1;
 		}
+		else if ( priv->agc_mode == -2 ) {
+			/* LNA/Mixer = Auto; VGA = auto */
+			lna_gain = priv->last_LNA_value;
+			mixer_gain = priv->last_Mixer_value;
+			vga_gain = priv->last_VGA_value | 0x10;  /* should activate AGC */
+			extended_mode = 0;
+		}
 		else if ( priv->agc_mode > 0 ) {
 			/* LNA/Mixer = from rtlsdr_set_tuner_gain(tunerAgcMode); VGA = auto */
 			r82xx_get_gain_index(priv->agc_mode, &lna_gain, &mixer_gain);
@@ -1138,16 +1145,27 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 		if (rc < 0)
 			return rc;
 
-		/* set fixed VGA gain for now (26.5 dB == -12 dB + 0x0b * 3.5 dB) */
-		/* rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f); */
-		/* set VGA gain auto */
-		rc = r82xx_write_reg_mask(priv, 0x0c, 0x1b, 0x9f);
-		if (rc < 0)
-			return rc;
-
-		priv->last_AGC_state = new_agc_state;
-		if ( rtl_vga_control )
-			*rtl_vga_control = 1;
+		if ( priv->agc_mode == -2 ) {
+			/* Set VGA = auto */
+			rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain, 0x9f);
+			if (rc < 0)
+				return rc;
+			priv->last_VGA_value = vga_gain & 0x0f;
+			priv->last_AGC_state = new_agc_state;
+			if ( (vga_gain & 0x10) && rtl_vga_control )
+				*rtl_vga_control = 1;
+		} else {
+			/* set fixed VGA gain for now (26.5 dB == -12 dB + 0x0b * 3.5 dB) */
+			/* rc = r82xx_write_reg_mask(priv, 0x0c, 0x0b, 0x9f); */
+			/* set VGA gain auto */
+			rc = r82xx_write_reg_mask(priv, 0x0c, 0x1b, 0x9f);
+			if (rc < 0)
+				return rc;
+	
+			priv->last_AGC_state = new_agc_state;
+			if ( rtl_vga_control )
+				*rtl_vga_control = 0;
+		}
 	}
 
 	return 0;

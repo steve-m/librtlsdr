@@ -308,7 +308,8 @@ RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
  * Automatic gain mode must be enabled for the gain setter function to work.
  *
  * \param dev the device handle given by rtlsdr_open()
- * \param agc variant:  0 for automatic LNA/Mixer; fixed VGA
+ * \param agc variant:   0 for automatic LNA/Mixer and fixed VGA (=default)
+ *                      -2 for automatic LNA/Mixer and automatic VGA
  *                      -1 for LNA/Mixer = last value from prev rtlsdr_set_tuner_gain; VGA = auto
  *                      >0: gain := agc_variant for rtlsdr_set_tuner_gain() for LNA/Mixer; VGA = auto
  * \return 0 on success
