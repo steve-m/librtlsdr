@@ -2323,6 +2323,8 @@ static int parseNum(const char * pacNum) {
 	return val * sgn;
 }
 
+#endif
+
 static double parseFreq(char *s)
 /* standard suffixes */
 {
@@ -2354,6 +2356,8 @@ static double parseFreq(char *s)
 	return atof(s);
 }
 
+/* UDP controller server */
+#ifdef WITH_UDP_SERVER
 
 static const char * formatInHex(char * buf, int v, int num_digits) {
 	static const char tab[] = "0123456789ABCDEF";
@@ -2427,7 +2431,8 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	 * c <frequency>           # set tuner bandwidth center in output. value in [ -1 600 000 .. 1 600 000 ]
 	 * v <sideband>            # set tuner sideband inversion
 	 *
-	 * a <tunerAgcVariant>     #  0: LNA/Mixer = auto; VGA = fixed 26.5 dB
+	 * a <tunerAgcVariant>     #  0: LNA/Mixer = auto; VGA = fixed 26.5 dB  (=default)
+	 *                         # -2: LNA/Mixer = auto; VGA = auto
 	 *                         # -1: LNA/Mixer = last value from prev rtlsdr_set_tuner_gain; VGA = auto
 	 *                         # >0: LNA/Mixer = from rtlsdr_set_tuner_gain(tunerAgcMode); VGA = auto
 	 * m <gain>                # set tuner gain
@@ -3844,7 +3849,8 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			ret = 0;
 		}
 		else if (!strncmp(optPart, "f=", 2)) {
-			uint32_t freq = (uint32_t)atol(optPart + 2);
+			double freqDbl = parseFreq(optPart + 2);
+			uint32_t freq = (uint32_t)(freqDbl + 0.5);
 			if (verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed frequency %u\n", (unsigned)freq);
 			ret = rtlsdr_set_center_freq(dev, freq);
@@ -3856,13 +3862,18 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			ret = rtlsdr_set_tuner_bandwidth(dev, bw);
 		}
 		else if (!strncmp(optPart, "bc=", 3)) {
-			int32_t if_band_center_freq = (int32_t)(atoi(optPart +3));
+			double freqDbl = parseFreq(optPart + 3);
+			int32_t if_band_center_freq = (int32_t)(freqDbl + 0.5);
 			if (verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed band center %d\n", (int)if_band_center_freq);
 			ret = rtlsdr_set_tuner_band_center(dev, if_band_center_freq );
 		}
 		else if (!strncmp(optPart, "sb=", 3)) {
 			int32_t sideband = (int32_t)(atoi(optPart +3));
+			if (!strcmp(optPart +3, "L") || !strcmp(optPart +3, "l"))
+				sideband = 0;
+			else if (!strcmp(optPart +3, "U") || !strcmp(optPart +3, "u"))
+				sideband = 1;
 			if (verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed sideband %d == %s\n", (int)sideband, (sideband ? "Upper" : "Lower") );
 			ret = rtlsdr_set_tuner_sideband(dev, sideband );
