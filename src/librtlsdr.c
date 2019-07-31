@@ -3948,10 +3948,15 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			dev->udpPortNo = udpPortNo;
 		}
 #endif
-		else {
+		else if (*optPart) {
 			if (verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed unknown option '%s'\n", optPart);
 			ret = -1;  /* unknown option */
+		}
+		else {
+			if (verbose)
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): skip empty option '%s'\n", optPart);
+			ret = 0;
 		}
 		if (verbose)
 			fprintf(stderr, "  application of parsed option returned %d\n", ret);
