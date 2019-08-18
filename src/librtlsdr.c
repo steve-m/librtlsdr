@@ -475,10 +475,10 @@ int r820t_set_gain_ext(void *dev, int lna_gain, int mixer_gain, int vga_gain) {
 	return rc;
 }
 
-int r820t_set_agc_mode(void *dev, int agc_variant) {
+int r820t_set_if_mode(void *dev, int if_mode) {
 	int rc, rtl_vga_control = 0;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	rc = r82xx_set_agc_mode(&devt->r82xx_p, agc_variant, &rtl_vga_control);
+	rc = r82xx_set_if_mode(&devt->r82xx_p, if_mode, &rtl_vga_control);
 	rc = rtlsdr_vga_control(devt, rc, rtl_vga_control);
 	return rc;
 }
@@ -1588,7 +1588,7 @@ int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, i
 	return r;
 }
 
-int rtlsdr_set_tuner_agc_mode(rtlsdr_dev_t *dev, int agc_variant)
+int rtlsdr_set_tuner_if_mode(rtlsdr_dev_t *dev, int if_mode)
 {
 	int r = 0;
 
@@ -1597,7 +1597,7 @@ int rtlsdr_set_tuner_agc_mode(rtlsdr_dev_t *dev, int agc_variant)
 
 	if (dev->tuner->set_gain) {
 		rtlsdr_set_i2c_repeater(dev, 1);
-		r = r820t_set_agc_mode((void *)dev, agc_variant);
+		r = r820t_set_if_mode((void *)dev, if_mode);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 
@@ -2639,10 +2639,10 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 		switch (comm & 63) {
 		case 1: /* agc variant */
 			if ( dev->verbose )
-				fprintf(stderr, "parsed agc variant %d from token '%s'\n", parsedVal, token);
-			retCode = rtlsdr_set_tuner_agc_mode(dev, parsedVal);
+				fprintf(stderr, "parsed if mode %d from token '%s'\n", parsedVal, token);
+			retCode = rtlsdr_set_tuner_if_mode(dev, parsedVal);
 			if ( dev->verbose )
-				fprintf(stderr, "  rtlsdr_set_tuner_agc_mode() returned %d\n", retCode);
+				fprintf(stderr, "  rtlsdr_set_tuner_if_mode() returned %d\n", retCode);
 			break;
 		case 2: /* manual gain */
 			if ( dev->verbose )
@@ -3890,11 +3890,17 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed tuner gain = %d /10 dB\n", gain);
 			ret = rtlsdr_set_tuner_gain(dev, gain);
 		}
-		else if (!strncmp(optPart, "agcv=", 5)) {
+		else if (!strncmp(optPart, "agcv=", 5)) {  /* previous option name */
 			int agcv = atoi(optPart +5);
 			if (verbose)
-				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed tuner agc variant = %d\n", agcv);
-			ret = rtlsdr_set_tuner_agc_mode(dev, agcv);
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed tuner if_mode = %d\n", agcv);
+			ret = rtlsdr_set_tuner_if_mode(dev, agcv);
+		}
+		else if (!strncmp(optPart, "ifm=", 4)) {   /* new option name */
+			int agcv = atoi(optPart +4);
+			if (verbose)
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed tuner if_mode = %d\n", agcv);
+			ret = rtlsdr_set_tuner_if_mode(dev, agcv);
 		}
 		else if (!strncmp(optPart, "dagc=", 5)) {
 			int on = atoi(optPart +5);

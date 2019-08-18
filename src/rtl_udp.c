@@ -435,10 +435,10 @@ static void *command_worker(void *arg)
 			printf("set tuner band to IF frequency %i Hz from center\n", if_band_center_freq);
 			rtlsdr_set_tuner_band_center(dev, if_band_center_freq );
 			break;
-		case SET_TUNER_AGC_VARIANT:
+		case SET_TUNER_IF_MODE:
 			itmp = ntohl(cmd.param);
-			printf("set tuner agc variant to %i\n", itmp);
-			rtlsdr_set_tuner_agc_mode(dev, itmp);
+			printf("set tuner IF mode to %i\n", itmp);
+			rtlsdr_set_tuner_if_mode(dev, itmp);
 			break;
 		case SET_SIDEBAND:
 			tmp = ntohl(cmd.param);

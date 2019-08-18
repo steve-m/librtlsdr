@@ -97,8 +97,9 @@ struct r82xx_priv {
 	uint32_t				bw;	/* in MHz */
 	void 					*rtl_dev;
 
-	int				agc_mode;
-	int				last_AGC_state;
+	int				last_if_mode;
+	int				last_manual_gain;
+	int				last_extended_mode;
 	int				last_LNA_value;
 	int				last_Mixer_value;
 	int				last_VGA_value;
@@ -142,7 +143,7 @@ int r82xx_standby(struct r82xx_priv *priv);
 int r82xx_init(struct r82xx_priv *priv);
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq);
 int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain, int extended_mode, int lna_gain, int mixer_gain, int vga_gain, int *rtl_vga_control);
-int r82xx_set_agc_mode(struct r82xx_priv *priv, int agc_mode, int *rtl_vga_control);
+int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control);
 
 int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask);
 int r82xx_get_i2c_register(struct r82xx_priv *priv, unsigned char* data, int len);
