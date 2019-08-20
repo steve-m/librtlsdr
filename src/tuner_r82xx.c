@@ -1114,7 +1114,7 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 
 		/* prepare VGA */
 		if (extended_mode) {
-			priv->last_if_mode = vga_gain_idx +20000;
+			priv->last_if_mode = vga_gain_idx +10000;
 		}
 
 	} else {
@@ -1145,21 +1145,17 @@ int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control
 	int rc = 0, vga_gain_idx = 0;
 	int old_mode = priv->last_if_mode;
 
-	if (if_mode < 0) {
-		if_mode = 1;
-	}
-
 	if (rtl_vga_control)
 		*rtl_vga_control = 0;
 
-	if ( 1 == if_mode || 20016 == if_mode ) {
+	if ( 0 == if_mode || 10016 == if_mode ) {
 		vga_gain_idx = 0x10;
 	}
-	else if ( 5000 <= if_mode && if_mode < 15000 ) {
-		vga_gain_idx = r82xx_get_if_gain_index(if_mode -10000);
+	else if ( -5000 <= if_mode && if_mode < 5000 ) {
+		vga_gain_idx = r82xx_get_if_gain_index(if_mode);
 	}
-	else if ( 20000 <= if_mode && if_mode < 20016 ) {
-		vga_gain_idx = if_mode -20000;
+	else if ( 10000 <= if_mode && if_mode < 10016 ) {
+		vga_gain_idx = if_mode -10000;
 	}
 	else {	/* assume 0 == default */
 		if ( 0 != if_mode ) {

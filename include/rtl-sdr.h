@@ -308,14 +308,15 @@ RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
  *
  * \param dev the device handle given by rtlsdr_open()
  * \param if_mode:
- *         0           for fixed VGA (=default)
- *         1           for automatic VGA
- *      5000 .. 15000: IF gain := if_mode -10000  (in 1/10th dB) == VGA gain for R820T/2
- *                     examples:
- *                        10000: if gain == vga gain == 0 dB
- *                        10450: if gain == vga gain == 45.0 dB for R820T/2
- *     20000 .. 20015: IF gain == VGA index from parameter if_mode
- *                     set if_mode := VGA_idx +20000
+ *         0           for automatic VGA
+ *     -5000 .. +5000  value range - except 0 - for fixed IF gain in tenths of a dB, 115 means 11.5 dB.
+ *                     use -1 or +1 in case you neither want attenuation nor gain.
+ *                     this equals the VGA gain for R820T/2 tuner.
+ *                     accepted values are in range -47 .. 408 in tenth of a dB == -4.7 .. +40.8 dB.
+ *                     the exact values may slightly change with better measured values.
+ *     10008           for fixed VGA (=default)
+ *     10000 .. 10015: IF gain == VGA index from parameter if_mode
+ *                     set if_mode by index: index := VGA_idx +10000
  * 
  * \return 0 on success
  */

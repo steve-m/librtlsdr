@@ -2421,7 +2421,7 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	/* commands:
 	 * g <register>            # get tuner i2c register
 	 * s <register> <value> [<mask>] # set tuner i2c register once
-	 * S <register> <value> [<mask>]   # set tuner i2c register permanent
+	 * S <register> <value> [<mask>] # set tuner i2c register permanent
 	 * 
 	 * i <IFfrequency>         # set tuner IF frequency once. value in [ 0 .. 28 800 000 ] or < 0 for reset
 	 * I <IFfrequency>         # set tuner IF frequency permanent
@@ -2431,10 +2431,9 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	 * c <frequency>           # set tuner bandwidth center in output. value in [ -1 600 000 .. 1 600 000 ]
 	 * v <sideband>            # set tuner sideband inversion
 	 *
-	 * a <tunerAgcVariant>     #  0: LNA/Mixer = auto; VGA = fixed 26.5 dB  (=default)
-	 *                         # -2: LNA/Mixer = auto; VGA = auto
-	 *                         # -1: LNA/Mixer = last value from prev rtlsdr_set_tuner_gain; VGA = auto
-	 *                         # >0: LNA/Mixer = from rtlsdr_set_tuner_gain(tunerAgcMode); VGA = auto
+	 * a <tunerIFmode>         #  0: VGA = auto
+	 *                         #  g in -5000 .. +5000: VGA = g / 10 dB
+	 *                         # 10000+x: VGA idx = x
 	 * m <gain>                # set tuner gain
 	 * 
 	 * M <gainMode>            # 0 : tuner agc off; digital rtl agc off
@@ -2676,7 +2675,7 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 			"b <bandwidth>\n"
 			"c <frequency>\n"
 			"v <sideband>\n"
-			"a <tunerAgcVariant>\n"
+			"a <tunerIFmode>\n"
 			"m <tuner gain>\n"
 			"M <gainMode>\n" );
 		sendto(dev->udpS, response, strlen(response), 0, (struct sockaddr*) &dev->si_other, dev->slen);
@@ -3812,7 +3811,7 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		return
 		"\t[-O\tset RTL options string seperated with ':' ]\n"
 		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>:sb=<sideband>\n"
-		"\t\tagc=<tuner_gain_mode>:agcv=<>:gain=<tenth_dB>:dagc=<rtl_agc>\n"
+		"\t\tagc=<tuner_gain_mode>:gain=<tenth_dB>:ifm=<tuner_if_mode>:dagc=<rtl_agc>\n"
 		"\t\tds=<direct_sampling_mode>:T=<bias_tee>\n"
 #ifdef WITH_UDP_SERVER
 		"\t\tport=<udp_port default with 1>\n"
@@ -3894,13 +3893,15 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			int agcv = atoi(optPart +5);
 			if (verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed tuner if_mode = %d\n", agcv);
+			if (agcv < 0)
+				agcv = 0;
 			ret = rtlsdr_set_tuner_if_mode(dev, agcv);
 		}
 		else if (!strncmp(optPart, "ifm=", 4)) {   /* new option name */
-			int agcv = atoi(optPart +4);
+			int ifmode = atoi(optPart +4);
 			if (verbose)
-				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed tuner if_mode = %d\n", agcv);
-			ret = rtlsdr_set_tuner_if_mode(dev, agcv);
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed tuner if_mode = %d\n", ifmode);
+			ret = rtlsdr_set_tuner_if_mode(dev, ifmode);
 		}
 		else if (!strncmp(optPart, "dagc=", 5)) {
 			int on = atoi(optPart +5);
