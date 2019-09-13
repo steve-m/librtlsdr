@@ -161,6 +161,7 @@ struct dongle_state
 	uint32_t freq;
 	uint32_t rate;
 	uint32_t bandwidth;
+	int	  bccorner;  /* -1 for low band corner, 0 for band center, +1 for high band corner */
 	int	  gain;
 	int16_t  buf16[MAXIMUM_BUF_LENGTH];
 	uint32_t buf_len;
@@ -305,6 +306,9 @@ void usage(void)
 		"\t	deemp:  enable de-emphasis filter\n"
 		"\t	direct: enable direct sampling (bypasses tuner, uses rtl2832 xtal)\n"
 		"\t	offset: enable offset tuning (only e4000 tuner)\n"
+		"\t	bcc:    use tuner bandwidths center as band center (default)\n"
+		"\t	bclo:   use tuner bandwidths low  corner as band center\n"
+		"\t	bchi:   use tuner bandwidths high corner as band center\n"
 		"%s"
 		"\t[-q dc_avg_factor for option rdc (default: 9)]\n"
 		"\t[-n disables demodulation output to stdout/file]\n"
@@ -1521,6 +1525,11 @@ static void *controller_thread_fn(void *arg)
 
 	if ( dongle.bandwidth ) {
 		if_band_center_freq = dongle.userFreq - dongle.freq;
+		if (dongle.bccorner < 0)
+			if_band_center_freq += ( dongle.bandwidth - demod.rate_out ) / 2;
+		else if (dongle.bccorner > 0)
+			if_band_center_freq -= ( dongle.bandwidth - demod.rate_out ) / 2;
+
 		if ( prev_if_band_center_freq != if_band_center_freq ) {
 			r = rtlsdr_set_tuner_band_center(dongle.dev, if_band_center_freq );
 			if (r)
@@ -1670,6 +1679,7 @@ void dongle_init(struct dongle_state *s)
 	s->samplePowCount = 0;
 	s->sampleMax = 0;
 	s->bandwidth = 0;
+	s->bccorner = 0;
 	s->buf_len = 32 * 512;  /* see rtl_tcp */
 }
 
@@ -1865,6 +1875,12 @@ int main(int argc, char **argv)
 				dongle.offset_tuning = 1;}
 			if (strcmp("rtlagc", optarg) == 0 || strcmp("agc", optarg) == 0) {
 				rtlagc = 1;}
+			if (strcmp("bclo", optarg) == 0 || strcmp("bcL", optarg) == 0 || strcmp("bcl", optarg) == 0) {
+				dongle.bccorner = -1; }
+			if (strcmp("bcc", optarg) == 0 || strcmp("bcC", optarg) == 0) {
+				dongle.bccorner = 0; }
+			if (strcmp("bchi", optarg) == 0 || strcmp("bcH", optarg) == 0 || strcmp("bch", optarg) == 0) {
+				dongle.bccorner = 1; }
 			break;
 		case 'O':
 			rtlOpts = optarg;
