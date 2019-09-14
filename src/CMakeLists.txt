@@ -103,7 +103,7 @@ endif()
 # Setup libraries used in executables
 ########################################################################
 add_library(convenience_static STATIC
-    convenience/convenience.c  convenience/wavewrite.c
+    convenience/rtl_convenience.c  convenience/convenience.c  convenience/wavewrite.c
 )
 
 if(WIN32)
@@ -127,11 +127,12 @@ add_executable(rtl_ir rtl_ir.c)
 add_executable(rtl_eeprom rtl_eeprom.c)
 add_executable(rtl_adsb rtl_adsb.c)
 add_executable(rtl_power rtl_power.c)
+add_executable(rtl_raw2wav rtl_raw2wav.c  convenience/convenience.c  convenience/wavewrite.c)
 if (WITH_RPC)
     add_executable(rtl_rpcd rtl_rpcd.c rtlsdr_rpc_msg.c)
-    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_rpcd)
+    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_raw2wav rtl_rpcd)
 else()
-    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power)
+    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_raw2wav)
 endif()
 
 target_link_libraries(rtl_sdr ${RTLSDR_TOOL_LIB} convenience_static
@@ -199,6 +200,7 @@ if(WIN32)
     target_link_libraries(rtl_eeprom libgetopt_static)
     target_link_libraries(rtl_adsb libgetopt_static)
     target_link_libraries(rtl_power libgetopt_static)
+    target_link_libraries(rtl_raw2wav libgetopt_static)
     set_property(TARGET rtl_sdr APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_tcp APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_udp APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )

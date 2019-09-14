@@ -49,6 +49,7 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
 
 static volatile int do_exit = 0;
 

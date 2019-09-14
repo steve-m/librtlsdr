@@ -46,6 +46,7 @@
 #include "rtl-sdr.h"
 #include "rtl_tcp.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
 
 #include "rtl_app_ver.h"
 

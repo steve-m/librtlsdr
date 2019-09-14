@@ -42,6 +42,7 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
 
 #define DEFAULT_SAMPLE_RATE		2048000
 #define DEFAULT_BUF_LENGTH		(16 * 16384)

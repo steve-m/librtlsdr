@@ -33,6 +33,7 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
 #include "convenience/wavewrite.h"
 
 #include "rtl_app_ver.h"

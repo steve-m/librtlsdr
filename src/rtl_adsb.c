@@ -45,6 +45,7 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
 
 #ifdef _WIN32
 #define sleep Sleep

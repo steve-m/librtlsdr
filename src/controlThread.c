@@ -47,6 +47,7 @@
 #include "rtl_tcp.h"
 #include "controlThread.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
 
 #include "tuner_r82xx.h"
 
