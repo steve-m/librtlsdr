@@ -207,14 +207,33 @@ static struct tm * str_to_tm( const char * str, struct tm * t, double * fraction
 time_t utctimestr_to_time(const char * str, double * fraction) {
 	struct tm t;
 	struct tm *p;
-
+#ifdef _WIN32
+	struct tm gtm;
+	struct tm ltm;
+	time_t nt;
+	time_t gt;
+	time_t lt;
+#endif
 	p = str_to_tm( str, &t, fraction );
 	if (!p)
 		return 0;
+	p->tm_isdst = 0;
 #ifndef _WIN32
 	return timegm(p);
 #else
-	return _mkgmtime(p);
+	#ifdef _MSC_VER
+		return _mkgmtime(p);
+	#else
+		/* workaround missing mkgmtime on mingw */
+		nt = mktime(p);
+		gtm = *gmtime(&nt);
+		ltm = *localtime(&nt);
+		gt = mktime(&gtm);
+		lt = mktime(&ltm);
+		assert( nt == gt );
+		nt += ( lt - gt );
+		return nt;
+	#endif
 #endif
 }
 
@@ -224,6 +243,7 @@ time_t localtimestr_to_time(const char * str, double * fraction) {
 	struct tm *p;
 
 	p = str_to_tm( str, &t, fraction );
+	
 	if (!p)
 		return 0;
 #ifndef _WIN32
