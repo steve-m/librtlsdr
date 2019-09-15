@@ -119,6 +119,122 @@ double atofp(char *s)
 	return atof(s);
 }
 
+
+static struct tm * str_to_tm( const char * str, struct tm * t, double * fraction ) {
+	char b[16];
+	int k, v;
+	/* 0         1         2   */
+	/* 01234567890123456789012 */
+	/* 2019-09-15T01:53:20.234 - mostly ISO 8601 */
+
+	*fraction = 0.0;
+	t->tm_sec	= 0;
+	t->tm_min	= 0;
+	t->tm_hour	= 0;
+	t->tm_mday	= 1;
+	t->tm_mon	= 0;
+	t->tm_year	= 0;
+	t->tm_wday	= 0;
+	t->tm_yday	= 0;
+	t->tm_isdst	= -1;
+
+	/* date */
+	if ( (str[4] == '-' || str[4] == '/') && str[4] == str[7] ) {
+		/* year */
+		b[4] = 0;	for ( k = 0; k < 4; ++k )	b[k] = str[k];
+		v = atoi(b);
+		t->tm_year = v - 1900;
+		/* month */
+		b[2] = 0;	for ( k = 0; k < 2; ++k )	b[k] = str[5+k];
+		v = atoi(b);
+		if (v < 1 || v > 12)
+			return NULL;
+		t->tm_mon = v - 1;
+		/* day */
+		b[2] = 0;	for ( k = 0; k < 2; ++k )	b[k] = str[8+k];
+		v = atoi(b);
+		if (v < 1 || v > 31)
+			return NULL;
+		t->tm_mday = v;
+	} else
+		return NULL;
+
+	if (str[10] == 0 )
+		return t;
+
+	/* time */
+	if ( str[10] != 'T' && str[10] != ' ' && str[10] != '_' )
+		return NULL;
+	if ( (str[13] == ':' || str[13] == '/') && str[13] == str[16] ) {
+		/* hour */
+		b[2] = 0;	for ( k = 0; k < 2; ++k )	b[k] = str[11+k];
+		v = atoi(b);
+		if (v < 0 || v > 23)
+			return NULL;
+		t->tm_hour = v;
+		/* minute */
+		b[2] = 0;	for ( k = 0; k < 2; ++k )	b[k] = str[14+k];
+		v = atoi(b);
+		if (v < 0 || v > 59)
+			return NULL;
+		t->tm_min = v;
+		/* second */
+		b[2] = 0;	for ( k = 0; k < 2; ++k )	b[k] = str[17+k];
+		v = atoi(b);
+		if (v < 0 || v > 61)
+			return NULL;
+		t->tm_sec = v;
+	} else
+		return NULL;
+
+	if (str[19] == 0 )
+		return t;
+
+	/* fraction */
+	if ( str[19] == '.' && str[19] == ',' ) {
+		for ( k = 0; k < 16; ++k )	b[k] = 0;
+		strcpy(b, "0.");
+		strncpy(&b[2], &str[20], 12);
+		*fraction = atof(b);
+		return t;
+	}
+
+	/* return t anyway .. without fraction */
+	return t;
+}
+
+
+time_t utctimestr_to_time(const char * str, double * fraction) {
+	struct tm t;
+	struct tm *p;
+
+	p = str_to_tm( str, &t, fraction );
+	if (!p)
+		return 0;
+#ifndef _WIN32
+	return timegm(p);
+#else
+	return _mkgmtime(p);
+#endif
+}
+
+
+time_t localtimestr_to_time(const char * str, double * fraction) {
+	struct tm t;
+	struct tm *p;
+
+	p = str_to_tm( str, &t, fraction );
+	if (!p)
+		return 0;
+#ifndef _WIN32
+	return timelocal(p);
+#else
+	return mktime(p);
+#endif
+}
+
+
+
 #ifndef _WIN32
 
 void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] )

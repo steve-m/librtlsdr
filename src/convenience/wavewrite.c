@@ -96,7 +96,8 @@ static waveFileHeader waveHdr;
 static uint32_t	waveDataSize = 0;
 int	waveHdrStarted = 0;
 
-void waveSetTime(Wind_SystemTime *p)
+
+static void waveSetCurrTime(Wind_SystemTime *p)
 {
 	struct timeval tv;
 	struct tm t;
@@ -109,7 +110,7 @@ void waveSetTime(Wind_SystemTime *p)
 #else
 	gmtime_r(&tv.tv_sec, &t);
 #endif
-	
+
 	p->wYear = t.tm_year + 1900;	/* 1601 through 30827 */
 	p->wMonth = t.tm_mon + 1;		/* 1..12 */
 	p->wDayOfWeek = t.tm_wday;		/* 0 .. 6: 0 == Sunday, .., 6 == Saturday */
@@ -118,6 +119,28 @@ void waveSetTime(Wind_SystemTime *p)
 	p->wMinute = t.tm_min;			/* 0 .. 59 */
 	p->wSecond = t.tm_sec;			/* 0 .. 59 */
 }
+
+static void waveSetStartTimeInt(time_t tim, double fraction, Wind_SystemTime *p)
+{
+	struct tm t = *gmtime( &tim );
+	p->wYear = t.tm_year + 1900;	/* 1601 through 30827 */
+	p->wMonth = t.tm_mon + 1;		/* 1..12 */
+	p->wDayOfWeek = t.tm_wday;		/* 0 .. 6: 0 == Sunday, .., 6 == Saturday */
+	p->wDay = t.tm_mday;			/* 1 .. 31 */
+	p->wHour = t.tm_hour;			/* 0 .. 23 */
+	p->wMinute = t.tm_min;			/* 0 .. 59 */
+	p->wSecond = t.tm_sec;			/* 0 .. 59 */
+	p->wMilliseconds = (int)( fraction * 1000.0 );
+	if (p->wMilliseconds >= 1000)
+		p->wMilliseconds = 999;
+}
+
+void waveSetStartTime(time_t tim, double fraction)
+{
+	waveSetStartTimeInt(tim, fraction, &waveHdr.StartTime );
+	waveHdr.StopTime = waveHdr.StartTime;		/* to fix */
+}
+
 
 void wavePrepareHeader(unsigned samplerate, unsigned freq, int bitsPerSample, int numChannels)
 {
@@ -139,7 +162,7 @@ void wavePrepareHeader(unsigned samplerate, unsigned freq, int bitsPerSample, in
 
 	strncpy( waveHdr.auxiID, "auxi", 4 );
 	waveHdr.auxiSize = 2 * sizeof(Wind_SystemTime) + 9 * sizeof(int32_t);  /* = 2 * 16 + 9 * 4 = 68 */
-	waveSetTime( &waveHdr.StartTime );
+	waveSetCurrTime( &waveHdr.StartTime );
 	waveHdr.StopTime = waveHdr.StartTime;		/* to fix */
 	waveHdr.centerFreq = freq;
 	waveHdr.ADsamplerate = samplerate;
@@ -221,7 +244,7 @@ int  waveFinalizeHeader(FILE * f)
 {
 	if (f != stdout) {
 		assert( waveHdrStarted );
-		waveSetTime( &waveHdr.StopTime );
+		waveSetCurrTime( &waveHdr.StopTime );
 		waveHdr.dataSize = waveDataSize;
 		waveHdr.riffSize += waveDataSize;
 

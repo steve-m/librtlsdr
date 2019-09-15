@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +53,10 @@ double atoft(char *s);
  */
 
 double atofp(char *s);
+
+
+time_t utctimestr_to_time(const char * str, double * fraction);
+time_t localtimestr_to_time(const char * str, double * fraction);
 
 
 void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] );

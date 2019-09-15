@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +45,7 @@ void waveWriteHeader(unsigned samplerate, unsigned freq, int bitsPerSample, int 
  */
 int  waveWriteFrames(FILE* f,  void * vpData, size_t numFrames, int needCleanData);
 int  waveWriteSamples(FILE* f,  void * vpData, size_t numSamples, int needCleanData);  /* returns 0, when no errors occured */
+void waveSetStartTime(time_t t, double fraction);
 int  waveFinalizeHeader(FILE * f);      /* returns 0, when no errors occured */
 
 #ifdef __cplusplus
