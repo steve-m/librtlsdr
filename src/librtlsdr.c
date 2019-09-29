@@ -1995,17 +1995,33 @@ uint32_t rtlsdr_get_tuner_clock(void *dev)
 
 int rtlsdr_i2c_write_fn(void *dev, uint8_t addr, uint8_t *buf, int len)
 {
-	if (dev)
-		return rtlsdr_i2c_write(((rtlsdr_dev_t *)dev), addr, buf, len);
-
+	int r;
+	int retries = 2;
+	if (!dev)
+		return -1;
+	do {
+		r = rtlsdr_i2c_write(((rtlsdr_dev_t *)dev), addr, buf, len);
+		if (r >= 0)
+		    return r;
+		rtlsdr_set_i2c_repeater(dev, 2);
+		retries--;
+	} while (retries > 0);
 	return -1;
 }
 
 int rtlsdr_i2c_read_fn(void *dev, uint8_t addr, uint8_t *buf, int len)
 {
-	if (dev)
-		return rtlsdr_i2c_read(((rtlsdr_dev_t *)dev), addr, buf, len);
-
+	int r;
+	int retries = 2;
+	if (!dev)
+		return -1;
+	do {
+		r = rtlsdr_i2c_read(((rtlsdr_dev_t *)dev), addr, buf, len);
+		if (r >= 0)
+		    return r;
+		rtlsdr_set_i2c_repeater(dev, 2);
+		retries--;
+	} while (retries > 0);
 	return -1;
 }
 
