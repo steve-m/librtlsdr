@@ -147,7 +147,19 @@ int main(int argc, char **argv)
 		rawfilename = argv[optind];
 	}
 
-	if (!wavfilename) {
+	while (!wavfilename) {
+		if (rawfilename) {
+			int slen = strlen(rawfilename);
+			const char * rawEnd = rawfilename + slen;
+			if (slen > 4 && (!strcmp(rawEnd - 4, ".bin") || !strcmp(rawEnd - 4, ".raw"))) {
+				char * wfn = strdup(rawfilename);
+				strcpy(wfn+slen-4, ".wav");
+				wavfilename = wfn;
+				if (verbosity)
+					fprintf(stderr, "Warning: deduced .wav filename '%s' from rawfilename '%s'\n", wavfilename, rawfilename);
+				break;  /* the while() */
+			}
+		}
 		usage();
 		fprintf(stderr, "Error: missing output wave filename!\n");
 		exit(1);
