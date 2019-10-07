@@ -247,17 +247,16 @@ int  waveFinalizeHeader(FILE * f)
 		waveSetCurrTime( &waveHdr.StopTime );
 		waveHdr.dataSize = waveDataSize;
 		waveHdr.riffSize += waveDataSize;
-
+		/* fprintf(stderr, "waveFinalizeHeader(): datasize = %d\n", waveHdr.dataSize); */
 		waveHdrStarted = 0;
 		if ( fseek(f, 0, SEEK_SET) )
 			return 1;
 		if ( 1 != fwrite(&waveHdr, sizeof(waveFileHeader), 1, f) )
 			return 1;
+		/* fprintf(stderr, "waveFinalizeHeader(): success writing header\n"); */
 		return 0;
 	}
 	return 1;
 }
-
-
 
 // vim: tabstop=8:softtabstop=8:shiftwidth=8:noexpandtab

@@ -118,7 +118,10 @@ int main(int argc, char **argv)
 		case 'f':	freq = (uint32_t)atofs(optarg);		break;
 		case 's':	srate = (uint32_t)atofs(optarg);	break;
 		case 'c':	nChan = atoi(optarg);	break;
-		case 'b':	nBits = 8 * atoi(optarg);	break;
+		case 'b':	nBits = atoi(optarg);
+				if (nBits <= 4) /* assume intention was: bytes per sample */
+					nBits *= 8;
+				break;
 		case 'v':	++verbosity;	break;
 		case 'r':	rawfilename = optarg;	break;
 		case 'u':	tim = utctimestr_to_time(optarg, &fraction);
@@ -175,7 +178,7 @@ int main(int argc, char **argv)
 
 	smpSize = nChan * ( nBits == 16 ? sizeof(int16_t) : sizeof(uint8_t) );
 	if (verbosity >= 2)
-		fprintf(stderr, "Frame size = %d channels * %d bits = %d bytes\n", nChan, nBits, smpSize);
+		fprintf(stderr, "Frame size = %d channels * %d bits = %d bytes\n", nChan, nBits, (int)smpSize);
 
 	if (!rawfilename || !strcmp(rawfilename, "-")) {
 #ifdef _WIN32
@@ -265,8 +268,7 @@ int main(int argc, char **argv)
 		}
 		nRead = fread(acBuf, smpSize, 65536, inpfile);
 		if (nRead > 0)
-			fwrite(acBuf, smpSize, nRead, outfile);
-
+			waveWriteFrames(outfile, acBuf, nRead, 0);
 		if (verbosity >= 2)
 			fprintf(stderr, ".");
 	}
