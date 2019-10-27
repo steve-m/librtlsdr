@@ -149,14 +149,23 @@ int  waveReadHeader(FILE * f, uint32_t *srate, uint32_t *freq, int *bitsPerSampl
 	if ( memcmp(waveHdr.d.hdr.ID, "data", 4 ) )
 		return 41;
 
-	smpSize = *numChannels * (*bitsPerSample + 7) / 8;
+	smpSize = (*bitsPerSample + 7) / 8;		/* round up to next byte */
+	smpSize *= *numChannels;
 	*nFrames = waveHdr.d.hdr.size / smpSize;
+
+#if 0
+	fprintf(stderr, "riffSize = %lu\n", (unsigned long)waveHdr.r.hdr.size );
+	fprintf(stderr, "dataSize = %lu\n", (unsigned long)waveHdr.d.hdr.size);
+	fprintf(stderr, "nBlockAlign = %d\n", (int)waveHdr.f.nBlockAlign);
+	fprintf(stderr, "smpSize = %d\n", (int)smpSize);
+	fprintf(stderr, "*nFrames = %lu\n", (unsigned long)(*nFrames) );
+#endif
 
 	return 0;
 }
 
 
-int  waveReadSamples(FILE* f,  void * vpData, size_t numSamples, int needCleanData)
+int  waveReadSamples(FILE* f,  void * vpData, size_t numSamples, int needCleanData, size_t *numRead)
 {
 	size_t nw;
 	switch (waveHdr.f.nBitsPerSample)
@@ -167,6 +176,7 @@ int  waveReadSamples(FILE* f,  void * vpData, size_t numSamples, int needCleanDa
 	case 8:
 		/* no endian conversion needed for single bytes */
 		nw = fread(vpData, sizeof(uint8_t), numSamples, f);
+		*numRead = nw;
 		return (nw == numSamples) ? 0 : 1;
 	case 16:
 		/* TODO: endian conversion needed */
@@ -175,11 +185,12 @@ int  waveReadSamples(FILE* f,  void * vpData, size_t numSamples, int needCleanDa
 		{
 			/* TODO: convert back endianness */
 		}
+		*numRead = nw;
 		return (nw == numSamples) ? 0 : 1;
 	}
 }
 
-int  waveReadFrames(FILE* f,  void * vpData, size_t numFrames, int needCleanData)
+int  waveReadFrames(FILE* f,  void * vpData, size_t numFrames, int needCleanData, size_t *numRead)
 {
 	size_t nw;
 	switch (waveHdr.f.nBitsPerSample)
@@ -190,6 +201,7 @@ int  waveReadFrames(FILE* f,  void * vpData, size_t numFrames, int needCleanData
 	case 8:
 		/* no endian conversion needed for single bytes */
 		nw = fread(vpData, waveHdr.f.nChannels * sizeof(uint8_t), numFrames, f);
+		*numRead = nw;
 		return (nw == numFrames) ? 0 : 1;
 	case 16:
 		/* TODO: endian conversion needed */
@@ -198,6 +210,7 @@ int  waveReadFrames(FILE* f,  void * vpData, size_t numFrames, int needCleanData
 		{
 			/* TODO: convert back endianness */
 		}
+		*numRead = nw;
 		return (nw == numFrames) ? 0 : 1;
 	}
 }

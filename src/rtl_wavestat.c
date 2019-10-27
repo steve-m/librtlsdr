@@ -71,6 +71,7 @@ void usage(void)
 		"\t-t  print start time in localtime: 'yyy-mm-ddThh:mm:dd.zzz'\n"
 		"\t-d  print file duration in frames (= num samples per channel)\n"
 		"\t-D  print file duration in seconds\n"
+		"\t-w  input file\n"
 		"\t-v  verbose output\n" );
 }
 
@@ -251,12 +252,12 @@ int main(int argc, char **argv)
 	}
 	if ( printAll || printDurationSmp ) {
 		if ( printFieldName )
-			fprintf(stdout, "duration/smp:\t");
+			fprintf(stdout, "duration/frames:\t");
 		fprintf(stdout, "%lu\n", (unsigned long)numFrames);
 	}
 	if ( printAll || printDurationTim ) {
 		if ( printFieldName )
-			fprintf(stdout, "duration/sec:\t");
+			fprintf(stdout, "duration/secs:\t");
 		fprintf(stdout, "%f\n", (double)numFrames/(double)srate);
 	}
 
