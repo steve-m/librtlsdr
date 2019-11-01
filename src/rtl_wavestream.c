@@ -185,8 +185,8 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Opened '%s' for input\n", wavfilename);
 	}
 
-	r = waveReadHeader(inpfile, &srate, &freq, &nBits, &nChan, &numFrames, &formatTag);
-	if ( r ) {
+	r = waveReadHeader(inpfile, &srate, &freq, &nBits, &nChan, &numFrames, &formatTag, verbosity);
+	if ( r >= 10 ) {
 		fprintf(stderr, "Error %d reading/evaluating wave file header\n", r);
 	} else if ( verbosity >= 2 ) {
 		fprintf(stderr, "Success reading/evaluating wave file header\n");

@@ -103,10 +103,12 @@ void waveGetStopTime(time_t *tim, double *fraction)
 
 
 int  waveReadHeader(FILE * f, uint32_t *srate, uint32_t *freq, int *bitsPerSample, int *numChannels
-	, uint32_t *nFrames, int16_t *formatTag)
+	, uint32_t *nFrames, int16_t *formatTag, int verbosity)
 {
 	uint8_t buf[32768];
 	size_t rd, smpSize;
+	int readDataHdr = 0;
+	int rv = 0;
 
 	rd = fread( &waveHdr.r, sizeof(riff_chunk), 1, f );
 	if ( rd != 1 )
@@ -125,25 +127,64 @@ int  waveReadHeader(FILE * f, uint32_t *srate, uint32_t *freq, int *bitsPerSampl
 		return 22;
 	*bitsPerSample = waveHdr.f.nBitsPerSample;
 	*numChannels = waveHdr.f.nChannels;
+	*srate = waveHdr.f.nSamplesPerSec;
+	*formatTag = waveHdr.f.wFormatTag;
 
 	rd = fread( &waveHdr.a.hdr, sizeof(chunk_hdr), 1, f );
 	if ( rd != 1 )
 		return 30;
-	if ( memcmp(waveHdr.a.hdr.ID, "auxi", 4 ) )
-		return 31;
-	if ( waveHdr.a.hdr.size > 32768 )
-		return 32;
-	if ( waveHdr.a.hdr.size < (sizeof(auxi_chunk) - sizeof(chunk_hdr)) )
-		return 33;
-	rd = fread( buf, waveHdr.a.hdr.size, 1, f );
-	if ( rd != 1 )
-		return 34;
-	memcpy( &waveHdr.a.StartTime, buf, sizeof(auxi_chunk) - sizeof(chunk_hdr));
-	*freq = waveHdr.a.centerFreq;
-	*srate = waveHdr.f.nSamplesPerSec;
-	*formatTag = waveHdr.f.wFormatTag;
+	if ( !memcmp(waveHdr.a.hdr.ID, "auxi", 4 ) )
+	{
+		if ( waveHdr.a.hdr.size > 32768 )
+			return 32;
+		if ( waveHdr.a.hdr.size < (sizeof(auxi_chunk) - sizeof(chunk_hdr)) )
+			return 33;
+		rd = fread( buf, waveHdr.a.hdr.size, 1, f );
+		if ( rd != 1 )
+			return 34;
+		memcpy( &waveHdr.a.StartTime, buf, sizeof(auxi_chunk) - sizeof(chunk_hdr));
+		*freq = waveHdr.a.centerFreq;
+	}
+	else
+	{
+		fprintf(stderr, "no 'auxi' chunk with frequency and timestamp informations\n");
+		rv = 1;		/* file ok, except missing auxi chunk */
+		while ( memcmp(waveHdr.a.hdr.ID, "data", 4 ) && waveHdr.a.hdr.size < sizeof(buf) )
+		{
+			/* neither 'auxi' nor 'data' */
+			if ( verbosity )
+				fprintf(stderr, "read and skipping chunk '%c%c%c%c' while expecting 'auxi' or 'data'\n"
+					, waveHdr.a.hdr.ID[0], waveHdr.a.hdr.ID[1], waveHdr.a.hdr.ID[2], waveHdr.a.hdr.ID[3] );
+			rd = fread( buf, waveHdr.a.hdr.size, 1, f );
+			if ( rd != 1 )
+				return 35;
+			rd = fread( &waveHdr.a.hdr, sizeof(chunk_hdr), 1, f );
+			if ( rd != 1 )
+				return 30;
+		}
+		if ( !memcmp(waveHdr.a.hdr.ID, "data", 4 ) )
+		{
+			waveHdr.d.hdr = waveHdr.a.hdr;
+			readDataHdr = 1;
+			memset(&waveHdr.a, 0, sizeof(auxi_chunk));
+			waveHdr.a.StartTime.wYear = 1970;
+			waveHdr.a.StartTime.wMonth = 1;
+			waveHdr.a.StartTime.wDay = 1;
+			*freq = 100UL * 1000 * 1000;	/* set frequency to 100 MHz */
+		}
+		else
+		{
+			/* neither 'auxi' nor 'data' */
+			fprintf(stderr, "read chunk '%c%c%c%c' while expected 'auxi' or 'data'\n"
+				, waveHdr.a.hdr.ID[0], waveHdr.a.hdr.ID[1], waveHdr.a.hdr.ID[2], waveHdr.a.hdr.ID[3] );
+			return 31;
+		}
+	}
 
-	rd = fread( &waveHdr.d.hdr, sizeof(chunk_hdr), 1, f );
+	if ( !readDataHdr )
+		rd = fread( &waveHdr.d.hdr, sizeof(chunk_hdr), 1, f );
+	else
+		rd = 1;
 	if ( rd != 1 )
 		return 40;
 	if ( memcmp(waveHdr.d.hdr.ID, "data", 4 ) )
@@ -153,15 +194,16 @@ int  waveReadHeader(FILE * f, uint32_t *srate, uint32_t *freq, int *bitsPerSampl
 	smpSize *= *numChannels;
 	*nFrames = waveHdr.d.hdr.size / smpSize;
 
-#if 0
-	fprintf(stderr, "riffSize = %lu\n", (unsigned long)waveHdr.r.hdr.size );
-	fprintf(stderr, "dataSize = %lu\n", (unsigned long)waveHdr.d.hdr.size);
-	fprintf(stderr, "nBlockAlign = %d\n", (int)waveHdr.f.nBlockAlign);
-	fprintf(stderr, "smpSize = %d\n", (int)smpSize);
-	fprintf(stderr, "*nFrames = %lu\n", (unsigned long)(*nFrames) );
-#endif
+	if ( verbosity >= 2 )
+	{
+		fprintf(stderr, "riffSize = %lu\n", (unsigned long)waveHdr.r.hdr.size );
+		fprintf(stderr, "dataSize = %lu\n", (unsigned long)waveHdr.d.hdr.size);
+		fprintf(stderr, "nBlockAlign = %d\n", (int)waveHdr.f.nBlockAlign);
+		fprintf(stderr, "smpSize = %d\n", (int)smpSize);
+		fprintf(stderr, "*nFrames = %lu\n", (unsigned long)(*nFrames) );
+	}
 
-	return 0;
+	return rv;
 }
 
 

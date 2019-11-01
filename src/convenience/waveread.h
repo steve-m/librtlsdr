@@ -27,7 +27,7 @@ extern "C" {
 
 
 int  waveReadHeader(FILE * f, uint32_t *samplerate, uint32_t *freq, int *bitsPerSample, int *numChannels
-	, uint32_t *nFrames, int16_t *formatTag);
+	, uint32_t *nFrames, int16_t *formatTag, int verbosity);
 int  waveReadFrames(FILE* f,  void * vpData, size_t numFrames, int needCleanData, size_t *numRead);
 int  waveReadSamples(FILE* f,  void * vpData, size_t numSamples, int needCleanData, size_t *numRead);  /* returns 0, when no errors occured */
 void waveGetStartTime(time_t *tim, double *fraction);

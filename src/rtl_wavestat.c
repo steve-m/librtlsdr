@@ -69,6 +69,7 @@ void usage(void)
 		"\t-F  print sample Format\n"
 		"\t-u  print start time in UTC:       'yyy-mm-ddThh:mm:dd.zzz'\n"
 		"\t-t  print start time in localtime: 'yyy-mm-ddThh:mm:dd.zzz'\n"
+		"\t-z  print start time in seconds since 1970-01-01T00:00:00.000\n"
 		"\t-d  print file duration in frames (= num samples per channel)\n"
 		"\t-D  print file duration in seconds\n"
 		"\t-w  input file\n"
@@ -121,10 +122,11 @@ int main(int argc, char **argv)
 	int printSmpFmt = 0;
 	int printStartZ = 0;
 	int printStartL = 0;
+	int printStartUnix = 0;
 	int printDurationSmp = 0;
 	int printDurationTim = 0;
 
-	while ((opt = getopt(argc, argv, "arfscbFutdDvhw:")) != -1) {
+	while ((opt = getopt(argc, argv, "arfscbFutzdDvhw:")) != -1) {
 		switch (opt) {
 		case 'a':	printAll = 1;	break;
 		case 'r':	printFieldName = 0;	break;
@@ -135,6 +137,7 @@ int main(int argc, char **argv)
 		case 'F':	printSmpFmt = 1;	break;
 		case 'u':	printStartZ = 1;	break;
 		case 't':	printStartL = 1;	break;
+		case 'z':	printStartUnix = 1;	break;
 		case 'd':	printDurationSmp = 1;	break;
 		case 'D':	printDurationTim = 1;	break;
 		case 'w':	wavfilename = optarg;	break;
@@ -186,9 +189,10 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Opened '%s' for input\n", wavfilename);
 	}
 
-	r = waveReadHeader(inpfile, &srate, &freq, &nBits, &nChan, &numFrames, &formatTag);
-	if ( r ) {
+	r = waveReadHeader(inpfile, &srate, &freq, &nBits, &nChan, &numFrames, &formatTag, verbosity);
+	if ( r >= 10 ) {
 		fprintf(stderr, "Error %d reading/evaluating wave file header\n", r);
+		exit(1);
 	} else if ( verbosity >= 2 ) {
 		fprintf(stderr, "Success reading/evaluating wave file header\n");
 	}
@@ -249,6 +253,15 @@ int main(int argc, char **argv)
 				, ptm->tm_year+1900, ptm->tm_mon+1, ptm->tm_mday
 				, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (int)(fraction*1000.0) );
 		}
+	}
+	if ( printAll || printStartUnix ) {
+		tim = 0;
+		fraction = 0;
+		waveGetStartTime(&tim, &fraction);
+		if ( printFieldName )
+			fprintf(stdout, "time_start/secs (unix):\t");
+		fraction += (double)tim;
+		fprintf(stdout, "%f\n", fraction );
 	}
 	if ( printAll || printDurationSmp ) {
 		if ( printFieldName )
