@@ -119,7 +119,7 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 				rtlsdr_cancel_async(dev);
 			}
 		} else {
-			if ( waveWriteSamples((FILE*)ctx, buf, len/2, 0) ) {
+			if ( waveWriteFrames((FILE*)ctx, buf, len/2, 0) ) {
 				fprintf(stderr, "Short write, samples lost, exiting!\n");
 				rtlsdr_cancel_async(dev);
 			}
