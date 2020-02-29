@@ -67,6 +67,7 @@ void usage(void)
 	fprintf(stderr,
 		"Use:\trtl_wavestream [-options] <input_wave_filename>\n"
 		"\t-f <fmt>  sample format for output. default = input format\n"
+		"\t            supported formats: 'PCM16'/'PCM' or 'FLOAT32'/'FLOAT'\n"
 		"\t-w  input file\n"
 		"\t-v        verbose output\n" );
 }
