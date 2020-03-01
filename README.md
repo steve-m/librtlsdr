@@ -19,6 +19,8 @@ https://osmocom.org/projects/rtl-sdr/wiki
  thus can be used without blacklisting dvb_usb_rtl28xxu below /etc/modprobe.d/
 - this allows to use a second RTL dongle for use with DVB in parallel
 - the IDs can be programmed with 'rtl_eeprom -n' or 'rtl_eeprom -g realtek_sdr'
+- for permanent blacklisting you might check/call following from the clone git directory
+    * ./install-blacklist.sh
 
 
 # Contributing
