@@ -1699,7 +1699,12 @@ int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband)
 		iffreq = (devt->tuner_sideband)	/* -1 for USB; +1 for LSB */
 			? ( devt->tuner_if_freq - devt->if_band_center_freq )
 			: ( devt->tuner_if_freq + devt->if_band_center_freq );
-		fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_if_freq(%d) ..\n", sideband, iffreq);
+		if ( devt->verbose ) {
+			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_if_freq(%d) ..\n", sideband, iffreq);
+			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): iffreq = %d %c %d = %d\n", sideband,
+				devt->tuner_if_freq, (devt->tuner_sideband ? '-' : '+'), devt->if_band_center_freq,
+				iffreq);
+		}
 		r = rtlsdr_set_if_freq(devt, iffreq );
 		if (r)
 		{
@@ -3809,7 +3814,30 @@ const char * rtlsdr_get_opt_help(int longInfo)
 {
 	if ( longInfo )
 		return
-		"\t[-O\tset RTL options string seperated with ':' ]\n"
+		"\t[-O\tset RTL driver options seperated with ':', e.g. -O 'bc=30000:agc=0' ]\n"
+		"\t\tf=<freqHz>            set tuner frequency\n"
+		"\t\tbw=<bw_in_kHz>        set tuner bandwidth\n"
+		"\t\tbc=<if_in_Hz>         set band center relative to the complex-base-band '0' frequency\n"
+		"\t\t                        puts the tuner frequency onto this if frequency (default: 0)\n"
+		"\t\tsb=<sideband>         set tuner sideband/mirror: 'L' or '0' for lower side band,\n"
+		"\t\t                        'U' or '1' for upper side band. default for R820T/2: 'L'\n"
+		"\t\tagc=<tuner_gain_mode> activates tuner agc with '1'. deactivates with '0'\n"
+		"\t\tgain=<tenth_dB>       set tuner gain. 400 for 40.0 dB\n"
+		"\t\tifm=<tuner_if_mode>   set R820T/2 tuner's variable-gain-amplifier (VGA):\n"
+		"\t\t                        0: activate agc controlled from RTL2832's feedback\n"
+		"\t\t                        5000+gain: set gain in 10th dB. 5408 for +40.8 dB, 4953 for -4.7 dB\n"
+		"\t\t                        10000+idx: set gain idx 0 .. 15: 10015 for maximum gain\n"
+		"\t\tdagc=<rtl_agc>        set RTL2832's digital agc (after ADC). 1 to activate. 0 to deactivate\n"
+		"\t\tds=<direct_sampling>  deactivate/bypass tuner with 1\n"
+		"\t\tT=<bias_tee>          1 activates power at antenna one some dongles, e.g. rtl-sdr.com's V3\n"
+#ifdef WITH_UDP_SERVER
+		"\t\tport=<udp_port>       1 or tcp port number activates UDP server. default: 0.\n"
+		"\t\t                        default port number: 32323\n"
+#endif
+		;
+	else
+		return
+		"\t[-O\tset RTL options string seperated with ':', e.g. -O 'bc=30000:agc=0' ]\n"
 		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>:sb=<sideband>\n"
 		"\t\tagc=<tuner_gain_mode>:gain=<tenth_dB>:ifm=<tuner_if_mode>:dagc=<rtl_agc>\n"
 		"\t\tds=<direct_sampling_mode>:T=<bias_tee>\n"
@@ -3817,9 +3845,6 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t\tport=<udp_port default with 1>\n"
 #endif
 		;
-	else
-		return
-		"\t[-O\tset RTL options string seperated with ':' ]\n";
 }
 
 int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
@@ -3869,9 +3894,9 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 		}
 		else if (!strncmp(optPart, "sb=", 3)) {
 			int32_t sideband = (int32_t)(atoi(optPart +3));
-			if (!strcmp(optPart +3, "L") || !strcmp(optPart +3, "l"))
+			if (!strcmp(optPart +3, "L") || !strcmp(optPart +3, "l") || !strcmp(optPart +3, "0"))
 				sideband = 0;
-			else if (!strcmp(optPart +3, "U") || !strcmp(optPart +3, "u"))
+			else if (!strcmp(optPart +3, "U") || !strcmp(optPart +3, "u") || !strcmp(optPart +3, "1"))
 				sideband = 1;
 			if (verbose)
 				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed sideband %d == %s\n", (int)sideband, (sideband ? "Upper" : "Lower") );
