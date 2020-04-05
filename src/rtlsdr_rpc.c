@@ -567,6 +567,8 @@ int rtlsdr_rpc_open(void** devp, uint32_t index)
   rtlsdr_rpc_dev_t* dev;
   int err = -1;
 
+  index = (uint32_t) atoi(getenv("RTLSDR_RPC_DEVICE_INDEX"));
+
   *devp = NULL;
 
   if (init_cli(cli)) goto on_error_0;
@@ -918,6 +920,33 @@ int rtlsdr_rpc_set_tuner_gain(void* devp, int gain)
 
   err = rtlsdr_rpc_msg_get_err(r);
   if (err) goto on_error_1;
+
+ on_error_1:
+  free_qr(cli, q, r);
+ on_error_0:
+  return err;
+}
+
+int rtlsdr_rpc_set_and_get_tuner_bandwidth(void* devp, uint32_t bw, uint32_t *applied_bw, int apply_bw )
+{
+  rtlsdr_rpc_dev_t* const dev = devp;
+  rtlsdr_rpc_cli_t* const cli = dev->cli;
+  rtlsdr_rpc_msg_t* q;
+  rtlsdr_rpc_msg_t* r;
+  int err = -1;
+
+  if (alloc_qr(cli, &q, &r)) goto on_error_0;
+
+  rtlsdr_rpc_msg_set_op(q, RTLSDR_RPC_OP_SET_GET_TUNER_BW);
+
+  if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error_1;
+  if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)bw)) goto on_error_1;
+  if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)apply_bw)) goto on_error_1;
+
+  if (send_recv_msg(cli, q, r)) goto on_error_1;
+
+  if (rtlsdr_rpc_msg_get_err(r)) goto on_error_1;
+  if (rtlsdr_rpc_msg_pop_uint32(r, applied_bw)) goto on_error_1;
 
  on_error_1:
   free_qr(cli, q, r);

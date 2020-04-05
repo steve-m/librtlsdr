@@ -74,6 +74,9 @@ int rtlsdr_rpc_set_tuner_if_gain
 int rtlsdr_rpc_set_tuner_gain_mode
 (void* dev, int manual);
 
+int rtlsdr_rpc_set_and_get_tuner_bandwidth
+(void* devp, uint32_t bw, uint32_t *applied_bw, int apply_bw);
+
 int rtlsdr_rpc_set_sample_rate
 (void* dev, uint32_t rate);
 

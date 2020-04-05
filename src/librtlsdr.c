@@ -1160,6 +1160,13 @@ int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains)
 
 int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw, uint32_t *applied_bw, int apply_bw )
 {
+	#ifdef _ENABLE_RPC
+	if (rtlsdr_rpc_is_enabled())
+	{
+     return rtlsdr_rpc_set_and_get_tuner_bandwidth(dev, bw, applied_bw, apply_bw);
+	}
+	#endif
+
 	int r = 0;
 
 		*applied_bw = 0;		/* unknown */
