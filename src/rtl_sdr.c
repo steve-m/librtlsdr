@@ -46,7 +46,7 @@
 
 
 static int do_exit = 0;
-static uint32_t bytes_to_read = 0;
+static uint32_t iq_frames_to_read = 0;
 static rtlsdr_dev_t *dev = NULL;
 
 void usage(void)
@@ -105,8 +105,9 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 		if (do_exit)
 			return;
 
-		if ((bytes_to_read > 0) && (bytes_to_read < len)) {
-			len = bytes_to_read;
+		if ((iq_frames_to_read) && (iq_frames_to_read < len/2)) {
+			len = 2U * iq_frames_to_read;
+			iq_frames_to_read = 0;
 			do_exit = 1;
 			rtlsdr_cancel_async(dev);
 		}
@@ -125,8 +126,14 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			}
 		}
 
-		if (bytes_to_read > 0)
-			bytes_to_read -= len;
+		if (iq_frames_to_read) {
+			if (iq_frames_to_read > len/2)
+				iq_frames_to_read -= len/2;
+			else {
+				do_exit = 1;
+				rtlsdr_cancel_async(dev);
+			}
+		}
 	}
 }
 
@@ -182,7 +189,7 @@ int main(int argc, char **argv)
 			out_block_size = (uint32_t)atof(optarg);
 			break;
 		case 'n':
-			bytes_to_read = (uint32_t)atof(optarg) * 2;
+			iq_frames_to_read = (uint32_t)atof(optarg);
 			break;
 		case 'S':
 			sync_mode = 1;
@@ -301,8 +308,8 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			if ((bytes_to_read > 0) && (bytes_to_read < (uint32_t)n_read)) {
-				n_read = bytes_to_read;
+			if ((iq_frames_to_read) && (iq_frames_to_read < ((uint32_t)n_read /2))) {
+				n_read = 2U * iq_frames_to_read;
 				do_exit = 1;
 			}
 
@@ -325,8 +332,12 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			if (bytes_to_read > 0)
-				bytes_to_read -= n_read;
+			if (iq_frames_to_read) {
+				if (iq_frames_to_read > ((uint32_t)n_read /2))
+					iq_frames_to_read -= n_read/2;
+				else
+					do_exit = 1;
+			}
 		}
 	} else {
 		fprintf(stderr, "Reading samples in async mode...\n");
