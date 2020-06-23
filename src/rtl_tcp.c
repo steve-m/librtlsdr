@@ -375,7 +375,7 @@ int main(int argc, char **argv)
 	char *addr = "127.0.0.1";
 	char *port = "1234";
 	uint32_t frequency = 100000000, samp_rate = 2048000;
-	struct sockaddr_storage local, remote;
+	struct sockaddr_storage remote;
 	struct addrinfo *ai;
 	struct addrinfo *aiHead;
 	struct addrinfo  hints;
@@ -524,6 +524,7 @@ int main(int argc, char **argv)
 	pthread_cond_init(&cond, NULL);
 	pthread_cond_init(&exit_cond, NULL);
 
+	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags  = AI_PASSIVE; /* Server mode. */
 	hints.ai_family = PF_UNSPEC;  /* IPv4 or IPv6. */
 	hints.ai_socktype = SOCK_STREAM;
@@ -538,7 +539,6 @@ int main(int argc, char **argv)
 		        addr, gai_strerror(aiErr));
 		return(-1);
 	}
-	memcpy(&local, aiHead->ai_addr, aiHead->ai_addrlen);
 
 	for (ai = aiHead; ai != NULL; ai = ai->ai_next) {
 		aiErr = getnameinfo((struct sockaddr *)ai->ai_addr, ai->ai_addrlen,
@@ -555,8 +555,8 @@ int main(int argc, char **argv)
 		setsockopt(listensocket, SOL_SOCKET, SO_REUSEADDR, (char *)&r, sizeof(int));
 		setsockopt(listensocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
 
-		if (bind(listensocket, (struct sockaddr *)&local, sizeof(local)))
-			fprintf(stderr, "rtl_tcp bind error: %s", strerror(errno));
+		if (bind(listensocket, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen))
+			fprintf(stderr, "rtl_tcp bind error: %s\n", strerror(errno));
 		else
 			break;
 	}
