@@ -83,18 +83,13 @@ int main(int argc, char **argv)
 	}
 
 	r = rtlsdr_open(&dev, dev_index);
+
+	/* Flip on the bias tee on the given GPIO pin */
 	rtlsdr_set_bias_tee_gpio(dev, gpio_pin, bias_on);
 
-exit:
-	/*
-	 * Note - rtlsdr_close() in this tree does not clear the bias tee
-	 * GPIO line, so it leaves the bias tee enabled if a client program
-	 * doesn't explictly disable it.
-	 *
-	 * If that behaviour changes then another rtlsdr_close() will be
-	 * needed that takes some extension flags, and one of them should
-	 * be to either explicitly close the biast or leave it alone.
-	 */
+	/* Ensure it stays on during rtlsdr_close() */
+	rtlsdr_set_bias_tee_leave_on(dev, 1);
+
 	rtlsdr_close(dev);
 
 	return r >= 0 ? r : -r;
