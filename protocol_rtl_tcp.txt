@@ -1,0 +1,81 @@
+
+The command protocol of rtl_tcp is on port 1234 (by default):
+=============================================================
+
+Commands are directed from a client application towards rtl_tcp.
+
+Each command consists of 2 fields:
+
+1- command_id: value of enum RTL_TCP_COMMANDS, defined in rtl_tcp.h.
+  This element is an unsigned character, starting at offset 0
+  with length: 1 byte.
+
+2- parameter: depends on the command id,
+  e.g. is a frequency for SET_FREQUENCY.
+  This element is a (signed or unsigned) 32 bit integer,
+  starting at offset 1 with length: 4 bytes.
+
+Both fields are in Network Byte Order (Big Endian).
+Size of one command is 3 bytes, without padding.
+
+
+Reverse direction on command connection:
+========================================
+
+With accepting a connection, rtl_tcp initially transmits some dongle_info.
+
+The dongle_info consists of 3 fields:
+
+1- magic string: identifies the rtl_tcp protocol. The value is "RTL0".
+  This element is a fixed size string, starting at offset 0
+  with length 4 bytes.
+
+2- tuner type: identifies the tuner chip built in the controlled RTL-SDR model,
+  e.g. E4000 or R820T.
+  This element is an unsigned 32 bit integer, starting at offset 4
+  with length: 4 bytes.
+
+3- tuner gain count: reports the number of available gain values,
+  necessary for the command SET_TUNER_GAIN_BY_INDEX.
+  This element is an unsigned 32 bit integer, starting at offset 8
+  with length: 4 bytes.
+
+Both fields are in Network Byte Order (Big Endian).
+Size of one dongle_info is 12 bytes, without padding.
+
+
+After that initial dongle_info, from offset 12 byte, just raw I/Q data is transferred.
+For each I/Q frame, in the commanded samplerate, I and Q values are transferred,
+each as unsigned 8 bit sample. Thus one I/Q-frame is 2 bytes, each frame 1 byte.
+
+
+
+Response channel:
+=================
+The command channel does not allow specific response on commands.
+This is why an additional response channel got necessary.
+rtl_tcp now offers an additional tcp server "response" channel,
+by default, on the next port as the command protocol.
+Thus, by default on port 1235.
+
+
+Each response from rtl_tcp to the client consists of 3 fields:
+
+1- command_id: references the command, which generated this response.
+  It's value is also the enum RTL_TCP_COMMANDS, defined in rtl_tcp.h.
+  This element is an unsigned character, starting at offset 0
+  with length: 1 byte.
+
+2- length_of_content: defines the number of bytes following this field at offset 3.
+  The length is necessary to allow responses with different lengths.
+  This element is an unsigned 16 bit integer, starting at offset 1
+  with length: 2 bytes. 0 is interpreted as 65536!
+  It is strongly recommended to limit the response to 32768 bytes in total.
+
+3- content: the content is command specific and might contain up to 65536 bytes.
+  The content starts at offset 3.
+
+
+All fields are in Network Byte Order (Big Endian).
+Size of one response is (3 + length_of_content), without padding.
+

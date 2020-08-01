@@ -17,6 +17,13 @@
 #ifndef __CONVENIENCE_H
 #define __CONVENIENCE_H
 
+#include <stdint.h>
+#include <stdio.h>
+#include <time.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* a collection of user friendly tools */
 
@@ -47,114 +54,16 @@ double atoft(char *s);
 
 double atofp(char *s);
 
-/*!
- * Find nearest supported gain
- *
- * \param dev the device handle given by rtlsdr_open()
- * \param target_gain in tenths of a dB
- * \return 0 on success
- */
 
-int nearest_gain(rtlsdr_dev_t *dev, int target_gain);
-
-/*!
- * Set device frequency and report status on stderr
- *
- * \param dev the device handle given by rtlsdr_open()
- * \param frequency in Hz
- * \return 0 on success
- */
-
-int verbose_set_frequency(rtlsdr_dev_t *dev, uint32_t frequency);
-
-/*!
- * Set device sample rate and report status on stderr
- *
- * \param dev the device handle given by rtlsdr_open()
- * \param samp_rate in samples/second
- * \return 0 on success
- */
-
-int verbose_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate);
-
-/*!
- * Set device bandwidth and report status on stderr
- *
- * \param dev the device handle given by rtlsdr_open()
- * \param frequency in Hz
- * \return 0 on success
- */
-
-int verbose_set_bandwidth(rtlsdr_dev_t *dev, uint32_t bandwidth);
-
-
-/*!
- * Enable or disable the direct sampling mode and report status on stderr
- *
- * \param dev the device handle given by rtlsdr_open()
- * \param on 0 means disabled, 1 I-ADC input enabled, 2 Q-ADC input enabled
- * \return 0 on success
- */
-
-int verbose_direct_sampling(rtlsdr_dev_t *dev, int on);
-
-/*!
- * Enable offset tuning and report status on stderr
- *
- * \param dev the device handle given by rtlsdr_open()
- * \return 0 on success
- */
-
-int verbose_offset_tuning(rtlsdr_dev_t *dev);
-
-/*!
- * Enable auto gain and report status on stderr
- *
- * \param dev the device handle given by rtlsdr_open()
- * \return 0 on success
- */
-
-int verbose_auto_gain(rtlsdr_dev_t *dev);
-
-/*!
- * Set tuner gain and report status on stderr
- *
- * \param dev the device handle given by rtlsdr_open()
- * \param gain in tenths of a dB
- * \return 0 on success
- */
-
-int verbose_gain_set(rtlsdr_dev_t *dev, int gain);
-
-/*!
- * Set the frequency correction value for the device and report status on stderr.
- *
- * \param dev the device handle given by rtlsdr_open()
- * \param ppm_error correction value in parts per million (ppm)
- * \return 0 on success
- */
-
-int verbose_ppm_set(rtlsdr_dev_t *dev, int ppm_error);
-
-/*!
- * Reset buffer
- *
- * \param dev the device handle given by rtlsdr_open()
- * \return 0 on success
- */
-
-int verbose_reset_buffer(rtlsdr_dev_t *dev);
-
-/*!
- * Find the closest matching device.
- *
- * \param s a string to be parsed
- * \return dev_index int, -1 on error
- */
-
-int verbose_device_search(char *s);
+time_t utctimestr_to_time(const char * str, double * fraction);
+time_t localtimestr_to_time(const char * str, double * fraction);
 
 
 void executeInBackground( char * file, char * args, char * searchStr[], char * replaceStr[] );
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*__CONVENIENCE_H*/

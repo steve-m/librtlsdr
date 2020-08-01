@@ -24,14 +24,16 @@
 extern "C" {
 #endif
 
-#ifndef WIN32
-#define _ENABLE_RPC
-#endif
-
 
 #include <stdint.h>
 #include <stddef.h>
 #include <rtl-sdr_export.h>
+
+
+#define RTLSDRLIB_VER_MAJOR	0
+#define RTLSDRLIB_VER_MINOR	7
+#define RTLSDRLIB_VER_ID		"github.com/hayguen"
+
 
 typedef struct rtlsdr_dev rtlsdr_dev_t;
 
@@ -241,6 +243,24 @@ RTLSDR_API int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw
 
 RTLSDR_API int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw );
 
+/*!
+ * Sets the center of the filtered tuner band(width)
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param if_band_center_freq in Hz. Zero means, that band center shall be at zero (=default).
+ *    set if_band_center_freq = +samplerate/4 to have the filtered band centered at output's right half.
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_center_freq );
+
+/*!
+ * Set the mixer sideband for the device.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param sideband mixer sideband 0 means lower sideband, 1 means upper sideband.
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband);
 
 /*!
  * Get actual gain the device is configured to.
@@ -254,9 +274,10 @@ RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
  * Set LNA / Mixer / VGA Device Gain for R820T device is configured to.
  *
  * \param dev the device handle given by rtlsdr_open()
- * \param lna_gain in tenths of a dB, -30 means -3.0 dB.
- * \param mixer_gain in tenths of a dB, -30 means -3.0 dB.
- * \param vga_gain in tenths of a dB, -30 means -3.0 dB.
+ * \param lna_gain index in 0 .. 15: 0 == min;   see tuner_r82xx.c table r82xx_lna_gain_steps[]
+ * \param mixer_gain index in 0 .. 15: 0 == min; see tuner_r82xx.c table r82xx_mixer_gain_steps[]
+ * \param vga_gain index in 0 .. 15: 0 == -12 dB; 15 == 40.5 dB; => 3.5 dB/step;
+ *     see tuner_r82xx.c table r82xx_vga_gain_steps[]
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, int vga_gain);
@@ -280,6 +301,26 @@ RTLSDR_API int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain);
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
+
+/*!
+ * Set the agc_variant for automatic gain mode for the device.
+ * Automatic gain mode must be enabled for the gain setter function to work.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param if_mode:
+ *         0           for automatic VGA
+ *     -5000 .. +5000  value range - except 0 - for fixed IF gain in tenths of a dB, 115 means 11.5 dB.
+ *                     use -1 or +1 in case you neither want attenuation nor gain.
+ *                     this equals the VGA gain for R820T/2 tuner.
+ *                     accepted values are in range -47 .. 408 in tenth of a dB == -4.7 .. +40.8 dB.
+ *                     the exact values may slightly change with better measured values.
+ *     10008           for fixed VGA (=default)
+ *     10000 .. 10015: IF gain == VGA index from parameter if_mode
+ *                     set if_mode by index: index := VGA_idx +10000
+ * 
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_tuner_if_mode(rtlsdr_dev_t *dev, int if_mode);
 
 /*!
  * Set the sample rate for the device, also selects the baseband filters
@@ -474,6 +515,52 @@ RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
  * \param verbose print parsed options to stderr
  */
 RTLSDR_API int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose);
+
+RTLSDR_API const char * rtlsdr_get_opt_help(int longInfo);
+
+
+/*!
+ * Exposes/permits hacking of Tuner-specific I2C registers: set register once
+ *
+ * \param dev           the device handle given by rtlsdr_open()
+ * \param i2c_register  register address
+ * \param mask          8-bit bitmask, indicating which bits shall be set
+ * \param data          8-bit data, which shall be set
+ * \return -1 if device is not initialized. 0 otherwise.
+ */
+RTLSDR_API int rtlsdr_set_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask, unsigned data);
+
+/* TODO: uint8_t */
+RTLSDR_API int rtlsdr_get_tuner_i2c_register(rtlsdr_dev_t *dev, unsigned char* data, int len);
+
+
+/*!
+ * Exposes/permits hacking of Tuner-specific I2C registers: set and keep register for future
+ *
+ * \param dev           the device handle given by rtlsdr_open()
+ * \param i2c_register  register address
+ * \param mask          8-bit bitmask, indicating which bits shall be set
+ * \param data          8-bit data, which shall be set; data in 0 .. 255 sets override; data > 255 clears override
+ * \return -1 if device is not initialized. 0 otherwise.
+ */
+RTLSDR_API int rtlsdr_set_tuner_i2c_override(rtlsdr_dev_t *dev, unsigned i2c_register, unsigned mask, unsigned data);
+
+
+/*!
+ * request version id string to identify source of library
+ *
+ * \return pointer to C string, e.g. "github.com/librtlsdr" or "github.com/hayguen" or .. with build date
+ *   string keeps owned by library
+ */
+RTLSDR_API const char * rtlsdr_get_ver_id();
+
+/*!
+ * request version numbers of library
+ *
+ * \return major version in upper 16 bit, minor revision in lower 16 bit
+ */
+RTLSDR_API uint32_t rtlsdr_get_version();
+
 
 #ifdef __cplusplus
 }

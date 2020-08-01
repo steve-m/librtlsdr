@@ -33,6 +33,10 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
+#include "convenience/wavewrite.h"
+
+#include "rtl_app_ver.h"
 
 #define DEFAULT_SAMPLE_RATE		2048000
 #define DEFAULT_BANDWIDTH		0	/* automatic bandwidth */
@@ -40,27 +44,37 @@
 #define MINIMAL_BUF_LENGTH		512
 #define MAXIMAL_BUF_LENGTH		(256 * 16384)
 
+
 static int do_exit = 0;
-static uint32_t bytes_to_read = 0;
+static uint32_t iq_frames_to_read = 0;
 static rtlsdr_dev_t *dev = NULL;
 
 void usage(void)
 {
+	fprintf(stderr, "rtl_sdr, an I/Q recorder for RTL2832 based receivers\n");
+	fprintf(stderr, "rtl_sdr version %u.%u %s (%s)\n",
+		APP_VER_MAJOR, APP_VER_MINOR,
+		APP_VER_ID, __DATE__ );
+	fprintf(stderr, "librtlsdr version %u.%u %s\n\n",
+		(unsigned)(rtlsdr_get_version() >> 16),
+		(unsigned)(rtlsdr_get_version() & 0xFFFFU),
+		rtlsdr_get_ver_id()
+		);
+
 	fprintf(stderr,
-		"rtl_sdr, an I/Q recorder for RTL2832 based DVB-T receivers\n\n"
 		"Usage:\t -f frequency_to_tune_to [Hz]\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-w tuner_bandwidth (default: automatic)]\n"
 		"\t[-d device_index or serial (default: 0)]\n"
 		"\t[-g gain (default: 0 for auto)]\n"
 		"\t[-p ppm_error (default: 0)]\n"
-		"\t[-O set RTL options string seperated with ':' ]\n"
-		"\t  f=<freqHz>:bw=<bw_in_kHz>:agc=<tuner_gain_mode>:gain=<tenth_dB>\n"
-		"\t  dagc=<rtl_agc>:ds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"%s"
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
 		"\t[-n number of samples to read (default: 0, infinite)]\n"
 		"\t[-S force sync output (default: async)]\n"
-		"\tfilename (a '-' dumps samples to stdout)\n\n");
+		"\t[-H write wave Header to file (default: off)]\n"
+		"\tfilename (a '-' dumps samples to stdout)\n\n"
+		, rtlsdr_get_opt_help(1) );
 	exit(1);
 }
 
@@ -91,19 +105,35 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 		if (do_exit)
 			return;
 
-		if ((bytes_to_read > 0) && (bytes_to_read < len)) {
-			len = bytes_to_read;
+		if ((iq_frames_to_read) && (iq_frames_to_read < len/2)) {
+			len = 2U * iq_frames_to_read;
+			iq_frames_to_read = 0;
 			do_exit = 1;
 			rtlsdr_cancel_async(dev);
 		}
 
-		if (fwrite(buf, 1, len, (FILE*)ctx) != len) {
-			fprintf(stderr, "Short write, samples lost, exiting!\n");
-			rtlsdr_cancel_async(dev);
+		if (!waveHdrStarted) {
+			size_t wr = fwrite(buf, 1, len, (FILE*)ctx);
+			if ( wr != len) {
+				fprintf(stderr, "Short write (wrote %ld of %ld bytes), samples lost, exiting!\n"
+						, (long)wr, (long)len );
+				rtlsdr_cancel_async(dev);
+			}
+		} else {
+			if ( waveWriteFrames((FILE*)ctx, buf, len/2, 0) ) {
+				fprintf(stderr, "Short write, samples lost, exiting!\n");
+				rtlsdr_cancel_async(dev);
+			}
 		}
 
-		if (bytes_to_read > 0)
-			bytes_to_read -= len;
+		if (iq_frames_to_read) {
+			if (iq_frames_to_read > len/2)
+				iq_frames_to_read -= len/2;
+			else {
+				do_exit = 1;
+				rtlsdr_cancel_async(dev);
+			}
+		}
 	}
 }
 
@@ -113,6 +143,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact;
 #endif
 	char *filename = NULL;
+	char *tempfilename = NULL;
 	int n_read;
 	int r, opt;
 	int gain = 0;
@@ -123,13 +154,14 @@ int main(int argc, char **argv)
 	const char * rtlOpts = NULL;
 	int dev_index = 0;
 	int dev_given = 0;
+	int writeWav = 0;
 	uint32_t frequency = 100000000;
 	uint32_t bandwidth = DEFAULT_BANDWIDTH;
 	uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
 	int verbosity = 0;
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:O:Sv")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:O:SHv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -157,10 +189,13 @@ int main(int argc, char **argv)
 			out_block_size = (uint32_t)atof(optarg);
 			break;
 		case 'n':
-			bytes_to_read = (uint32_t)atof(optarg) * 2;
+			iq_frames_to_read = (uint32_t)atof(optarg);
 			break;
 		case 'S':
 			sync_mode = 1;
+			break;
+		case 'H':
+			writeWav = 1;
 			break;
 		case 'v':
 			++verbosity;
@@ -244,10 +279,20 @@ int main(int argc, char **argv)
 		_setmode(_fileno(stdin), _O_BINARY);
 #endif
 	} else {
-		file = fopen(filename, "wb");
+		const char * filename_to_open = filename;
+		if (writeWav) {
+			tempfilename = malloc( strlen(filename)+8 );
+			strcpy(tempfilename, filename);
+			strcat(tempfilename, ".tmp");
+			filename_to_open = tempfilename;
+		}
+		file = fopen(filename_to_open, "wb");
 		if (!file) {
-			fprintf(stderr, "Failed to open %s\n", filename);
+			fprintf(stderr, "Failed to open %s\n", filename_to_open);
 			goto out;
+		}
+		if (writeWav) {
+			waveWriteHeader(samp_rate, frequency, 8, 2, file);
 		}
 	}
 
@@ -263,14 +308,23 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			if ((bytes_to_read > 0) && (bytes_to_read < (uint32_t)n_read)) {
-				n_read = bytes_to_read;
+			if ((iq_frames_to_read) && (iq_frames_to_read < ((uint32_t)n_read /2))) {
+				n_read = 2U * iq_frames_to_read;
 				do_exit = 1;
 			}
 
-			if (fwrite(buffer, 1, n_read, file) != (size_t)n_read) {
-				fprintf(stderr, "Short write, samples lost, exiting!\n");
-				break;
+			if (!waveHdrStarted) {
+				size_t wr = fwrite(buffer, 1, n_read, file);
+				if (wr != (size_t)n_read) {
+					fprintf(stderr, "Short write (wrote %ld of %ld bytes), samples lost, exiting!\n"
+							, (long)wr, (long)n_read );
+					break;
+				}
+			} else {
+				if ( waveWriteSamples(file, buffer, n_read/2, 0) ) {
+					fprintf(stderr, "Short write, samples lost, exiting!\n");
+					break;
+				}
 			}
 
 			if ((uint32_t)n_read < out_block_size) {
@@ -278,8 +332,12 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			if (bytes_to_read > 0)
-				bytes_to_read -= n_read;
+			if (iq_frames_to_read) {
+				if (iq_frames_to_read > ((uint32_t)n_read /2))
+					iq_frames_to_read -= n_read/2;
+				else
+					do_exit = 1;
+			}
 		}
 	} else {
 		fprintf(stderr, "Reading samples in async mode...\n");
@@ -287,13 +345,25 @@ int main(int argc, char **argv)
 				      0, out_block_size);
 	}
 
+	if (file != stdout) {
+		if (writeWav) {
+			waveFinalizeHeader(file);
+			fclose(file);
+			remove(filename);	/* delete, in case file already exists */
+			r = rename( tempfilename, filename );	/* #include <stdio.h> */
+			if ( r )
+				fprintf( stderr, "%s: error %d '%s' renaming'%s' to '%s'\n"
+					, argv[0], errno, strerror(errno), tempfilename, filename );
+		} else {
+			fclose(file);
+		}
+
+	}
+
 	if (do_exit)
 		fprintf(stderr, "\nUser cancel, exiting...\n");
 	else
 		fprintf(stderr, "\nLibrary error %d, exiting...\n", r);
-
-	if (file != stdout)
-		fclose(file);
 
 	rtlsdr_close(dev);
 	free (buffer);

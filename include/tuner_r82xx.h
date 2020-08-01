@@ -35,11 +35,13 @@
 #define R82XX_IF_FREQ		3570000
 
 #define REG_SHADOW_START	5
-#define NUM_REGS			30
+#define NUM_REGS			32
 #define NUM_IMR				5
 #define IMR_TRIAL			9
 
 #define VER_NUM				49
+
+#define USE_R82XX_ENV_VARS	1
 
 enum r82xx_chip {
 	CHIP_R820T,
@@ -77,19 +79,47 @@ struct r82xx_priv {
 
 	uint8_t						regs[NUM_REGS];
 	uint8_t						buf[NUM_REGS + 1];
+	uint8_t						override_data[NUM_REGS];
+	uint8_t						override_mask[NUM_REGS];
 	enum r82xx_xtal_cap_value	xtal_cap_sel;
 	uint16_t					pll;	/* kHz */
 	uint32_t					int_freq;
+	int32_t						if_band_center_freq;
 	uint8_t						fil_cal_code;
 	uint8_t						input;
 	int							has_lock;
 	int							init_done;
+	int							sideband;
 
 	/* Store current mode */
 	uint32_t				delsys;
 	enum r82xx_tuner_type	type;
 	uint32_t				bw;	/* in MHz */
 	void 					*rtl_dev;
+
+	int				last_if_mode;
+	int				last_manual_gain;
+	int				last_extended_mode;
+	int				last_LNA_value;
+	int				last_Mixer_value;
+	int				last_VGA_value;
+
+#if USE_R82XX_ENV_VARS
+	/* store some environment variables */
+	int printI2C;
+	unsigned int filterCenter;
+	unsigned int haveR9, valR9;
+	unsigned int haveR10L, valR10L;
+	unsigned int haveR10H, valR10H;
+	unsigned int haveR11L, valR11L;
+	unsigned int haveR11H, valR11H;
+	unsigned int haveR13L, valR13L;
+	unsigned int haveR13H, valR13H;
+	unsigned int haveR14L, valR14L;
+	unsigned int haveR14H, valR14H;
+	unsigned int haveR30H, valR30H;
+	unsigned int haveR30L, valR30L;
+#endif
 };
 
 struct r82xx_freq_range {
@@ -112,9 +142,21 @@ enum r82xx_delivery_system {
 int r82xx_standby(struct r82xx_priv *priv);
 int r82xx_init(struct r82xx_priv *priv);
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq);
-//int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain);
-int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain, int extended_mode, int lna_gain, int mixer_gain, int vga_gain);
+int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain, int extended_mode, int lna_gain, int mixer_gain, int vga_gain, int *rtl_vga_control);
+int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control);
+
+int r82xx_set_i2c_register(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask);
+int r82xx_get_i2c_register(struct r82xx_priv *priv, unsigned char* data, int len);
+int r82xx_set_i2c_override(struct r82xx_priv *priv, unsigned i2c_register, unsigned data, unsigned mask);
 
 int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate, uint32_t * applied_bw, int apply);
+int r82xx_set_bw_center(struct r82xx_priv *priv, int32_t if_band_center_freq);
+/* Mixer Sideband:  0: lower, 1: upper */
+int r82xx_set_sideband(struct r82xx_priv *priv, int sideband);
+
+int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg);
+int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val,uint8_t bit_mask);
+int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val, uint8_t bit_mask, const char * func_name);
 
 #endif
+

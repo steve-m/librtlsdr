@@ -68,6 +68,7 @@
 
 #include "rtl-sdr.h"
 #include "convenience/convenience.h"
+#include "convenience/rtl_convenience.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 
