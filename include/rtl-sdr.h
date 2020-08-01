@@ -422,6 +422,9 @@ RTLSDR_API int rtlsdr_read_async(rtlsdr_dev_t *dev,
 
 /*!
  * Cancel all pending asynchronous operations on the device.
+ * Due to incomplete concurrency implementation, this should
+ * only be called from within the callback function, so it is
+ * in the correct thread.
  *
  * \param dev the device handle given by rtlsdr_open()
  * \return 0 on success
