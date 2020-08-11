@@ -32,7 +32,7 @@ set(PATCH_VERSION ${VERSION_INFO_PATCH_VERSION})
 ########################################################################
 find_package(Git QUIET)
 
-if(GIT_FOUND)
+if(GIT_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/.git)
     message(STATUS "Extracting version information from git describe...")
     execute_process(
         COMMAND ${GIT_EXECUTABLE} describe --always --abbrev=4 --long
