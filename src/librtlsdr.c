@@ -749,6 +749,16 @@ enum blocks {
 	IICB			= 6,
 };
 
+
+static const char * dsmode_str[] = {
+"0: use I & Q",
+"1: use I",
+"2: use Q",
+"3: use I below threshold frequency",
+"4: use Q below threshold frequency"
+};
+
+
 int rtlsdr_read_array(rtlsdr_dev_t *dev, uint8_t block, uint16_t addr, uint8_t *array, uint8_t len)
 {
 	int r;
@@ -2040,6 +2050,10 @@ static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq)
 	case RTLSDR_DS_I_BELOW:	new_ds = (freq < dev->direct_sampling_threshold) ? 1 : 0; break;
 	case RTLSDR_DS_Q_BELOW:	new_ds = (freq < dev->direct_sampling_threshold) ? 2 : 0; break;
 	}
+
+	//if ( dev->verbose )
+	//	fprintf(stderr, "rtlsdr_update_ds(%u Hz) --> ds = %d for mode %s\n",
+	//		freq, new_ds, dsmode_str[dev->direct_sampling_mode] );
 
 	if ( curr_ds != new_ds )
 		return rtlsdr_set_direct_sampling(dev, new_ds);
@@ -3836,6 +3850,10 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t\t                        10000+idx: set gain idx 0 .. 15: 10015 for maximum gain\n"
 		"\t\tdagc=<rtl_agc>        set RTL2832's digital agc (after ADC). 1 to activate. 0 to deactivate\n"
 		"\t\tds=<direct_sampling>  deactivate/bypass tuner with 1\n"
+		"\t\tdm=<ds_mode_thresh>   set dynamic direct threshold mode or threshold frequency:\n"
+		"\t\t                        0: use I & Q; 1: use I; 2: use Q; 3: use I below threshold frequency;\n"
+		"\t\t                        4: use Q below threshold frequency (=RTL-SDR v3)\n"
+		"\t\t                        other values set the threshold frequency\n"
 		"\t\tT=<bias_tee>          1 activates power at antenna one some dongles, e.g. rtl-sdr.com's V3\n"
 #ifdef WITH_UDP_SERVER
 		"\t\tport=<udp_port>       1 or tcp port number activates UDP server. default: 0.\n"
@@ -3847,7 +3865,7 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t[-O\tset RTL options string seperated with ':', e.g. -O 'bc=30000:agc=0' ]\n"
 		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>:sb=<sideband>\n"
 		"\t\tagc=<tuner_gain_mode>:gain=<tenth_dB>:ifm=<tuner_if_mode>:dagc=<rtl_agc>\n"
-		"\t\tds=<direct_sampling_mode>:T=<bias_tee>\n"
+		"\t\tds=<direct_sampling>:dm=<ds_mode_thresh>:T=<bias_tee>\n"
 #ifdef WITH_UDP_SERVER
 		"\t\tport=<udp_port default with 1>\n"
 #endif
@@ -3874,6 +3892,8 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 	while (optPart)
 	{
 		int ret = 0;
+		//if (verbose || dev->verbose)
+		//	fprintf(stderr, "\nrtlsdr_set_opt_string(): parsing option '%s'\n", optPart);
 		if (!strcmp(optPart, "verbose")) {
 			fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed option verbose\n");
 			dev->verbose = verbose = 1;
@@ -3944,8 +3964,22 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 		else if (!strncmp(optPart, "ds=", 3)) {
 			int on = atoi(optPart +3);
 			if (verbose)
-				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed direct sampling mode %d\n", on);
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed direct sampling config %d\n", on);
 			ret = rtlsdr_set_direct_sampling(dev, on);
+		}
+		else if (!strncmp(optPart, "dm=", 3)) {
+			uint32_t dm = (uint32_t)parseFreq(optPart + 3);
+			if (verbose) {
+				if (dm <= RTLSDR_DS_Q_BELOW)
+					fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed direct sampling mode %u == %s\n", dm, dsmode_str[dm]);
+				else
+					fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed direct sampling threshold %u\n", dm);
+			}
+			if (dm <= RTLSDR_DS_Q_BELOW)
+				dev->direct_sampling_mode = (enum rtlsdr_ds_mode)dm;
+			else
+				dev->direct_sampling_threshold = dm;
+			ret = rtlsdr_set_ds_mode(dev, dev->direct_sampling_mode, dev->direct_sampling_threshold);
 		}
 		else if (!strncmp(optPart, "t=", 2) || !strncmp(optPart, "T=", 2)) {
 			int on = atoi(optPart +2);
