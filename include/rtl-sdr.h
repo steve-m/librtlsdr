@@ -209,7 +209,7 @@ enum rtlsdr_tuner {
 	RTLSDR_TUNER_FC0012,
 	RTLSDR_TUNER_FC0013,
 	RTLSDR_TUNER_FC2580,
-	RTLSDR_TUNER_R820T,
+	RTLSDR_TUNER_R820T,		/* or R820T2 - R820T and R820T2 is not disdinguishable */
 	RTLSDR_TUNER_R828D
 };
 
@@ -291,7 +291,7 @@ RTLSDR_API int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband);
 RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
 
 /*!
- * Set LNA / Mixer / VGA Device Gain for R820T device is configured to.
+ * Set LNA / Mixer / VGA Device Gain for R820T/2 device is configured to.
  *
  * \param dev the device handle given by rtlsdr_open()
  * \param lna_gain index in 0 .. 15: 0 == min;   see tuner_r82xx.c table r82xx_lna_gain_steps[]

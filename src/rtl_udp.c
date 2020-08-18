@@ -119,7 +119,7 @@ void usage(void)
 		"\t[-b number of buffers (default: 15, set by library)]\n"
 		"\t[-l length of single buffer in units of 512 samples (default: 32 was 256)]\n"
 		"\t[-n max number of linked list buffers to keep (default: 500)]\n"
-		"\t[-w rtlsdr tuner bandwidth [Hz] (for R820T and E4000 tuners)]\n"
+		"\t[-w rtlsdr tuner bandwidth [Hz] (for R820T/2 and E4000 tuners)]\n"
 		"\t[-d device index or serial (default: 0)]\n"
 		"\t[-P ppm_error (default: 0)]\n"
 		"%s"

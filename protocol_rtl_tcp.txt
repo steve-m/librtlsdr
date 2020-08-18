@@ -31,7 +31,7 @@ The dongle_info consists of 3 fields:
   with length 4 bytes.
 
 2- tuner type: identifies the tuner chip built in the controlled RTL-SDR model,
-  e.g. E4000 or R820T.
+  e.g. E4000 or R820T or R820T2.
   This element is an unsigned 32 bit integer, starting at offset 4
   with length: 4 bytes.
 
