@@ -68,8 +68,25 @@ RTLSDR_API int rtlsdr_get_device_usb_strings(uint32_t index,
  */
 RTLSDR_API int rtlsdr_get_index_by_serial(const char *serial);
 
+/*!
+ * Open device index by index.
+ *
+ * \param pointer where to save the device handle, which again is a pointer
+ * \param serial serial string of the device
+ * \return device index to be opened
+ * \return -1 if device or libusb is inaccessible
+ * \return -3 if device permissions don't fit:
+ *              check, if udev rules file rtl-sdr.rules needs to be installed
+ * \return negative, for a libusb error code or some other initialization error
+ */
 RTLSDR_API int rtlsdr_open(rtlsdr_dev_t **dev, uint32_t index);
 
+/*!
+ * Close device.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \return -1 if device handle was already close - or never opened
+ */
 RTLSDR_API int rtlsdr_close(rtlsdr_dev_t *dev);
 
 /* configuration functions */
@@ -155,7 +172,8 @@ RTLSDR_API int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data,
  *
  * \param dev the device handle given by rtlsdr_open()
  * \param frequency in Hz
- * \return 0 on error, frequency in Hz otherwise
+ * \return 0 on success
+ * \return < 0 if device handle is invalid or some other error
  */
 RTLSDR_API int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq);
 
@@ -181,6 +199,7 @@ RTLSDR_API int rtlsdr_set_freq_correction(rtlsdr_dev_t *dev, int ppm);
  *
  * \param dev the device handle given by rtlsdr_open()
  * \return correction value in parts per million (ppm)
+ *         if dev is valid, no error can occur
  */
 RTLSDR_API int rtlsdr_get_freq_correction(rtlsdr_dev_t *dev);
 
@@ -267,6 +286,7 @@ RTLSDR_API int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband);
  *
  * \param dev the device handle given by rtlsdr_open()
  * \return 0 on error, gain in tenths of a dB, 115 means 11.5 dB.
+ *         unfortunately it's impossible to distinguish error against 0 dB
  */
 RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
 
@@ -422,8 +442,23 @@ RTLSDR_API int rtlsdr_get_offset_tuning(rtlsdr_dev_t *dev);
 
 /* streaming functions */
 
+
+/*!
+ * Reset buffer in RTL2832
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \return 0 on success
+ * \return -1 on error
+ */
 RTLSDR_API int rtlsdr_reset_buffer(rtlsdr_dev_t *dev);
 
+/*!
+ * Read data synchronously
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \return 0 on success
+ * \return -1 on error or error code from libusb
+ */
 RTLSDR_API int rtlsdr_read_sync(rtlsdr_dev_t *dev, void *buf, int len, int *n_read);
 
 typedef void(*rtlsdr_read_async_cb_t)(unsigned char *buf, uint32_t len, void *ctx);
