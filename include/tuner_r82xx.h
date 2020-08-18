@@ -83,8 +83,10 @@ struct r82xx_priv {
 	uint8_t						override_mask[NUM_REGS];
 	enum r82xx_xtal_cap_value	xtal_cap_sel;
 	uint16_t					pll;	/* kHz */
-	uint32_t					int_freq;
-	int32_t						if_band_center_freq;
+	uint32_t					rf_freq;  /* frequency from r82xx_set_freq() */
+	uint32_t					int_freq; /* if frequency at which to deliver towards RTL2832U */
+	int32_t						if_band_center_freq;	/* frequency relative to zero IF,
+														 * on which the band center shall be positioned */
 	uint8_t						fil_cal_code;
 	uint8_t						input;
 	int							has_lock;

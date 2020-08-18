@@ -704,6 +704,7 @@ static int r82xx_set_mux(struct r82xx_priv *priv, uint32_t freq)
 
 static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 {
+	/* freq == tuner's LO frequency */
 	int rc, i;
 	uint64_t vco_freq;
 	uint64_t vco_div;
@@ -847,10 +848,16 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	}
 
 	if (!(data[2] & 0x40)) {
-		fprintf(stderr, "[R82XX] PLL not locked for %u Hz!\n", freq);
+		if ( priv->rf_freq )
+			fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
+				freq, priv->rf_freq);
 		priv->has_lock = 0;
 		return 0;
 	}
+#if 0
+	else
+		fprintf(stderr, "[R82XX] PLL locked at Tuner LO %u Hz for RF %u Hz!\n", freq, priv->rf_freq);
+#endif
 
 	priv->has_lock = 1;
 
@@ -1566,6 +1573,8 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 	else
 		lo_freq = freq + priv->int_freq + priv->if_band_center_freq;
 
+	priv->rf_freq = freq;
+
 #if 0
 	fprintf(stderr, "%s(freq = %u) @ %s--> intfreq %u, ifcenter %d --> f %u\n"
 			, __FUNCTION__, (unsigned)freq, (priv->sideband ? "USB" : "LSB")
@@ -1660,6 +1669,7 @@ int r82xx_init(struct r82xx_priv *priv)
 	/* TODO: R828D might need r82xx_xtal_check() */
 	priv->xtal_cap_sel = XTAL_HIGH_CAP_0P;
 
+	priv->rf_freq = 0;
 	priv->if_band_center_freq = 0;
 
 	priv->last_if_mode = 0;
