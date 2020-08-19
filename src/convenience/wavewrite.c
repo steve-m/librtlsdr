@@ -94,11 +94,11 @@ void wavePrepareHeader(unsigned samplerate, unsigned freq, int bitsPerSample, in
 	int	bytesPerSample = bitsPerSample / 8;
 	int bytesPerFrame = bytesPerSample * numChannels;
 
-	strncpy( waveHdr.r.hdr.ID, "RIFF", 4 );
+	memcpy( waveHdr.r.hdr.ID, "RIFF", 4 );
 	waveHdr.r.hdr.size = sizeof(waveFileHeader) - 8;		/* to fix */
-	strncpy( waveHdr.r.waveID, "WAVE", 4 );
+	memcpy( waveHdr.r.waveID, "WAVE", 4 );
 
-	strncpy( waveHdr.f.hdr.ID, "fmt ", 4 );
+	memcpy( waveHdr.f.hdr.ID, "fmt ", 4 );
 	waveHdr.f.hdr.size = 16;
 	waveHdr.f.wFormatTag = 1;					/* PCM */
 	waveHdr.f.nChannels = numChannels;		/* I and Q channels */
@@ -107,7 +107,7 @@ void wavePrepareHeader(unsigned samplerate, unsigned freq, int bitsPerSample, in
 	waveHdr.f.nBlockAlign = waveHdr.f.nChannels;
 	waveHdr.f.nBitsPerSample = bitsPerSample;
 
-	strncpy( waveHdr.a.hdr.ID, "auxi", 4 );
+	memcpy( waveHdr.a.hdr.ID, "auxi", 4 );
 	waveHdr.a.hdr.size = 2 * sizeof(Wind_SystemTime) + 9 * sizeof(int32_t);  /* = 2 * 16 + 9 * 4 = 68 */
 	waveSetCurrTime( &waveHdr.a.StartTime );
 	waveHdr.a.StopTime = waveHdr.a.StartTime;		/* to fix */
@@ -121,7 +121,7 @@ void wavePrepareHeader(unsigned samplerate, unsigned freq, int bitsPerSample, in
 	waveHdr.a.Unused4 = 0;
 	waveHdr.a.Unused5 = 0;
 
-	strncpy( waveHdr.d.hdr.ID, "data", 4 );
+	memcpy( waveHdr.d.hdr.ID, "data", 4 );
 	waveHdr.d.hdr.size = 0;		/* to fix later */
 	waveDataSize = 0;
 }

@@ -1364,7 +1364,7 @@ static const int r82xx_bw_tablen = sizeof(IFi) / sizeof(IFi[0]);
 int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t * applied_bw, int apply)
 {
 	int rc;
-	unsigned int i;
+	int i;
 	int real_bw = 0;
 #if USE_R82XX_ENV_VARS
 	uint8_t reg_09, reg_0d =0, reg_0e =0;
