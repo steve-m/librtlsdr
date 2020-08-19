@@ -848,9 +848,8 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	}
 
 	if (!(data[2] & 0x40)) {
-		if ( priv->rf_freq )
-			fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
-				freq, priv->rf_freq);
+		fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
+			freq, priv->rf_freq);
 		priv->has_lock = 0;
 		return 0;
 	}
@@ -956,7 +955,6 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 	int need_calibration = 1;
 
 	/* BW < 6 MHz */
-	uint32_t filt_cal_lo = 56000;	/* 52000->56000 */
 	uint8_t filt_q = 0x10;		/* r10[4]:low q(1'b1) */
 
 	/* for LT Gain test */
@@ -965,6 +963,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 		if (rc < 0)
 			return rc;
 	}
+	priv->rf_freq = 56000 * 1000;  /* set a default frequency */
 	priv->if_band_center_freq = 0;
 	priv->int_freq = 3570 * 1000;
 	priv->sideband = 0;
@@ -980,7 +979,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 			if (rc < 0)
 				return rc;
 
-			rc = r82xx_set_pll(priv, filt_cal_lo * 1000);
+			rc = r82xx_set_pll(priv, priv->rf_freq);
 			if (rc < 0 || !priv->has_lock)
 				return rc;
 
@@ -1568,12 +1567,15 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 	uint32_t lo_freq;
 	uint8_t air_cable1_in;
 
+	if (!freq)
+		freq = priv->rf_freq;	/* ignore zero frequency; keep last one */
+	else
+		priv->rf_freq = freq;
+
 	if(priv->sideband)
 		lo_freq = freq - priv->int_freq + priv->if_band_center_freq;
 	else
 		lo_freq = freq + priv->int_freq + priv->if_band_center_freq;
-
-	priv->rf_freq = freq;
 
 #if 0
 	fprintf(stderr, "%s(freq = %u) @ %s--> intfreq %u, ifcenter %d --> f %u\n"
