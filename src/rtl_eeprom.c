@@ -402,11 +402,21 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (manuf_str)
-		strncpy((char*)&conf.manufacturer, manuf_str, MAX_STR_SIZE);
+	if (manuf_str) {
+		int len = strlen(manuf_str);
+		if (len > MAX_STR_SIZE)
+			len = MAX_STR_SIZE;
+		memset(&conf.manufacturer[0], 0, MAX_STR_SIZE * sizeof(char));
+		memcpy(&conf.manufacturer[0], manuf_str,  len * sizeof(char));
+	}
 
-	if (product_str)
-		strncpy((char*)&conf.product, product_str, MAX_STR_SIZE);
+	if (product_str) {
+		int len = strlen(product_str);
+		if (len > MAX_STR_SIZE)
+			len = MAX_STR_SIZE;
+		memset(&conf.product[0], 0, MAX_STR_SIZE  * sizeof(char));
+		memcpy(&conf.product[0], product_str, len * sizeof(char));
+	}
 
 	if (manuf_id > 0)
 		conf.vendor_id = manuf_id;
@@ -415,8 +425,12 @@ int main(int argc, char **argv)
 		conf.product_id = product_id;
 
 	if (serial_str) {
+		int len = strlen(serial_str);
+		if (len > MAX_STR_SIZE)
+			len = MAX_STR_SIZE;
 		conf.have_serial = 1;
-		strncpy((char*)&conf.serial, serial_str, MAX_STR_SIZE);
+		memset(&conf.serial[0], 0, MAX_STR_SIZE * sizeof(char));
+		memcpy(&conf.serial[0], serial_str, len * sizeof(char));
 	}
 
 	if (ir_endpoint != 0)

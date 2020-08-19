@@ -153,7 +153,7 @@ void rtlsdr_rpc_msg_skip_safe(rtlsdr_rpc_msg_t* msg, size_t size)
   msg->off += size;
 }
 
-int rtlsdr_rpc_msg_pop_int(rtlsdr_rpc_msg_t* msg, int* x)
+int rtlsdr_rpc_msg_pop_int32(rtlsdr_rpc_msg_t* msg, int32_t* x)
 {
   return pop_uint32(msg, (uint32_t*)x);
 }

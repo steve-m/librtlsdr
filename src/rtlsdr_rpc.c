@@ -941,7 +941,7 @@ int rtlsdr_rpc_set_and_get_tuner_bandwidth(void* devp, uint32_t bw, uint32_t *ap
 
   if (rtlsdr_rpc_msg_push_uint32(q, dev->index)) goto on_error_1;
   if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)bw)) goto on_error_1;
-  if (rtlsdr_rpc_msg_push_uint32(q, (uint32_t)apply_bw)) goto on_error_1;
+  if (rtlsdr_rpc_msg_push_int32(q, (int32_t)apply_bw)) goto on_error_1;
 
   if (send_recv_msg(cli, q, r)) goto on_error_1;
 

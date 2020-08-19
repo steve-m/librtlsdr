@@ -795,15 +795,15 @@ static int handle_query
       uint32_t did;
       uint32_t bw;
       uint32_t applied_bw;
-      int apply_bw;
+      int32_t apply_bw;
 
       if (rtlsdr_rpc_msg_pop_uint32(q, &did)) goto on_error;
       if (rtlsdr_rpc_msg_pop_uint32(q, &bw)) goto on_error;
-      if (rtlsdr_rpc_msg_pop_uint32(q, &apply_bw)) goto on_error;
+      if (rtlsdr_rpc_msg_pop_int32(q, &apply_bw)) goto on_error;
 
       if ((rpcd->dev == NULL) || (rpcd->did != did)) goto on_error;
 
-      err = rtlsdr_set_and_get_tuner_bandwidth(rpcd->dev, bw, &applied_bw, apply_bw);
+      err = rtlsdr_set_and_get_tuner_bandwidth(rpcd->dev, bw, &applied_bw, (int)apply_bw);
       if (err) goto on_error;
       if (rtlsdr_rpc_msg_push_uint32(r, applied_bw)) goto on_error;
 
