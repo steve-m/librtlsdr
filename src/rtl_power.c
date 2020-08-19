@@ -96,7 +96,7 @@ struct tuning_state
 	int freq;
 	int rate;
 	int bin_e;
-	long *avg;  /* length == 2^bin_e */
+	int64_t *avg;  /* length == 2^bin_e */
 	int samples;
 	int downsample;
 	int downsample_passes;  /* for the recursive filter */
@@ -409,19 +409,19 @@ void rms_power(struct tuning_state *ts)
 	int i, s;
 	uint8_t *buf = ts->buf8;
 	int buf_len = ts->buf_len;
-	long p, t;
+	int64_t p, t;
 	double dc, err;
 
 	p = t = 0L;
 	for (i=0; i<buf_len; i++) {
 		s = (int)buf[i] - 127;
-		t += (long)s;
-		p += (long)(s * s);
+		t += (int64_t)s;
+		p += (int64_t)(s * s);
 	}
 	/* correct for dc offset in squares */
 	dc = (double)t / (double)buf_len;
 	err = t * 2 * dc - dc * dc * buf_len;
-	p -= (long)round(err);
+	p -= (int64_t)round(err);
 
 	if (!peak_hold) {
 		ts->avg[0] += p;
@@ -508,7 +508,7 @@ void frequency_range(char *arg, double crop)
 		ts->crop = crop;
 		ts->downsample = downsample;
 		ts->downsample_passes = downsample_passes;
-		ts->avg = (long*)malloc((1<<bin_e) * sizeof(long));
+		ts->avg = (int64_t*)malloc((1<<bin_e) * sizeof(int64_t));
 		if (!ts->avg) {
 			fprintf(stderr, "Error: malloc.\n");
 			exit(1);
@@ -579,11 +579,11 @@ void remove_dc(int16_t *data, int length)
 {
 	int i;
 	int16_t ave;
-	long sum = 0L;
+	int64_t sum = 0L;
 	for (i=0; i < length; i+=2) {
 		sum += data[i];
 	}
-	ave = (int16_t)(sum / (long)(length));
+	ave = (int16_t)(sum / (int64_t)(length));
 	if (ave == 0) {
 		return;}
 	for (i=0; i < length; i+=2) {
@@ -629,10 +629,10 @@ void downsample_iq(int16_t *data, int length)
 	//remove_dc(data+1, length-1);
 }
 
-long real_conj(int16_t real, int16_t imag)
+int64_t real_conj(int16_t real, int16_t imag)
 /* real(n * conj(n)) */
 {
-	return ((long)real*(long)real + (long)imag*(long)imag);
+	return ((int64_t)real*(int64_t)real + (int64_t)imag*(int64_t)imag);
 }
 
 void scanner(void)
@@ -718,7 +718,7 @@ void scanner(void)
 void csv_dbm(struct tuning_state *ts)
 {
 	int i, len, ds, i1, i2, bw2, bin_count;
-	long tmp;
+	int64_t tmp;
 	double dbm;
 	len = 1 << ts->bin_e;
 	ds = ts->downsample;
