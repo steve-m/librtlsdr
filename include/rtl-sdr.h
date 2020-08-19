@@ -536,6 +536,16 @@ RTLSDR_API int rtlsdr_ir_query(rtlsdr_dev_t *dev, uint8_t *buf, size_t buf_len);
 RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
 
 /*!
+ * Enable or disable the bias tee on the given GPIO pin.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param gpio the gpio pin to configure as a Bias T control.
+ * \param on  1 for Bias T on. 0 for Bias T off.
+ * \return -1 if device is not initialized. 0 otherwise.
+ */
+RTLSDR_API int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on);
+
+/*!
  * Sets multiple options from a string encoded like "bw=300:agc=0:gain=27.3:dagc=0:T=1".
  * this is a helper function, that programs don't need to implement every single option
  *   at the command line interface.
