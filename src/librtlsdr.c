@@ -243,6 +243,8 @@ struct rtlsdr_dev {
 	WSADATA  wsa;
 #endif
 
+	int biast_gpio_pin_no;
+
 	/* status */
 	int dev_lost;
 	int driver_active;
@@ -2813,6 +2815,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	pthread_mutex_init(&dev->cs_mutex, &dev->cs_mutex_attr);
 
 	dev->rtl_vga_control = 0;
+	dev->biast_gpio_pin_no = 0;
 
 	/* dev->softagc.command_thread; */
 	dev->softagc.agcState = SOFTSTATE_OFF;
@@ -3026,7 +3029,8 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 		return -1;
 
 	/* automatic de-activation of bias-T */
-	rtlsdr_set_bias_tee(dev, 0);
+	/* no: keep last bias-tee status, that rtl_biast hasn't to be called again */
+	/* rtlsdr_set_bias_tee(dev, 0); */
 
 	if(!dev->dev_lost) {
 		/* block until all async operations have been completed (if any) */
@@ -3846,7 +3850,10 @@ int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on)
 
 int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on)
 {
-	return rtlsdr_set_bias_tee_gpio(dev, 0, on);
+	if (!dev)
+		return -1;
+
+	return rtlsdr_set_bias_tee_gpio(dev, dev->biast_gpio_pin_no, on);
 }
 
 
@@ -3873,6 +3880,7 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t\t                        0: use I & Q; 1: use I; 2: use Q; 3: use I below threshold frequency;\n"
 		"\t\t                        4: use Q below threshold frequency (=RTL-SDR v3)\n"
 		"\t\t                        other values set the threshold frequency\n"
+		"\t\tTp=<gpio_pin>         set GPIO pin for Bias T, default =0 for rtl-sdr.com compatible V3\n"
 		"\t\tT=<bias_tee>          1 activates power at antenna one some dongles, e.g. rtl-sdr.com's V3\n"
 #ifdef WITH_UDP_SERVER
 		"\t\tport=<udp_port>       1 or tcp port number activates UDP server. default: 0.\n"
@@ -3999,6 +4007,12 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 			else
 				dev->direct_sampling_threshold = dm;
 			ret = rtlsdr_set_ds_mode(dev, dev->direct_sampling_mode, dev->direct_sampling_threshold);
+		}
+		else if (!strncmp(optPart, "tp=", 3) || !strncmp(optPart, "Tp=", 3) || !strncmp(optPart, "TP=", 3) ) {
+			int gpio_pin_no = atoi(optPart +3);
+			if (verbose)
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed bias tee GPIO pin %d\n", gpio_pin_no);
+			dev->biast_gpio_pin_no = gpio_pin_no;
 		}
 		else if (!strncmp(optPart, "t=", 2) || !strncmp(optPart, "T=", 2)) {
 			int on = atoi(optPart +2);
