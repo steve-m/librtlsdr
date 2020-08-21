@@ -247,6 +247,7 @@ struct rtlsdr_dev {
 	int dev_lost;
 	int driver_active;
 	unsigned int xfer_errors;
+	int i2c_repeater_on;
 	int rc_active;
 	int verbose;
 	int dev_num;
@@ -939,7 +940,16 @@ void rtlsdr_set_i2c_repeater(rtlsdr_dev_t *dev, int on)
 	if (on)
 		pthread_mutex_lock(&dev->cs_mutex);
 
-	rtlsdr_demod_write_reg(dev, 1, 0x01, on ? 0x18 : 0x10, 1);
+	/* hayguen: don't do early exit for mutex!
+	 * just skip rtlsdr_demod_write_reg() call
+	 * if (on == dev->i2c_repeater_on)
+	 *	return;
+	 */
+
+	if (on != dev->i2c_repeater_on) {
+		dev->i2c_repeater_on = on;
+		rtlsdr_demod_write_reg(dev, 1, 0x01, on ? 0x18 : 0x10, 1);
+	}
 
 	if (!on)
 		pthread_mutex_unlock(&dev->cs_mutex);
