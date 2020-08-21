@@ -325,7 +325,7 @@ void usage(void)
 		"\t[-F fir_size (default: off)]\n"
 		"\t	enables low-leakage downsample filter\n"
 		"\t	size can be 0 or 9.  0 has bad roll off\n"
-		"\t[-A std/fast/lut choose atan math (default: std)]\n"
+		"\t[-A std/fast/lut/ale choose atan math (default: std)]\n"
 #if 0
 		"\t[-C clip_path (default: off)\n"
 		"\t (create time stamped raw clips, requires squelch)\n"
@@ -948,6 +948,24 @@ int polar_disc_lut(int ar, int aj, int br, int bj)
 	return 0;
 }
 
+int esbensen(int ar, int aj, int br, int bj)
+/*
+  input signal: s(t) = a*exp(-i*w*t+p)
+  a = amplitude, w = angular freq, p = phase difference
+  solve w
+  s' = -i(w)*a*exp(-i*w*t+p)
+  s'*conj(s) = -i*w*a*a
+  s'*conj(s) / |s|^2 = -i*w
+*/
+{
+	int cj, dr, dj;
+	int scaled_pi = 2608; /* 1<<14 / (2*pi) */
+	dr = (br - ar) * 2;
+	dj = (bj - aj) * 2;
+	cj = bj*dr - br*dj; /* imag(ds*conj(s)) */
+	return (scaled_pi * cj / (ar*ar+aj*aj+1));
+}
+
 void fm_demod(struct demod_state *fm)
 {
 	int i, pcm;
@@ -967,6 +985,10 @@ void fm_demod(struct demod_state *fm)
 			break;
 		case 2:
 			pcm = polar_disc_lut(lp[i], lp[i+1],
+				lp[i-2], lp[i-1]);
+			break;
+		case 3:
+			pcm = esbensen(lp[i], lp[i+1],
 				lp[i-2], lp[i-1]);
 			break;
 		}
@@ -1918,6 +1940,8 @@ int main(int argc, char **argv)
 			if (strcmp("lut",  optarg) == 0) {
 				atan_lut_init();
 				demod.custom_atan = 2;}
+			if (strcmp("ale", optarg) == 0) {
+				demod.custom_atan = 3;}
 			break;
 		case 'M':
 			if (strcmp("nbfm",  optarg) == 0 || strcmp("nfm",  optarg) == 0 || strcmp("fm",  optarg) == 0) {
