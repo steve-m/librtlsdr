@@ -336,7 +336,7 @@ void usage(void)
 		"\n"
 		"Produces signed 16 bit ints, use Sox or aplay to hear them.\n"
 		"\trtl_fm ... | play -t raw -r 24k -es -b 16 -c 1 -V1 -\n"
-		"\t		   | aplay -r 24k -f S16_LE -t raw -c 1\n"
+		"\t		   | aplay -r 24000 -f S16_LE -t raw -c 1\n"
 		"\t  -M wbfm  | play -r 32k ... \n"
 		"\t  -s 22050 | multimon -t raw /dev/stdin\n\n"
 		, rtlsdr_get_opt_help(1) );
