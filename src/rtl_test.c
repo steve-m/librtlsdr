@@ -100,7 +100,7 @@ void usage(void)
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-d device_index or serial (default: 0)]\n"
 		"%s"
-		"\t[-t enable E4000 or R820T tuner range benchmark]\n"
+		"\t[-t enable tuner range benchmark]\n"
 #ifndef _WIN32
 		"\t[-p[seconds] enable PPM error measurement (default: 10 seconds)]\n"
 #endif
@@ -265,78 +265,160 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 		ppm_test(len);
 }
 
-void e4k_benchmark(void)
-{
-	uint32_t freq, gap_start = 0, gap_end = 0;
-	uint32_t range_start = 0, range_end = 0;
-
-	fprintf(stderr, "Benchmarking E4000 PLL...\n");
-
-	/* find tuner range start */
-	for (freq = MHZ(70); freq > MHZ(1); freq -= MHZ(1)) {
-		if (rtlsdr_set_center_freq(dev, freq) < 0) {
-			range_start = freq;
-			break;
-		}
-	}
-
-	/* find tuner range end */
-	for (freq = MHZ(2000); freq < MHZ(2300UL); freq += MHZ(1)) {
-		if (rtlsdr_set_center_freq(dev, freq) < 0) {
-			range_end = freq;
-			break;
-		}
-	}
-
-	/* find start of L-band gap */
-	for (freq = MHZ(1000); freq < MHZ(1300); freq += MHZ(1)) {
-		if (rtlsdr_set_center_freq(dev, freq) < 0) {
-			gap_start = freq;
-			break;
-		}
-	}
-
-	/* find end of L-band gap */
-	for (freq = MHZ(1300); freq > MHZ(1000); freq -= MHZ(1)) {
-		if (rtlsdr_set_center_freq(dev, freq) < 0) {
-			gap_end = freq;
-			break;
-		}
-	}
-
-	fprintf(stderr, "E4K range: %i to %i MHz\n",
-		range_start/MHZ(1) + 1, range_end/MHZ(1) - 1);
-
-	fprintf(stderr, "E4K L-band gap: %i to %i MHz\n",
-		gap_start/MHZ(1), gap_end/MHZ(1));
+/* smallest band or band gap that tuner_benchmark() will notice */
+static uint32_t max_step(uint32_t freq) {
+	if (freq < 1e6)
+		return 1e4;
+	if (freq > 1e8)
+		return 1e6;
+	return freq / 1e2;
 }
 
-void r820t_benchmark(void)
-{
-	uint32_t freq;
-	uint32_t range_start = 0, range_end = 0;
-
-	fprintf(stderr, "Benchmarking R820T PLL...\n");
-
-	/* find tuner range start */
-	for (freq = MHZ(30); freq > MHZ(1); freq -= MHZ(1)) {
-		if (rtlsdr_set_center_freq(dev, freq)) {
-			break;}
-		range_start = freq;
-	}
-
-	/* find tuner range end */
-	for (freq = MHZ(1750); freq < MHZ(1950UL); freq += MHZ(1)) {
-		if (rtlsdr_set_center_freq(dev, freq)) {
-			break;}
-		range_end = freq;
-	}
-
-	fprintf(stderr, "R820T range: %i to %i MHz\n",
-		range_start/MHZ(1), range_end/MHZ(1));
+/* precision with which tuner_benchmark() will measure the edges of bands */
+static uint32_t min_step(uint32_t freq) {
+	return 100;
 }
 
+static void report_band_start(uint32_t start) {
+	fprintf(stderr, "Found a new band starting at %u Hz\n", start);
+}
 
+static void report_band(uint32_t low, uint32_t high) {
+	fprintf(stderr, "Tuning band: %u - %u Hz\n", low, high);
+}
+
+void tuner_benchmark(void)
+{
+	uint32_t current = max_step(0);
+	uint32_t band_start = 0;
+	uint32_t low_bound = 0, high_bound = 0;
+	char buf[20];
+	enum { FIND_START, REFINE_START, FIND_END, REFINE_END } state;
+
+	fprintf(stderr, "Testing tuner range. This may take a couple of minutes..\n");
+
+	/* Scan for tuneable frequencies coarsely. When we find something,
+	 * do a binary search to narrow down the exact edge of the band.
+	 *
+	 * This can potentially miss bands/gaps smaller than max_step(freq)
+	 * but it is a lot faster than exhaustively scanning everything.
+	 */
+
+	/* handle bands starting at 0Hz */
+	if (rtlsdr_set_center_freq(dev, 0) < 0)
+		state = FIND_START;
+	else {
+		band_start = 0;
+		report_band_start(band_start);
+		state = FIND_END;
+	}
+
+	while (current < 3e9 && !do_exit) {
+		switch (state) {
+		case FIND_START:
+			/* scanning for the start of a new band */
+			if (rtlsdr_set_center_freq(dev, current) < 0) {
+				/* still looking for a band */
+				low_bound = current;
+				current += max_step(current);
+			} else {
+				/* new band, starting somewhere at or before current */
+				/* low_bound < start <= current */
+				high_bound = current;
+				state = REFINE_START;
+			}
+			break;
+
+		case REFINE_START:
+			/* refining the start of a band */
+			/* low_bound < bandstart <= high_bound */
+			if (rtlsdr_set_center_freq(dev, current) == 0) {
+				/* current is inside the band */
+				/* low_bound < bandstart <= current */
+				if (current - low_bound <= min_step(current)) {
+					/* start found at low_bound */
+					band_start = current;
+					report_band_start(band_start);
+					low_bound = current;
+					current = band_start + max_step(band_start);
+					state = FIND_END;
+				} else {
+					/* binary search */
+					high_bound = current;
+					current = (current + low_bound) / 2;
+				}
+			} else {
+				/* current is outside the band */
+				/* current < bandstart <= high_bound */
+				if (high_bound - current <= min_step(current)) {
+					/* start found at high_bound */
+					low_bound = band_start = high_bound;
+					report_band_start(band_start);
+					current = band_start + max_step(band_start);
+					state = FIND_END;
+				} else {
+					/* binary search */
+					low_bound = current;
+					current = (current + high_bound) / 2;
+				}
+			}
+			break;
+
+		case FIND_END:
+			/* scanning for the end of the current band */
+			if (rtlsdr_set_center_freq(dev, current) == 0) {
+				/* still looking for the end of the band */
+				low_bound = current;
+				current += max_step(current);
+			} else {
+				/* end found, coarsely */
+				/* low_bound <= bandend < current, refine it */
+				high_bound = current;
+				state = REFINE_END;
+			}
+			break;
+
+		case REFINE_END:
+			/* refining the end of a band */
+			/* low_bound <= bandend < high_bound */
+			if (rtlsdr_set_center_freq(dev, current) < 0) {
+				/* current is outside the band */
+				/* low_bound <= bandend < current */
+				if (current - low_bound <= min_step(current)) {
+					/* band ends at low_bound */
+					report_band(band_start, low_bound);
+					low_bound = current;
+					current = low_bound + max_step(low_bound);
+					state = FIND_START;
+				} else {
+					/* binary search */
+					high_bound = current;
+					current = (current + low_bound) / 2;
+				}
+			} else {
+				/* current is inside the band */
+				/* current <= bandend < high_bound */
+				if (high_bound - current <= min_step(current)) {
+					/* band ends at high_bound */
+					report_band(band_start, current);
+					low_bound = high_bound;
+					current = low_bound + max_step(low_bound);
+					state = FIND_START;
+				} else {
+					/* binary search */
+					low_bound = current;
+					current = (current + high_bound) / 2;
+				}
+			}
+			break;
+		}
+	}
+
+	if (state == FIND_END)
+		report_band(band_start, current);
+	else if (state == REFINE_END)
+		report_band(band_start, low_bound);
+}
 
 int main(int argc, char **argv)
 {
@@ -440,16 +522,7 @@ int main(int argc, char **argv)
 	}
 
 	if (test_mode == TUNER_BENCHMARK) {
-		switch (rtlsdr_get_tuner_type(dev)) {
-			case RTLSDR_TUNER_E4000:
-				e4k_benchmark();
-				break;
-			case RTLSDR_TUNER_R820T:
-				r820t_benchmark();
-				break;
-			default:
-			    fprintf(stderr, "No testable tuner found, aborting.\n");
-		}
+		tuner_benchmark();
 		goto exit;
 	}
 
