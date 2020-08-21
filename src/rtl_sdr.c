@@ -31,12 +31,11 @@
 #include "getopt/getopt.h"
 #endif
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
 #include "convenience/wavewrite.h"
-
-#include "rtl_app_ver.h"
 
 #define DEFAULT_SAMPLE_RATE		2048000
 #define DEFAULT_BANDWIDTH		0	/* automatic bandwidth */
@@ -51,18 +50,15 @@ static rtlsdr_dev_t *dev = NULL;
 
 void usage(void)
 {
-	fprintf(stderr, "rtl_sdr, an I/Q recorder for RTL2832 based receivers\n");
-	fprintf(stderr, "rtl_sdr version %u.%u %s (%s)\n",
-		APP_VER_MAJOR, APP_VER_MINOR,
-		APP_VER_ID, __DATE__ );
-	fprintf(stderr, "librtlsdr version %u.%u %s\n\n",
-		(unsigned)(rtlsdr_get_version() >> 16),
-		(unsigned)(rtlsdr_get_version() & 0xFFFFU),
-		rtlsdr_get_ver_id()
-		);
-
 	fprintf(stderr,
-		"Usage:\t -f frequency_to_tune_to [Hz]\n"
+		"rtl_sdr, an I/Q recorder for RTL2832 based SDR-receivers\n"
+		"rtl_sdr version %d.%d %s (%s)\n"
+		"rtl-sdr library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr,
+		"Usage:\trtl_sdr -f frequency_to_tune_to [Hz]\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-w tuner_bandwidth (default: automatic)]\n"
 		"\t[-d device_index or serial (default: 0)]\n"

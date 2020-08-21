@@ -81,12 +81,11 @@
 #include <pthread.h>
 #include <libusb.h>
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
 #include "convenience/wavewrite.h"
-
-#include "rtl_app_ver.h"
 
 #define DEFAULT_SAMPLE_RATE		24000
 #define DEFAULT_BUF_LENGTH		(1 * 16384)
@@ -257,18 +256,15 @@ struct cmd_state cmd;
 
 void usage(void)
 {
-	fprintf(stderr, "rtl_fm, a simple narrow band FM demodulator for RTL2832 based receivers\n");
-	fprintf(stderr, "rtl_fm version %u.%u %s (%s)\n",
-		APP_VER_MAJOR, APP_VER_MINOR,
-		APP_VER_ID, __DATE__ );
-	fprintf(stderr, "librtlsdr version %u.%u %s\n\n",
-		(unsigned)(rtlsdr_get_version() >> 16),
-		(unsigned)(rtlsdr_get_version() & 0xFFFFU),
-		rtlsdr_get_ver_id()
-		);
-
 	fprintf(stderr,
-		"Use:\trtl_fm -f freq [-options] [filename]\n"
+		"rtl_fm, a simple demodulator for RTL2832 based SDR-receivers\n"
+		"rtl_fm  version %d.%d %s (%s)\n"
+		"rtl-sdr library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr,
+		"Usage:\trtl_fm -f freq [-options] [filename]\n"
 		"\t-f frequency_to_tune_to [Hz]\n"
 		"\t	use multiple -f for scanning (requires squelch)\n"
 		"\t	ranges supported, -f 118M:137M:25k\n"

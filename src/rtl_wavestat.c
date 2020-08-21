@@ -42,10 +42,9 @@
   #endif
 #endif
 
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/waveread.h"
-
-#include "rtl_app_ver.h"
 
 
 static volatile int do_exit = 0;
@@ -54,10 +53,10 @@ static int verbosity = 0;
 
 void usage(void)
 {
-	fprintf(stderr, "rtl_wavestat, display wave file meta information\n");
-	fprintf(stderr, "rtl_wavestat version %u.%u %s (%s)\n",
-		APP_VER_MAJOR, APP_VER_MINOR,
-		APP_VER_ID, __DATE__ );
+	fprintf(stderr,
+		"rtl_wavestat, display wave file meta information\n"
+		"rtl_wavestat version %d.%d %s (%s)\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__ );
 	fprintf(stderr,
 		"Use:\trtl_wavestat [-options] <input_wave_filename>\n"
 		"\t-a  print all information\n"

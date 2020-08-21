@@ -47,7 +47,8 @@
 #include <math.h>
 #include <libusb.h>
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
 
@@ -70,8 +71,14 @@ struct dongle_state dongle;
 void usage(void)
 {
 	fprintf(stderr,
-		"rtl_ir\n\n"
-		"Use:\trtl_ir [-options]\n"
+		"rtl_ir, display received IR signals\n"
+		"rtl_ir  version %d.%d %s (%s)\n"
+		"rtl-sdr library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr,
+		"Usage:\trtl_ir [-options]\n"
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-w wait_usec]\tDelay to wait before each iteration (10000)\n"
 		"\t[-c max_count]\tMaximum number of loop iterations (0)\n"

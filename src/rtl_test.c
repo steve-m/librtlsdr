@@ -40,7 +40,8 @@
 #include "getopt/getopt.h"
 #endif
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
 
@@ -88,8 +89,14 @@ static unsigned int ppm_duration = PPM_DURATION;
 void usage(void)
 {
 	fprintf(stderr,
-		"rtl_test, a benchmark tool for RTL2832 based DVB-T receivers\n\n"
-		"Usage:\n"
+		"rtl_test, a benchmark tool for RTL2832 based SDR-receivers\n"
+		"rtl_test version %d.%d %s (%s)\n"
+		"rtl-sdr  library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr,
+		"Usage:\trtl_test [-options]\n"
 		"\t[-s samplerate (default: 2048000 Hz)]\n"
 		"\t[-d device_index or serial (default: 0)]\n"
 		"%s"

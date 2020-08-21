@@ -42,10 +42,9 @@
   #endif
 #endif
 
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/wavewrite.h"
-
-#include "rtl_app_ver.h"
 
 
 static volatile int do_exit = 0;
@@ -54,12 +53,12 @@ static int verbosity = 0;
 
 void usage(void)
 {
-	fprintf(stderr, "rtl_raw2wav, a raw (binary sampledata) to wave file converter\n");
-	fprintf(stderr, "rtl_raw2wav version %u.%u %s (%s)\n",
-		APP_VER_MAJOR, APP_VER_MINOR,
-		APP_VER_ID, __DATE__ );
 	fprintf(stderr,
-		"Use:\trtl_raw2wav -w <output_wave_filename> [-options] [input_raw_filename]\n"
+		"rtl_raw2wav, a raw (binary sampledata) to wave file converter\n"
+		"rtl_raw2wav version %d.%d %s (%s)\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__ );
+	fprintf(stderr,
+		"Usage:\trtl_raw2wav -w <output_wave_filename> [-options] [input_raw_filename]\n"
 		"\t-w filename     output filename\n"
 		"\t-f frequency    frequency, to write into output filename\n"
 		"\t-s samplerate   samplerate, of raw input\n"

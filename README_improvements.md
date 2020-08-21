@@ -75,7 +75,7 @@ against librtlsdr's development branch (same date)
 ## Tools
 
 * added rtl_ir:
- print received IR signals.
+ display received IR signals.
   * requires the IR diode of an RTL-SDR - which might not exist!
 
 * added rtl_rpcd:

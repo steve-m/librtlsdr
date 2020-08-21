@@ -78,7 +78,8 @@
 /* two raised to the power of n */
 #define TWO_POW(n)		((double)(1ULL<<(n)))
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "tuner_e4k.h"
 #include "tuner_fc0012.h"
 #include "tuner_fc0013.h"
@@ -4068,11 +4069,11 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 
 
 const char * rtlsdr_get_ver_id() {
-	return RTLSDRLIB_VER_ID " (" __DATE__ ")";
+	return APP_VER_ID " (" __DATE__ ")";
 }
 
 uint32_t rtlsdr_get_version() {
-	return ((uint32_t)RTLSDRLIB_VER_MAJOR << 16 ) | ((uint32_t)RTLSDRLIB_VER_MINOR );
+	return ((uint32_t)APP_VER_MAJOR << 16 ) | ((uint32_t)APP_VER_MINOR );
 }
 
 

@@ -24,6 +24,10 @@
 cmake_minimum_required(VERSION 2.6)
 project(rtlsdr C)
 
+# quite old cmake version - probably for compatibility with old OS versions?
+# see https://cmake.org/cmake/help/cmake2.6docs.html
+
+
 #select the release build type by default to get optimization flags
 if(NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE "Release")
@@ -45,9 +49,19 @@ OPTION(WITH_RPC "RPC for non-Windows" OFF)
 
 # Set the version information here
 set(VERSION_INFO_MAJOR_VERSION 0) # increment major on api compatibility changes
-set(VERSION_INFO_MINOR_VERSION 7) # increment minor on feature-level changes
+set(VERSION_INFO_MINOR_VERSION 8) # increment minor on feature-level changes
 set(VERSION_INFO_PATCH_VERSION git) # increment patch for bug fixes and docs
 include(Version) # setup version info
+
+########################################################################
+# Version defines to include in library and tools
+########################################################################
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rtl_app_ver.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/src/rtl_app_ver.h
+    @ONLY )
+
 
 if(PROVIDE_UDP_SERVER AND WIN32)
     add_definitions(-DWITH_UDP_SERVER)
@@ -116,6 +130,7 @@ endif()
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${LIBUSB_INCLUDE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/src
     ${THREADS_PTHREADS_INCLUDE_DIR}
 )
 

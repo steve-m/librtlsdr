@@ -66,7 +66,8 @@
 #include <pthread.h>
 #include <libusb.h>
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
 
@@ -123,8 +124,14 @@ int peak_hold = 0;
 void usage(void)
 {
 	fprintf(stderr,
-		"rtl_power, a simple FFT logger for RTL2832 based DVB-T receivers\n\n"
-		"Use:\trtl_power -f freq_range [-options] [filename]\n"
+		"rtl_power, a simple FFT logger for RTL2832 based SDR-receivers\n"
+		"rtl_power version %d.%d %s (%s)\n"
+		"rtl-sdr   library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr,
+		"Usage:\trtl_power -f freq_range [-options] [filename]\n"
 		"\t-f lower:upper:bin_size [Hz]\n"
 		"\t (bin size is a maximum, smaller more convenient bins\n"
 		"\t  will be used.  valid range 1Hz - 2.8MHz)\n"

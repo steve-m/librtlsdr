@@ -23,7 +23,7 @@ VS_VERSION_INFO VERSIONINFO
         VALUE "InternalName", "rtl-sdr.dll"
         VALUE "LegalCopyright", "Licensed under GPLv2"
         VALUE "OriginalFilename", "rtl-sdr.dll"
-        VALUE "ProductName", "osmocom rtl-sdr"
+        VALUE "ProductName", "github.com/librtlsdr/librtlsdr"
         VALUE "ProductVersion", "@VERSION@"
       END
     END

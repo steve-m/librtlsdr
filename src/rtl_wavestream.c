@@ -42,10 +42,9 @@
   #endif
 #endif
 
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/waveread.h"
-
-#include "rtl_app_ver.h"
 
 
 static volatile int do_exit = 0;
@@ -60,12 +59,12 @@ static uint8_t outBuffer[BLOCKLEN * sizeof(int32_t) * sizeof(int32_t)];
 
 void usage(void)
 {
-	fprintf(stderr, "rtl_wavestream, stream raw data (in specified format)\n");
-	fprintf(stderr, "rtl_wavestream version %u.%u %s (%s)\n",
-		APP_VER_MAJOR, APP_VER_MINOR,
-		APP_VER_ID, __DATE__ );
 	fprintf(stderr,
-		"Use:\trtl_wavestream [-options] <input_wave_filename>\n"
+		"rtl_wavestream, stream raw data (in specified format)\n"
+		"rtl_wavestream version %d.%d %s (%s)\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__ );
+	fprintf(stderr,
+		"Usage:\trtl_wavestream [-options] <input_wave_filename>\n"
 		"\t-f <fmt>  sample format for output. default = input format\n"
 		"\t            supported formats: 'PCM16'/'PCM' or 'FLOAT32'/'FLOAT'\n"
 		"\t-w  input file\n"

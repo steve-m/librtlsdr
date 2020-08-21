@@ -30,11 +30,6 @@ extern "C" {
 #include <rtl-sdr_export.h>
 
 
-#define RTLSDRLIB_VER_MAJOR	0
-#define RTLSDRLIB_VER_MINOR	7
-#define RTLSDRLIB_VER_ID		"github.com/hayguen"
-
-
 typedef struct rtlsdr_dev rtlsdr_dev_t;
 
 RTLSDR_API uint32_t rtlsdr_get_device_count(void);
@@ -608,9 +603,9 @@ RTLSDR_API int rtlsdr_set_tuner_i2c_override(rtlsdr_dev_t *dev, unsigned i2c_reg
 
 
 /*!
- * request version id string to identify source of library
+ * request version id string to identify source and date of library
  *
- * \return pointer to C string, e.g. "github.com/librtlsdr" or "github.com/hayguen" or .. with build date
+ * \return pointer to C string, e.g. "github.com/librtlsdr" or "github.com/hayguen" or .. with build date (in parantheses)
  *   string keeps owned by library
  */
 RTLSDR_API const char * rtlsdr_get_ver_id();

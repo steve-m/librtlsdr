@@ -28,7 +28,8 @@
 #include "getopt/getopt.h"
 #endif
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
 
@@ -37,11 +38,17 @@ static rtlsdr_dev_t *dev = NULL;
 void usage(void)
 {
 	fprintf(stderr,
-		"rtl_biast, a tool for turning the RTL-SDR.com \n"
-		"bias tee or any GPIO ON and OFF. Example to turn on the \n"
-		"bias tee: rtl_biast -d 0 -b 1\n"
-		"Any GPIO: rtl_biast -d 0 -g 1 -b 1\n\n"
-		"Usage:\n"
+		"rtl_biast, a tool for switching the RTL-SDR.com\n"
+		"bias tee or any GPIO ON and OFF. Example to activate\n"
+		"the bias tee: rtl_biast -d 0 -b 1\n"
+		"Any GPIO:     rtl_biast -d 0 -g 1 -b 1\n"
+		"rtl_biast version %d.%d %s (%s)\n"
+		"rtl-sdr   library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr,
+		"Usage:\trtl_biast [-options]\n"
 		"\t[-d device_index (default: 0)]\n"
 		"\t[-b bias_on (default: 0)]\n"
 		"\t[-g GPIO select (default: 0)]\n");

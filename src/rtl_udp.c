@@ -43,12 +43,11 @@
 #endif
 #include <pthread.h>
 
-#include "rtl-sdr.h"
-#include "rtl_tcp.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
+#include <rtl_tcp.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
-
-#include "rtl_app_ver.h"
 
 #ifdef _WIN32
 #pragma comment(lib, "ws2_32.lib")
@@ -99,17 +98,14 @@ static volatile int do_exit = 0;
 
 void usage(void)
 {
-	fprintf(stderr, "rtl_udp, an I/Q spectrum server for RTL2832 based receivers\n");
-	fprintf(stderr, "rtl_udp version %u.%u %s (%s)\n",
-		APP_VER_MAJOR, APP_VER_MINOR,
-		APP_VER_ID, __DATE__ );
-	fprintf(stderr, "librtlsdr version %u.%u %s\n\n",
-		(unsigned)(rtlsdr_get_version() >> 16),
-		(unsigned)(rtlsdr_get_version() & 0xFFFFU),
-		rtlsdr_get_ver_id()
-		);
-
-	fprintf(stderr, "Usage:\t[-a listen address]\n"
+	fprintf(stderr,
+		"rtl_udp, an I/Q spectrum server for RTL2832 based SDR-receivers\n"
+		"rtl_udp version %d.%d %s (%s)\n"
+		"rtl-sdr library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr, "Usage:\trtl_udp [-a listen address]\n"
 		"\t[-p listen port (default: 1234)]\n"
 		"\t[-I infrared sensor listen port (default: 0=none)]\n"
 		"\t[-W infrared sensor query wait interval usec (default: 10000)]\n"

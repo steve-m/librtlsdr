@@ -15,7 +15,9 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <pthread.h>
+
 #include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "rtlsdr_rpc_msg.h"
 
 
@@ -1122,9 +1124,15 @@ static int do_rpcd(rpcd_t* rpcd)
 
 void usage(void)
 {
+	fprintf(stderr,
+		"rtl_rpcd, a Remote Procedure Call server for RTL2832 based SDR-receivers\n"
+		"rtl_rpcd version %d.%d %s (%s)\n"
+		"rtl-sdr  library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
   fprintf(stderr,
-    "rtl_rpcd, a Remote Procedure Call server for RTL-SDR dongles\n\n"
-    "Use:\trtl_rpcd [-options]\n"
+    "Usage:\trtl_rpcd [-options]\n"
     "\t[-a address]\tAddress to listen on (default: 0.0.0.0 for all), or RTLSDR_RPC_SERV_ADDR\n"
     "\t[-p port]\tPort number to listen on (default: 40000), or RTLSDR_RPC_SERV_PORT\n"
     "\t[-I port_ir]\tinfrared sensor listen port (default: 0=none)\n"

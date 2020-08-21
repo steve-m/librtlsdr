@@ -43,7 +43,8 @@
 #include <pthread.h>
 #include <libusb.h>
 
-#include "rtl-sdr.h"
+#include <rtl-sdr.h>
+#include <rtl_app_ver.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
 
@@ -91,8 +92,14 @@ int adsb_frame[14];
 void usage(void)
 {
 	fprintf(stderr,
-		"rtl_adsb, a simple ADS-B decoder\n\n"
-		"Use:\trtl_adsb [-R] [-g gain] [-p ppm] [output file]\n"
+		"rtl_adsb, a simple ADS-B decoder\n"
+		"rtl_adsb version %d.%d %s (%s)\n"
+		"rtl-sdr  library %d.%d %s\n\n",
+		APP_VER_MAJOR, APP_VER_MINOR, APP_VER_ID, __DATE__,
+		rtlsdr_get_version() >>16, rtlsdr_get_version() & 0xFFFF,
+		rtlsdr_get_ver_id() );
+	fprintf(stderr,
+		"Usage:\trtl_adsb [-R] [-g gain] [-p ppm] [output file]\n"
 		"\t[-d device_index or serial (default: 0)]\n"
 		"\t[-V verbove output (default: off)]\n"
 		"\t[-S show short frames (default: off)]\n"
