@@ -3336,7 +3336,7 @@ static int softagc(rtlsdr_dev_t *dev, unsigned char *buf, int len)
 			break;
 		case SOFTAGC_AUTO_ATTEN:
 		case SOFTAGC_AUTO:
-			agc->agcState == SOFTSTATE_ON;
+			agc->agcState = SOFTSTATE_ON;
 			return 1;
 		}
 	}

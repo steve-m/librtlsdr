@@ -1587,7 +1587,7 @@ static void *controller_thread_fn(void *arg)
 			/* 1- set center frequency */
 			if (c->prevFreq != dongle.freq) {
 				rtlsdr_set_center_freq(dongle.dev, dongle.freq);
-				c->prevFreq != dongle.freq;
+				c->prevFreq = dongle.freq;
 			}
 			/* 2- Set the tuner gain */
 			if (c->prevGain != c->gain) {
