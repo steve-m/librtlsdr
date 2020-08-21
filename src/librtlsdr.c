@@ -2907,7 +2907,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->dev_lost = 0;
 
 	/* Probe tuners */
-	rtlsdr_set_i2c_repeater(dev, 1);
+	rtlsdr_set_i2c_repeater(dev, 1);  /* C++ style RAII would be fine! */
 
 	reg = rtlsdr_i2c_read_reg(dev, E4K_I2C_ADDR, E4K_CHECK_ADDR);
 	if (reg == E4K_CHECK_VAL) {
