@@ -31,6 +31,7 @@
 #include "tuner_r82xx.h"
 
 #define WITH_ASYM_FILTER	0
+#define PRINT_PLL_ERRORS	0
 
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
@@ -802,7 +803,9 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 #endif
 
 	if (nint > ((128 / vco_power_ref) - 1)) {
+#if PRINT_PLL_ERRORS
 		fprintf(stderr, "[R82XX] No valid PLL values for %u Hz!\n", freq);
+#endif
 		return -1;
 	}
 
@@ -848,10 +851,12 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	}
 
 	if (!(data[2] & 0x40)) {
+#if PRINT_PLL_ERRORS
 		fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
 			freq, priv->rf_freq);
+#endif
 		priv->has_lock = 0;
-		return 0;
+		return -1;
 	}
 #if 0
 	else
@@ -1605,8 +1610,10 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 	}
 
 err:
+#if PRINT_PLL_ERRORS
 	if (rc < 0)
 		fprintf(stderr, "%s: failed=%d\n", __FUNCTION__, rc);
+#endif
 	return rc;
 }
 

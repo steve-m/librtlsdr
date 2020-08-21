@@ -280,11 +280,13 @@ static uint32_t min_step(uint32_t freq) {
 }
 
 static void report_band_start(uint32_t start) {
-	fprintf(stderr, "Found a new band starting at %u Hz\n", start);
+	if (start)
+		fprintf(stderr, "Found a new band starting at %u Hz\n", start);
 }
 
 static void report_band(uint32_t low, uint32_t high) {
-	fprintf(stderr, "Tuning band: %u - %u Hz\n", low, high);
+	if ( low != high && low )
+		fprintf(stderr, "Tuning band: %u - %u Hz\n\n", low, high);
 }
 
 void tuner_benchmark(void)
