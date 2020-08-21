@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <libusb.h>
+
 #ifdef __APPLE__
 #include <sys/time.h>
 #else
@@ -289,11 +291,35 @@ static void report_band(uint32_t low, uint32_t high) {
 		fprintf(stderr, "Tuning band: %u - %u Hz\n\n", low, high);
 }
 
+
+static int set_center_freq_wait(rtlsdr_dev_t *dev, uint32_t freq, const char * state_text) {
+	int rcA, rcB;
+	rcA = rtlsdr_set_center_freq(dev, freq);
+	if ( rcA == LIBUSB_ERROR_NO_DEVICE ) {
+		fprintf(stderr, "%s: Got Error -4 for frequency %u .. retry after wait ..\n", state_text, (unsigned)freq);
+#ifdef _WIN32
+		Sleep(5);
+#else
+		usleep(5000);
+#endif
+		rcB = rtlsdr_set_center_freq(dev, freq);
+		if ( rcB == LIBUSB_ERROR_NO_DEVICE ) {
+			fprintf(stderr, "%s: Got Error -4 .. again. Giving Up!\n", state_text);
+			return rcB;
+		}
+		fprintf(stderr, "%s: Now return code %d at retry.\n", state_text, rcB);
+		return rcB;
+	}
+	return rcA;
+}
+
+
 void tuner_benchmark(void)
 {
 	uint32_t current = max_step(0);
 	uint32_t band_start = 0;
 	uint32_t low_bound = 0, high_bound = 0;
+	int rc;
 	char buf[20];
 	enum { FIND_START, REFINE_START, FIND_END, REFINE_END } state;
 
@@ -307,7 +333,8 @@ void tuner_benchmark(void)
 	 */
 
 	/* handle bands starting at 0Hz */
-	if (rtlsdr_set_center_freq(dev, 0) < 0)
+	rc = set_center_freq_wait(dev, 0, "FIND_START");
+	if (rc < 0)
 		state = FIND_START;
 	else {
 		band_start = 0;
@@ -319,7 +346,12 @@ void tuner_benchmark(void)
 		switch (state) {
 		case FIND_START:
 			/* scanning for the start of a new band */
-			if (rtlsdr_set_center_freq(dev, current) < 0) {
+			rc = set_center_freq_wait(dev, current, "FIND_START");
+			if (rc < 0) {
+				if ( rc == LIBUSB_ERROR_NO_DEVICE ) {
+					do_exit = 1;
+					break;
+				}
 				/* still looking for a band */
 				low_bound = current;
 				current += max_step(current);
@@ -334,7 +366,8 @@ void tuner_benchmark(void)
 		case REFINE_START:
 			/* refining the start of a band */
 			/* low_bound < bandstart <= high_bound */
-			if (rtlsdr_set_center_freq(dev, current) == 0) {
+			rc = set_center_freq_wait(dev, current, "REFINE_START");
+			if (rc == 0) {
 				/* current is inside the band */
 				/* low_bound < bandstart <= current */
 				if (current - low_bound <= min_step(current)) {
@@ -350,6 +383,10 @@ void tuner_benchmark(void)
 					current = (current + low_bound) / 2;
 				}
 			} else {
+				if ( rc == LIBUSB_ERROR_NO_DEVICE ) {
+					do_exit = 1;
+					break;
+				}
 				/* current is outside the band */
 				/* current < bandstart <= high_bound */
 				if (high_bound - current <= min_step(current)) {
@@ -368,11 +405,16 @@ void tuner_benchmark(void)
 
 		case FIND_END:
 			/* scanning for the end of the current band */
-			if (rtlsdr_set_center_freq(dev, current) == 0) {
+			rc = set_center_freq_wait(dev, current, "FIND_END");
+			if (rc == 0) {
 				/* still looking for the end of the band */
 				low_bound = current;
 				current += max_step(current);
 			} else {
+				if ( rc == LIBUSB_ERROR_NO_DEVICE ) {
+					do_exit = 1;
+					break;
+				}
 				/* end found, coarsely */
 				/* low_bound <= bandend < current, refine it */
 				high_bound = current;
@@ -383,7 +425,12 @@ void tuner_benchmark(void)
 		case REFINE_END:
 			/* refining the end of a band */
 			/* low_bound <= bandend < high_bound */
-			if (rtlsdr_set_center_freq(dev, current) < 0) {
+			rc = set_center_freq_wait(dev, current, "REFINE_END");
+			if (rc < 0) {
+				if ( rc == LIBUSB_ERROR_NO_DEVICE ) {
+					do_exit = 1;
+					break;
+				}
 				/* current is outside the band */
 				/* low_bound <= bandend < current */
 				if (current - low_bound <= min_step(current)) {
@@ -415,6 +462,9 @@ void tuner_benchmark(void)
 			break;
 		}
 	}
+
+	if ( rc == LIBUSB_ERROR_NO_DEVICE )
+		return;
 
 	if (state == FIND_END)
 		report_band(band_start, current);
