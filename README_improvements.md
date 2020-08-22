@@ -17,7 +17,7 @@ against librtlsdr's development branch (same date)
   * the IDs can be programmed with 'rtl_eeprom -n' or 'rtl_eeprom -g realtek_sdr'
   * see https://www.rtl-sdr.com/watching-dvb-t-tv-and-using-sdr-mode-at-the-same-time-with-two-rtl-sdrs/
 
-* added support for using RTLSDR-Dongle from remote - see rtl_rpcd
+* added support for using RTLSDR-Dongle from remote - see rtl_rpcd and README.rtlsdr_rpc
 
 * improvements for R820T/2 tuner
   also see https://codingspirit.de/librtlsdr-driver.pdf
@@ -72,7 +72,7 @@ against librtlsdr's development branch (same date)
 * added rtlsdr_get_version()
 
 
-## Tools
+## Added Tools
 
 * added rtl_ir:
  display received IR signals.
@@ -98,6 +98,24 @@ against librtlsdr's development branch (same date)
 * added rtl_wavestream:
  stream raw data (in specified format)
 
+
+## Improved Tools
+
+* rtl_fm:
+  * added command file option '-C', which can trigger actions depending on signal.
+    have a look at README.rtlfm_cmdfile.
+  * added command line interface option '-E rdc', to enable dc blocking on raw I/Q data at capture rate
+  * added CLI option '-E rtlagc', to enable rtl2832's digital agc
+  * added CLI option '-E bclo', to use tuner bandwidths low  corner as band center
+  * added CLI option '-E bchi', to use tuner bandwidths high corner as band center
+  * added CLI option '-O', to set RTL driver options seperated with ':', e.g. -O 'bc=30000:agc=0'
+  * added CLI option '-R', to specify number of seconds to run
+  * added CLI option '-H', to write wave Header to file, producing a wave file with meta information,
+    compatible with several SDR programs
+  * added CLI option '-o', to request oversampling (4 recommended) for processing gain
+
+* not just rtl_fm, but many tools have more options.
+ compare all the details by starting with command line option '-h'.
 
 
 ## "Driver" Library's UDP-Server - only on Windows
