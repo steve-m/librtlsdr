@@ -31,6 +31,9 @@
 #include <tuner_e4k.h>
 #include <rtlsdr_i2c.h>
 
+#define PRINT_PLL_ERRORS	0
+
+
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 /* If this is defined, the limits are somewhat relaxed compared to what the
@@ -587,7 +590,9 @@ int e4k_tune_freq(struct e4k_state *e4k, uint32_t freq)
 	/* check PLL lock */
 	rc = e4k_reg_read(e4k, E4K_REG_SYNTH1);
 	if (!(rc & 0x01)) {
+#if PRINT_PLL_ERRORS
 		fprintf(stderr, "[E4K] PLL not locked for %u Hz!\n", freq);
+#endif
 		return -1;
 	}
 
