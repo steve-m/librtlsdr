@@ -278,7 +278,10 @@ static const uint8_t r82xx_init_array[] = {
 	0xdb, /* Reg 0x0a */
 	0x6b,	/* Reg 0x0b */
 
-	0xf0, /* Reg 0x0c */
+	/* Reg 0x0c:
+	 * for manual gain was: set fixed VGA gain for now (16.3 dB): 0x08
+	 * with active agc was: set fixed VGA gain for now (26.5 dB): 0x0b */
+	0xfb, /* Reg 0x0c */
 	0x53, /* Reg 0x0d */
 	0x75, /* Reg 0x0e */
 	0x68,	/* Reg 0x0f */
@@ -1162,8 +1165,11 @@ int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control
 	if ( 0 == if_mode || 10016 == if_mode ) {
 		vga_gain_idx = 0x10;
 	}
-	else if ( -5000 <= if_mode && if_mode < 5000 ) {
+	else if ( -2500 <= if_mode && if_mode <= 2500 ) {
 		vga_gain_idx = r82xx_get_if_gain_index(if_mode);
+	}
+	else if ( 2500 < if_mode && if_mode < 10000 ) {
+		vga_gain_idx = r82xx_get_if_gain_index(if_mode - 5000);
 	}
 	else if ( 10000 <= if_mode && if_mode < 10016 ) {
 		vga_gain_idx = if_mode -10000;
