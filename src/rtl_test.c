@@ -57,6 +57,9 @@
 #define PPM_DURATION			10
 #define PPM_DUMP_TIME			5
 
+#define DETAILED_LOST_MSG		0
+
+
 struct time_generic
 /* holds all the platform specific values */
 {
@@ -83,6 +86,7 @@ static rtlsdr_dev_t *dev = NULL;
 
 static uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 
+static uint32_t bufferNo = 0;
 static uint32_t total_samples = 0;
 static uint32_t dropped_samples = 0;
 
@@ -117,7 +121,7 @@ BOOL WINAPI
 sighandler(int signum)
 {
 	if (CTRL_C_EVENT == signum) {
-		fprintf(stderr, "Signal caught, exiting!\n");
+		fprintf(stderr, "\nSignal caught, exiting!\n");
 		do_exit = 1;
 		rtlsdr_cancel_async(dev);
 		return TRUE;
@@ -127,7 +131,7 @@ sighandler(int signum)
 #else
 static void sighandler(int signum)
 {
-	fprintf(stderr, "Signal caught, exiting!\n");
+	fprintf(stderr, "\nSignal caught, exiting!\n");
 	do_exit = 1;
 	rtlsdr_cancel_async(dev);
 }
@@ -137,6 +141,10 @@ static void underrun_test(unsigned char *buf, uint32_t len, int mute)
 {
 	uint32_t i, lost = 0;
 	static uint8_t bcnt, uninit = 1;
+#if DETAILED_LOST_MSG
+	uint32_t n_incont = 0, first_incont_sample = 0;
+	uint8_t err_from, err_to;
+#endif
 
 	if (uninit) {
 		bcnt = buf[0];
@@ -144,10 +152,17 @@ static void underrun_test(unsigned char *buf, uint32_t len, int mute)
 	}
 	for (i = 0; i < len; i++) {
 		if(bcnt != buf[i]) {
+#if DETAILED_LOST_MSG
+			if (!first_incont_sample) {
+				first_incont_sample = 1 + i;
+				err_from = bcnt;
+				err_to = buf[i];
+			}
+			++n_incont;
+#endif
 			lost += (buf[i] > bcnt) ? (buf[i] - bcnt) : (bcnt - buf[i]);
 			bcnt = buf[i];
 		}
-
 		bcnt++;
 	}
 
@@ -156,8 +171,17 @@ static void underrun_test(unsigned char *buf, uint32_t len, int mute)
 	if (mute)
 		return;
 	if (lost)
-		printf("lost at least %d bytes\n", lost);
-
+		printf("lost at least %3u bytes in buffer %u"
+#if DETAILED_LOST_MSG
+			" in %u incontinuities at byte %4u switching from %3u to %3u"
+#endif
+			"\n", (unsigned)lost, (unsigned)bufferNo
+#if DETAILED_LOST_MSG
+			, (unsigned)n_incont, (unsigned)(first_incont_sample-1)
+			, (unsigned)err_from, (unsigned)err_to
+#endif
+			);
+	++bufferNo;
 }
 
 #ifndef _WIN32
@@ -619,11 +643,11 @@ int main(int argc, char **argv)
 	}
 
 	if (do_exit) {
-		fprintf(stderr, "\nUser cancel, exiting...\n");
+		fprintf(stderr, "\nUser cancel after %u buffers, exiting...\n", (unsigned)bufferNo );
 		fprintf(stderr, "Samples per million lost (minimum): %i\n", (int)(1000000L * dropped_samples / total_samples));
 	}
 	else
-		fprintf(stderr, "\nLibrary error %d, exiting...\n", r);
+		fprintf(stderr, "\nLibrary error %d after %u buffers, exiting...\n", r, (unsigned)bufferNo);
 
 exit:
 	rtlsdr_close(dev);

@@ -3455,6 +3455,7 @@ static int _rtlsdr_alloc_async_buffers(rtlsdr_dev_t *dev)
 
 	/* no zero-copy available, allocate buffers in userspace */
 	if (!dev->use_zerocopy) {
+		fprintf(stderr, "Allocating %d (non-zero-copy) user-space buffers\n", dev->xfer_buf_num);
 		for (i = 0; i < dev->xfer_buf_num; ++i) {
 			dev->xfer_buf[i] = malloc(dev->xfer_buf_len);
 
