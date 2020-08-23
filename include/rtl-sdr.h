@@ -299,6 +299,7 @@ RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
  * \param lna_gain index in 0 .. 15: 0 == min;   see tuner_r82xx.c table r82xx_lna_gain_steps[]
  * \param mixer_gain index in 0 .. 15: 0 == min; see tuner_r82xx.c table r82xx_mixer_gain_steps[]
  * \param vga_gain index in 0 .. 15: 0 == -12 dB; 15 == 40.5 dB; => 3.5 dB/step;
+ *        vga_gain index 16 activates AGC for VGA controlled from RTL2832
  *     see tuner_r82xx.c table r82xx_vga_gain_steps[]
  * \return 0 on success
  */
@@ -325,20 +326,22 @@ RTLSDR_API int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain);
 RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
 
 /*!
- * Set the agc_variant for automatic gain mode for the device.
+ * Set the agc_variant for automatic gain mode for the device (only R820T/2).
  * Automatic gain mode must be enabled for the gain setter function to work.
  *
  * \param dev the device handle given by rtlsdr_open()
  * \param if_mode:
- *         0           for automatic VGA
- *     -5000 .. +5000  value range - except 0 - for fixed IF gain in tenths of a dB, 115 means 11.5 dB.
+ *         0           set automatic VGA, which is controlled from RTL2832
+ *     -2500 .. +2500: set fixed IF gain in tenths of a dB, 115 means 11.5 dB.
  *                     use -1 or +1 in case you neither want attenuation nor gain.
  *                     this equals the VGA gain for R820T/2 tuner.
- *                     accepted values are in range -47 .. 408 in tenth of a dB == -4.7 .. +40.8 dB.
- *                     the exact values may slightly change with better measured values.
- *     10008           for fixed VGA (=default)
+ *                     exact values (R820T/2) are in range -47 .. 408 in tenth of a dB,
+ *                       giving -4.7 .. +40.8 dB. these exact values may slightly change
+ *                       with better measurements.
  *     10000 .. 10015: IF gain == VGA index from parameter if_mode
  *                     set if_mode by index: index := VGA_idx +10000
+ *     10016:          same as 0; set automatic VGA
+ *     10011:          for fixed VGA (=default) of -12 dB + 11 * 3.5 dB = 26.5 dB
  * 
  * \return 0 on success
  */
