@@ -95,6 +95,8 @@
 #endif
 #include <signal.h>
 
+#define LOG_API_CALLS			0
+#define LOG_API_SET_FREQ		0
 
 #define INIT_R820T_TUNER_GAIN	0
 
@@ -1135,6 +1137,10 @@ int rtlsdr_set_xtal_freq(rtlsdr_dev_t *dev, uint32_t rtl_freq, uint32_t tuner_fr
 {
 	int r = 0;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_xtal_freq(rtl_freq %u, tuner_freq %u)\n", (unsigned)rtl_freq, (unsigned)tuner_freq);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1178,6 +1184,10 @@ int rtlsdr_set_xtal_freq(rtlsdr_dev_t *dev, uint32_t rtl_freq, uint32_t tuner_fr
 
 int rtlsdr_get_xtal_freq(rtlsdr_dev_t *dev, uint32_t *rtl_freq, uint32_t *tuner_freq)
 {
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_get_xtal_freq(rtl_freq, tuner_freq)\n");
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1326,6 +1336,11 @@ int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data, uint8_t offset, uint16_
 int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 {
 	int r = -1;
+
+	#if LOG_API_CALLS && LOG_API_SET_FREQ
+	fprintf(stderr, "LOG: rtlsdr_set_center_freq(freq %u)\n", (unsigned)freq);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1372,6 +1387,11 @@ uint32_t rtlsdr_get_center_freq(rtlsdr_dev_t *dev)
 int rtlsdr_set_freq_correction(rtlsdr_dev_t *dev, int ppm)
 {
 	int r = 0;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_freq_correction(ppm %d)\n", ppm);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1525,6 +1545,10 @@ int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw, uint32_t 
 {
 	int r = 0;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_and_get_tuner_bandwidth(bw %u Hz, apply_bw %d)\n", (unsigned)bw, apply_bw);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1560,6 +1584,11 @@ int rtlsdr_set_and_get_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw, uint32_t 
 int rtlsdr_set_tuner_bandwidth(rtlsdr_dev_t *dev, uint32_t bw )
 {
 	uint32_t applied_bw = 0;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_bandwidth(bw %u Hz)\n", (unsigned)bw);
+	#endif
+
 	return rtlsdr_set_and_get_tuner_bandwidth(dev, bw, &applied_bw, 1 /* =apply_bw */ );
 }
 
@@ -1568,6 +1597,11 @@ int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_center_freq 
 	int r = -1;
 	if (!dev || !dev->tuner || !dev->tuner->set_bw_center)
 		return -1;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_band_center(if_band_center_freq %d Hz)\n", (int)if_band_center_freq);
+	#endif
+
 	return dev->tuner->set_bw_center(dev, if_band_center_freq);
 }
 
@@ -1575,6 +1609,10 @@ int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_center_freq 
 int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
 {
 	int r = 0;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_gain(%d /10 dB)\n", gain);
+	#endif
 
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
@@ -1602,6 +1640,11 @@ int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, i
 	if (!dev || ( dev->tuner_type != RTLSDR_TUNER_R820T && dev->tuner_type != RTLSDR_TUNER_R828D ) )
 		return -1;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_gain_ext(indexes 0 .. 15: lna %d, mixer %d, vga %d)\n",
+		lna_gain, mixer_gain, vga_gain );
+	#endif
+
 	if (dev->tuner->set_gain) {
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = r820t_set_gain_ext((void *)dev, lna_gain, mixer_gain, vga_gain);
@@ -1617,6 +1660,10 @@ int rtlsdr_set_tuner_if_mode(rtlsdr_dev_t *dev, int if_mode)
 
 	if (!dev || ( dev->tuner_type != RTLSDR_TUNER_R820T && dev->tuner_type != RTLSDR_TUNER_R828D ) )
 		return -1;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_if_mode(if_mode %d)\n", if_mode);
+	#endif
 
 	if (dev->tuner->set_gain) {
 		rtlsdr_set_i2c_repeater(dev, 1);
@@ -1652,6 +1699,11 @@ int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain)
 {
 	int r = 0;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_if_gain(stage %d, gain %d /10 dB)\n",
+		stage, gain );
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1675,6 +1727,11 @@ int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain)
 int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int mode)
 {
 	int r = 0;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_gain_mode(mgc mode %d => agc %d)\n",
+		mode, (mode ? 0 : 1) );
+	#endif
 
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
@@ -1707,6 +1764,11 @@ int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband)
 
 	if (!dev || !dev->tuner)
 		return -1;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_tuner_sideband(sideband %d '%s')\n",
+		sideband, (sideband ? "Upper" : "Lower") );
+	#endif
 
 	if (dev->tuner->set_sideband) {
 		if ( devt->verbose )
@@ -1826,6 +1888,10 @@ int rtlsdr_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 	uint32_t rsamp_ratio, real_rsamp_ratio;
 	double real_rate;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_sample_rate(samp_rate %u)\n", (unsigned)samp_rate);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1901,6 +1967,10 @@ uint32_t rtlsdr_get_sample_rate(rtlsdr_dev_t *dev)
 
 int rtlsdr_set_testmode(rtlsdr_dev_t *dev, int on)
 {
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_testmode(on %d)\n", on);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1916,6 +1986,10 @@ int rtlsdr_set_testmode(rtlsdr_dev_t *dev, int on)
 
 int rtlsdr_set_agc_mode(rtlsdr_dev_t *dev, int on)
 {
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_agc_mode(on %d for digital AGC in RTL2832)\n", on);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1932,6 +2006,10 @@ int rtlsdr_set_agc_mode(rtlsdr_dev_t *dev, int on)
 int rtlsdr_set_direct_sampling(rtlsdr_dev_t *dev, int on)
 {
 	int r = 0;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_direct_sampling(on %d - 1 = I-ADC, 2 = Q-ADC)\n", on);
+	#endif
 
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
@@ -2020,6 +2098,11 @@ int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t fre
 	if (!dev)
 		return -1;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_ds_mode(mode %d, freq threshold %u Hz)\n",
+		(int)mode, (unsigned)freq_threshold);
+	#endif
+
 	center_freq = rtlsdr_get_center_freq(dev);
 	if ( !center_freq )
 		return -2;
@@ -2076,6 +2159,10 @@ int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on)
 {
 	int r = 0;
 	int bw;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_offset_tuning(on %d)\n", on);
+	#endif
 
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
@@ -2788,6 +2875,10 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	uint8_t reg;
 	ssize_t cnt;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_open(%u)\n", (unsigned)index);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -3024,6 +3115,10 @@ err:
 
 int rtlsdr_close(rtlsdr_dev_t *dev)
 {
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_close()\n");
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -3522,6 +3617,11 @@ int rtlsdr_read_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx,
 	struct timeval zerotv = { 0, 0 };
 	enum rtlsdr_async_status next_status = RTLSDR_INACTIVE;
 
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_read_async(buf_num %u, buf_len %u)\n",
+		(unsigned)buf_num, (unsigned)buf_len);
+	#endif
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -3847,6 +3947,11 @@ int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on)
 {
 	if (!dev)
 		return -1;
+
+	#if LOG_API_CALLS
+	fprintf(stderr, "LOG: rtlsdr_set_bias_tee_gpio(gpio %d, on %d)\n",
+		gpio, on);
+	#endif
 
 	rtlsdr_set_gpio_output(dev, gpio);
 	rtlsdr_set_gpio_bit(dev, gpio, on);
