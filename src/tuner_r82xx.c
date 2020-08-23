@@ -32,6 +32,10 @@
 
 #define WITH_ASYM_FILTER	0
 #define PRINT_PLL_ERRORS	0
+#define PRINT_VGA_REG		0
+
+/* #define VGA_FOR_AGC_MODE	16 */
+#define DEFAULT_IF_VGA_VAL	11
 
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
@@ -281,7 +285,7 @@ static const uint8_t r82xx_init_array[] = {
 	/* Reg 0x0c:
 	 * for manual gain was: set fixed VGA gain for now (16.3 dB): 0x08
 	 * with active agc was: set fixed VGA gain for now (26.5 dB): 0x0b */
-	0xfb, /* Reg 0x0c */
+	0xe0 | DEFAULT_IF_VGA_VAL, /* Reg 0x0c */
 	0x53, /* Reg 0x0d */
 	0x75, /* Reg 0x0e */
 	0x68,	/* Reg 0x0f */
@@ -1119,6 +1123,7 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
   int extended_mode, int lna_gain_idx, int mixer_gain_idx, int vga_gain_idx, int *rtl_vga_control)
 {
 	int rc;
+	int new_if_mode = priv->last_if_mode;
 	uint8_t data[4];
 
 	if (extended_mode || set_manual_gain) {
@@ -1159,7 +1164,7 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 
 		/* prepare VGA */
 		if (extended_mode) {
-			priv->last_if_mode = vga_gain_idx +10000;
+			new_if_mode = vga_gain_idx +10000;
 		}
 
 	} else {
@@ -1176,10 +1181,14 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 		/* save last values */
 		priv->last_manual_gain = set_manual_gain;
 		priv->last_extended_mode = extended_mode;
+
+#ifdef VGA_FOR_AGC_MODE
+		new_if_mode = VGA_FOR_AGC_MODE;
+#endif
 	}
 
 	/* Set VGA */
-	rc = r82xx_set_if_mode(priv, priv->last_if_mode, rtl_vga_control);
+	rc = r82xx_set_if_mode(priv, new_if_mode, rtl_vga_control);
 
 	return rc;
 }
@@ -1204,7 +1213,6 @@ int r82xx_get_if_gain(struct r82xx_priv *priv)
 int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control)
 {
 	int rc = 0, vga_gain_idx = 0;
-	int old_mode = priv->last_if_mode;
 
 	if (rtl_vga_control)
 		*rtl_vga_control = 0;
@@ -1218,27 +1226,31 @@ int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control
 	else if ( 2500 < if_mode && if_mode < 10000 ) {
 		vga_gain_idx = r82xx_get_if_gain_index(if_mode - 5000);
 	}
-	else if ( 10000 <= if_mode && if_mode < 10016 ) {
+	else if ( 10000 <= if_mode && if_mode <= 10016+15 ) {
 		vga_gain_idx = if_mode -10000;
 	}
 	else {	/* assume 0 == default */
-		if ( 0 != if_mode ) {
-			fprintf(stderr, "%s: invalid if_mode value %d; setting to default: 0\n", __FUNCTION__, if_mode );
-			if_mode = 0;
-		}
+		fprintf(stderr, "%s: invalid if_mode value %d; setting to default: %d\n",
+			__FUNCTION__, if_mode, 10000 + DEFAULT_IF_VGA_VAL );
 		/* was  26.5 dB == -12 dB + 0x0b * 3.5 dB  with AGC on
 		 * and  16.3 dB == -12 dB + 8 * 3.5 dB     with AGC off
 		 * BUT IT makes no sense to make this different!
 		 */
 		/* vga_gain_idx = (priv->last_extended_mode || priv->last_manual_gain) ? 0x08 : 0x0b; */
-		vga_gain_idx = 0x08;
+		if_mode = 10000 + DEFAULT_IF_VGA_VAL;
+		vga_gain_idx = DEFAULT_IF_VGA_VAL;
 	}
 
+#if PRINT_VGA_REG
+	fprintf(stderr, "%s: writing 0x%02X (=%.1f dB) into VGA register %sactivating RTL AGC control\n", __FUNCTION__,
+		(vga_gain_idx & 0x0f), (-12.0 + 3.5 * (vga_gain_idx & 0x0f)),
+		( (vga_gain_idx & 0x10) && rtl_vga_control ) ? "" : "de" );
+#endif
 	rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain_idx, 0x1f);
 	if (rc < 0)
 		return rc;
 	priv->last_if_mode = if_mode;
-	priv->last_VGA_value = vga_gain_idx & 0x0f;
+	priv->last_VGA_value = vga_gain_idx;
 	if ( (vga_gain_idx & 0x10) && rtl_vga_control )
 		*rtl_vga_control = 1;
 
@@ -1735,11 +1747,11 @@ int r82xx_init(struct r82xx_priv *priv)
 	priv->if_band_center_freq = 0;
 
 	priv->last_if_mode = 0;
-	priv->last_manual_gain = 1;
+	priv->last_manual_gain = 0;
 	priv->last_extended_mode = 0;
 	priv->last_LNA_value = 0;
 	priv->last_Mixer_value = 0;
-	priv->last_VGA_value = 0;
+	priv->last_VGA_value = DEFAULT_IF_VGA_VAL;
 
 	/* Initialize override registers */
 	memset( &(priv->override_data[0]), 0, NUM_REGS * sizeof(uint8_t) );

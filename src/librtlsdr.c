@@ -96,6 +96,9 @@
 #include <signal.h>
 
 
+#define INIT_R820T_TUNER_GAIN	0
+
+
 typedef struct rtlsdr_tuner_iface {
 	/* tuner interface */
 	int (*init)(void *);
@@ -1639,7 +1642,6 @@ int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
 	if (!dev)
 		return 0;
 
-
 	if (dev->tuner_type == RTLSDR_TUNER_R820T)
 		rf_gain = r82xx_get_rf_gain(&dev->r82xx_p);
 
@@ -2995,6 +2997,14 @@ found:
 		r = dev->tuner->init(dev);
 
 	rtlsdr_set_i2c_repeater(dev, 0);
+
+#if INIT_R820T_TUNER_GAIN
+	if ( dev->tuner_type == RTLSDR_TUNER_R820T )
+	{
+		rtlsdr_set_tuner_if_mode(dev, 10000 + 11);
+		rtlsdr_set_tuner_gain_mode(dev, 0);
+	}
+#endif
 
 	*out_dev = dev;
 	return 0;

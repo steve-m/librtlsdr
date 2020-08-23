@@ -340,7 +340,7 @@ RTLSDR_API int rtlsdr_set_tuner_gain_mode(rtlsdr_dev_t *dev, int manual);
  *                       with better measurements.
  *     10000 .. 10015: IF gain == VGA index from parameter if_mode
  *                     set if_mode by index: index := VGA_idx +10000
- *     10016:          same as 0; set automatic VGA
+ *     10016 .. 10031: same as 10000 .. 10015, but additionally set automatic VGA
  *     10011:          for fixed VGA (=default) of -12 dB + 11 * 3.5 dB = 26.5 dB
  * 
  * \return 0 on success
