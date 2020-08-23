@@ -212,7 +212,7 @@ struct rtlsdr_dev {
 	int      tuner_if_freq;
 	int      tuner_sideband;
 	int corr; /* ppm */
-	int gain; /* tenth dB */
+	/* int gain; * tenth dB */
 	enum rtlsdr_ds_mode direct_sampling_mode;
 	uint32_t direct_sampling_threshold; /* Hz */
 	struct e4k_state e4k_s;
@@ -1589,11 +1589,6 @@ int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain)
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 
-	if (!r)
-		dev->gain = gain;
-	else
-		dev->gain = 0;
-
 	return r;
 }
 
@@ -1609,11 +1604,6 @@ int rtlsdr_set_tuner_gain_ext(rtlsdr_dev_t *dev, int lna_gain, int mixer_gain, i
 		r = r820t_set_gain_ext((void *)dev, lna_gain, mixer_gain, vga_gain);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
-
-	if (!r)
-		dev->gain = lna_gain + mixer_gain + vga_gain;
-	else
-		dev->gain = 0;
 
 	return r;
 }
@@ -1637,6 +1627,8 @@ int rtlsdr_set_tuner_if_mode(rtlsdr_dev_t *dev, int if_mode)
 
 int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
 {
+	int rf_gain = 0;
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -1647,7 +1639,11 @@ int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
 	if (!dev)
 		return 0;
 
-	return dev->gain;
+
+	if (dev->tuner_type == RTLSDR_TUNER_R820T)
+		rf_gain = r82xx_get_rf_gain(&dev->r82xx_p);
+
+	return rf_gain;
 }
 
 int rtlsdr_set_tuner_if_gain(rtlsdr_dev_t *dev, int stage, int gain)

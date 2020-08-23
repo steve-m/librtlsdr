@@ -284,7 +284,7 @@ RTLSDR_API int rtlsdr_set_tuner_band_center(rtlsdr_dev_t *dev, int32_t if_band_c
 RTLSDR_API int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband);
 
 /*!
- * Get actual gain the device is configured to.
+ * Get actual (RF / HF) gain the device is configured to - excluding the IF gain.
  *
  * \param dev the device handle given by rtlsdr_open()
  * \return 0 on error, gain in tenths of a dB, 115 means 11.5 dB.

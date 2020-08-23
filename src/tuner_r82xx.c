@@ -1083,6 +1083,37 @@ static int r82xx_get_if_gain_index(int gain)
 	return vga_index;
 }
 
+static int r82xx_get_lna_gain_from_index(int lna_index)
+{
+	int i, total_gain = 0;
+	if ( lna_index < 0 || lna_index > 15 )
+		return 0;
+	for ( i = 0; i <= lna_index; ++i )
+		total_gain += r82xx_lna_gain_steps[i];
+	return total_gain;
+}
+
+static int r82xx_get_mixer_gain_from_index(int mixer_index)
+{
+	int i, total_gain = 0;
+	if ( mixer_index < 0 || mixer_index > 15 )
+		return 0;
+	for ( i = 0; i <= mixer_index; ++i )
+		total_gain += r82xx_mixer_gain_steps[i];
+	return total_gain;
+}
+
+static int r82xx_get_vga_gain_from_index(int vga_index)
+{
+	int i, total_gain = VGA_BASE_GAIN;
+	if ( vga_index < 0 || vga_index > 15 )
+		return 0;
+	for ( i = 0; i <= vga_index; ++i )
+		total_gain += r82xx_vga_gain_steps[i];
+	return total_gain;
+}
+
+
 /* set HF gain (LNA/Mixer) and pass through for IF gain (VGA) */
 int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
   int extended_mode, int lna_gain_idx, int mixer_gain_idx, int vga_gain_idx, int *rtl_vga_control)
@@ -1152,6 +1183,22 @@ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain,
 
 	return rc;
 }
+
+int r82xx_get_rf_gain(struct r82xx_priv *priv)
+{
+	int lna_gain = r82xx_get_lna_gain_from_index(priv->last_LNA_value);
+	int mix_gain = r82xx_get_mixer_gain_from_index(priv->last_Mixer_value);
+	int gain = lna_gain + mix_gain;
+	return gain;
+}
+
+
+int r82xx_get_if_gain(struct r82xx_priv *priv)
+{
+	int vga_gain = r82xx_get_vga_gain_from_index(priv->last_VGA_value);
+	return vga_gain;
+}
+
 
 /* set IF gain (VGA) */
 int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control)
