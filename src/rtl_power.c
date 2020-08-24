@@ -112,6 +112,8 @@ struct tuning_state
 	//pthread_mutex_t buf_mutex;
 };
 
+enum time_modes { VERBOSE_TIME, EPOCH_TIME };
+
 /* 3000 is enough for 3GHz b/w worst case */
 #define MAX_TUNES	3000
 struct tuning_state tunes[MAX_TUNES];
@@ -120,6 +122,7 @@ int tune_count = 0;
 int boxcar = 1;
 int comp_fir_size = 0;
 int peak_hold = 0;
+static enum time_modes time_mode = VERBOSE_TIME;
 
 void usage(void)
 {
@@ -777,6 +780,7 @@ int main(int argc, char **argv)
 	int f_set = 0;
 	int gain = AUTO_GAIN; // tenths of a dB
 	int dev_index = 0;
+	char dev_label[256];
 	int dev_given = 0;
 	int ppm_error = 0;
 	int interval = 10;
@@ -793,12 +797,12 @@ int main(int argc, char **argv)
 	time_t next_tick;
 	time_t time_now;
 	time_t exit_time = 0;
-	char t_str[50];
+	char t_str[512];
 	struct tm *cal_time;
 	double (*window_fn)(int, int) = rectangle;
 	freq_optarg = "";
 
-	while ((opt = getopt(argc, argv, "f:i:s:t:d:g:p:e:w:c:F:1POhTD:")) != -1) {
+	while ((opt = getopt(argc, argv, "f:i:s:t:d:g:p:e:w:c:F:1EPOhTD:")) != -1) {
 		switch (opt) {
 		case 'f': // lower:upper:bin_size
 			freq_optarg = strdup(optarg);
@@ -806,6 +810,8 @@ int main(int argc, char **argv)
 			break;
 		case 'd':
 			dev_index = verbose_device_search(optarg);
+			strncpy(dev_label, optarg, 255);
+			dev_label[255] = 0;
 			dev_given = 1;
 			break;
 		case 'g':
@@ -852,6 +858,9 @@ int main(int argc, char **argv)
 			break;
 		case '1':
 			single = 1;
+			break;
+		case 'E':
+			time_mode = EPOCH_TIME;
 			break;
 		case 'P':
 			peak_hold = 1;
@@ -996,7 +1005,12 @@ int main(int argc, char **argv)
 			continue;}
 		// time, Hz low, Hz high, Hz step, samples, dbm, dbm, ...
 		cal_time = localtime(&time_now);
-		strftime(t_str, 50, "%Y-%m-%d, %H:%M:%S", cal_time);
+		if (time_mode == VERBOSE_TIME) {
+			strftime(t_str, 512, "%Y-%m-%d, %H:%M:%S", cal_time);
+		}
+		if (time_mode == EPOCH_TIME) {
+			snprintf(t_str, 512, "%u, %s", (unsigned)time_now, dev_label);
+		}
 		for (i=0; i<tune_count; i++) {
 			fprintf(file, "%s, ", t_str);
 			csv_dbm(&tunes[i]);
