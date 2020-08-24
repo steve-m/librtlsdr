@@ -25,7 +25,7 @@
 extern "C" {
 #endif
 
-int	waveHdrStarted;
+extern int	waveHdrStarted;
 
 /*!
  * helper functions to write and finalize wave headers
