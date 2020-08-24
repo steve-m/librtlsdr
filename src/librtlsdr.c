@@ -249,6 +249,7 @@ struct rtlsdr_dev {
 #endif
 
 	int biast_gpio_pin_no;
+	int called_set_opt;
 
 	/* status */
 	int dev_lost;
@@ -2905,6 +2906,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 
 	dev->rtl_vga_control = 0;
 	dev->biast_gpio_pin_no = 0;
+	dev->called_set_opt = 0;
 
 	/* dev->softagc.command_thread; */
 	dev->softagc.agcState = SOFTSTATE_OFF;
@@ -3187,8 +3189,23 @@ int rtlsdr_reset_buffer(rtlsdr_dev_t *dev)
 	return 0;
 }
 
+
+static void rtlsdr_process_env_opts(rtlsdr_dev_t *dev)
+{
+	char * opts = getenv("LIBRTLSDR_OPT");
+	if ( opts ) {
+		fprintf(stderr, "process options '%s' from environment 'LIBRTLSDR_OPT'\n", opts);
+		rtlsdr_set_opt_string(dev, opts, 1);
+	}
+	dev->called_set_opt = 1;
+}
+
+
 int rtlsdr_read_sync(rtlsdr_dev_t *dev, void *buf, int len, int *n_read)
 {
+	if (dev && !dev->called_set_opt )
+		rtlsdr_process_env_opts(dev);
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -3494,6 +3511,9 @@ static void LIBUSB_CALL _libusb_callback(struct libusb_transfer *xfer)
 
 int rtlsdr_wait_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx)
 {
+	if (dev && !dev->called_set_opt )
+		rtlsdr_process_env_opts(dev);
+
 	#ifdef _ENABLE_RPC
 	if (rtlsdr_rpc_is_enabled())
 	{
@@ -3616,6 +3636,9 @@ int rtlsdr_read_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx,
 	struct timeval tv = { 1, 0 };
 	struct timeval zerotv = { 0, 0 };
 	enum rtlsdr_async_status next_status = RTLSDR_INACTIVE;
+
+	if (dev && !dev->called_set_opt )
+		rtlsdr_process_env_opts(dev);
 
 	#if LOG_API_CALLS
 	fprintf(stderr, "LOG: rtlsdr_read_async(buf_num %u, buf_len %u)\n",
@@ -4019,6 +4042,8 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 
 	if (!dev)
 		return -1;
+
+	dev->called_set_opt = 1;
 
 	/* set some defaults */
 	dev->softagc.deadTimeMs = 100;
