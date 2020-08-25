@@ -191,7 +191,7 @@ static struct tm * str_to_tm( const char * str, struct tm * t, double * fraction
 		return t;
 
 	/* fraction */
-	if ( str[19] == '.' && str[19] == ',' ) {
+	if ( str[19] == '.' || str[19] == ',' ) {
 		for ( k = 0; k < 16; ++k )	b[k] = 0;
 		strcpy(b, "0.");
 		strncpy(&b[2], &str[20], 12);
