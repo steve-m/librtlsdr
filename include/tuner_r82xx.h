@@ -41,7 +41,7 @@
 
 #define VER_NUM				49
 
-#define USE_R82XX_ENV_VARS	1
+#define USE_R82XX_ENV_VARS	0
 
 enum r82xx_chip {
 	CHIP_R820T,

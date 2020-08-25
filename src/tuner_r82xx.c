@@ -1595,14 +1595,15 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bw, uint32_t rate, uint32_t
 #endif
 
 	/* channel filter extension */
-	reg_mask = 0x60;
+	reg_mask = 0x40;
 #if USE_R82XX_ENV_VARS
 	if ( priv->haveR30H ) {
-		reg_1e = ( priv->valR30H << 4 );
+		reg_1e = ( priv->valR30H << 6 );
+		reg_mask = reg_mask | 0xC0;
 	}
 	if ( priv->haveR30L ) {
 		reg_1e = reg_1e | priv->valR30L;
-		reg_mask = reg_mask | 0x1F;
+		reg_mask = reg_mask | 0x3F;
 	}
 #endif
 	rc = r82xx_write_reg_mask_ext(priv, 0x1e, reg_1e, reg_mask, __FUNCTION__);
@@ -1906,9 +1907,9 @@ int r82xx_init(struct r82xx_priv *priv)
 		pacR30Hi = getenv("RTL_R820_R30_HI");
 		if ( pacR30Hi ) {
 			priv->haveR30H = 1;
-			priv->valR30H = atoi(pacR30Hi) & 0x06;
-			if ( priv->valR30H > 6 ) {
-				fprintf(stderr, "*** read R30_HI from environment: %d - but value should be 2 - 6 for bit [6:5]\n", priv->valR30H);
+			priv->valR30H = atoi(pacR30Hi) & 0x03;
+			if ( priv->valR30H > 3 ) {
+				fprintf(stderr, "*** read R30_HI from environment: %d - but value should be 0 - 3 for bit [7:6]\n", priv->valR30H);
 				priv->haveR30H = 0;
 			}
 			fprintf(stderr, "*** read R30_HI from environment: %d\n", priv->valR30H);
@@ -1918,8 +1919,8 @@ int r82xx_init(struct r82xx_priv *priv)
 		if ( pacR30Lo ) {
 			priv->haveR30L = 1;
 			priv->valR30L = atoi(pacR30Lo);
-			if ( priv->valR30L > 31 ) {
-				fprintf(stderr, "*** read R30_LO from environment: %d - but value should be 0 - 31 for bit [4:0]\n", priv->valR30L);
+			if ( priv->valR30L > 63 ) {
+				fprintf(stderr, "*** read R30_LO from environment: %d - but value should be 0 - 63 for bit [5:0]\n", priv->valR30L);
 				priv->haveR30L = 0;
 			}
 			fprintf(stderr, "*** read R30_LO from environment: %d\n", priv->valR30L);
