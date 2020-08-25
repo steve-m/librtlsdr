@@ -55,6 +55,8 @@ against librtlsdr's development branch (same date)
 
 * added rtlsdr_set_tuner_if_mode(), sets AGC modes in detail
 
+* added rtlsdr_set_dithering(), to allow disabling frequency dithering for R820T/2 tuner
+
 * added rtlsdr_set_ds_mode() including threshold frequency
 
 * added rtlsdr_ir_query()
