@@ -1907,7 +1907,7 @@ int r82xx_init(struct r82xx_priv *priv)
 		pacR30Hi = getenv("RTL_R820_R30_HI");
 		if ( pacR30Hi ) {
 			priv->haveR30H = 1;
-			priv->valR30H = atoi(pacR30Hi) & 0x03;
+			priv->valR30H = atoi(pacR30Hi);
 			if ( priv->valR30H > 3 ) {
 				fprintf(stderr, "*** read R30_HI from environment: %d - but value should be 0 - 3 for bit [7:6]\n", priv->valR30H);
 				priv->haveR30H = 0;
