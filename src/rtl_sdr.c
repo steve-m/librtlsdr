@@ -68,6 +68,7 @@ void usage(void)
 		"\t[-b output_block_size (default: 16 * 16384)]\n"
 		"\t[-n number of samples to read (default: 0, infinite)]\n"
 		"\t[-S force sync output (default: async)]\n"
+		"\t[-N no dithering (default: use dithering)]\n"
 		"\t[-H write wave Header to file (default: off)]\n"
 		"\tfilename (a '-' dumps samples to stdout)\n\n"
 		, rtlsdr_get_opt_help(1) );
@@ -145,6 +146,7 @@ int main(int argc, char **argv)
 	int gain = 0;
 	int ppm_error = 0;
 	int sync_mode = 0;
+	int dithering = 1;
 	FILE *file;
 	uint8_t *buffer;
 	const char * rtlOpts = NULL;
@@ -157,7 +159,7 @@ int main(int argc, char **argv)
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
 	int verbosity = 0;
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:O:SHv")) != -1) {
+	while ((opt = getopt(argc, argv, "d:f:g:s:w:b:n:p:O:SNHv")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -189,6 +191,9 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 			sync_mode = 1;
+			break;
+		case 'N':
+			dithering = 0;
 			break;
 		case 'H':
 			writeWav = 1;
@@ -245,6 +250,17 @@ int main(int argc, char **argv)
 #else
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) sighandler, TRUE );
 #endif
+
+	if (!dithering) {
+		fprintf(stderr, "Disabling dithering...  ");
+		r = rtlsdr_set_dithering(dev, dithering);
+		if (r) {
+			fprintf(stderr, "failure\n");
+		} else {
+			fprintf(stderr, "success\n");
+		}
+	}
+
 	/* Set the sample rate */
 	verbose_set_sample_rate(dev, samp_rate);
 

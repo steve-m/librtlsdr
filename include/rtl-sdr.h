@@ -445,6 +445,17 @@ RTLSDR_API int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on);
  */
 RTLSDR_API int rtlsdr_get_offset_tuning(rtlsdr_dev_t *dev);
 
+/*!
+ * Enable or disable frequency dithering for r820t tuners.
+ * Must be performed before freq_set().
+ * Fails for other tuners.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param on 0 means disabled, 1 enabled
+ * \return 0 on success
+ */
+RTLSDR_API int rtlsdr_set_dithering(rtlsdr_dev_t *dev, int dither);
+
 /* streaming functions */
 
 

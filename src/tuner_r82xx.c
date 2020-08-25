@@ -829,7 +829,10 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	else
 		val = 0x00;
 
-	rc = r82xx_write_reg_mask(priv, 0x12, val, 0x08);
+	if (priv->disable_dither)
+		val |= 0x10;
+
+	rc = r82xx_write_reg_mask(priv, 0x12, val, 0x18);
 	if (rc < 0)
 		return rc;
 
@@ -1682,6 +1685,13 @@ err:
 #endif
 	return rc;
 }
+
+int r82xx_set_dither(struct r82xx_priv *priv, int dither)
+{
+	priv->disable_dither = !dither;
+	return 0;
+}
+
 
 /*
  * r82xx standby logic

@@ -2221,6 +2221,14 @@ int rtlsdr_get_offset_tuning(rtlsdr_dev_t *dev)
 	return (dev->offs_freq) ? 1 : 0;
 }
 
+int rtlsdr_set_dithering(rtlsdr_dev_t *dev, int dither)
+{
+	if (dev->tuner_type == RTLSDR_TUNER_R820T) {
+		return r82xx_set_dither(&dev->r82xx_p, dither);
+	}
+	return 1;
+}
+
 static rtlsdr_dongle_t *find_known_device(uint16_t vid, uint16_t pid)
 {
 	unsigned int i;

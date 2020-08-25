@@ -92,6 +92,7 @@ struct r82xx_priv {
 	int							has_lock;
 	int							init_done;
 	int							sideband;
+	int							disable_dither;
 
 	/* Store current mode */
 	uint32_t				delsys;
@@ -158,6 +159,7 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate, 
 int r82xx_set_bw_center(struct r82xx_priv *priv, int32_t if_band_center_freq);
 /* Mixer Sideband:  0: lower, 1: upper */
 int r82xx_set_sideband(struct r82xx_priv *priv, int sideband);
+int r82xx_set_dither(struct r82xx_priv *priv, int dither);
 
 int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg);
 int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val,uint8_t bit_mask);
