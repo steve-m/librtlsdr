@@ -136,7 +136,7 @@ against librtlsdr's development branch (same date)
 
 ## RTL_TCP TCP-PROTOCOL
 
-* allows non-GPL programs, e.g. QIRX, to utilize the RTLSDR stuff in a license compliant way
+* allows non-GPL programs to utilize the RTLSDR stuff in a license compliant way
 
 * added several control functions in rtl_tcp, not existing in osmocom release:
  UDP_ESTABLISH, UDP_TERMINATE, SET_I2C_TUNER_REGISTER, SET_I2C_TUNER_OVERRIDE,
