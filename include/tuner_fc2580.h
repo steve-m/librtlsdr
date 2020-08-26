@@ -9,6 +9,9 @@
 #define FC2580_CHECK_ADDR	0x01
 #define FC2580_CHECK_VAL	0x56
 
+/* 16.384 MHz (at least on the Logilink VG0002A) */
+#define FC2580_XTAL_FREQ	16384000
+
 typedef enum {
 	FC2580_UHF_BAND,
 	FC2580_L_BAND,

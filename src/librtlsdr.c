@@ -100,6 +100,11 @@
 
 #define INIT_R820T_TUNER_GAIN	0
 
+/* activate/use RTL's IF AGC control .. from  https://github.com/old-dab/rtlsdr
+ * purpose: make AGC more smooth .. and NOT freeze
+ * most of it is in switch case on tuner_type in rtlsdr_open() */
+#define USE_OLD_DAB_IF_GAIN		1
+
 
 typedef struct rtlsdr_tuner_iface {
 	/* tuner interface */
@@ -460,10 +465,12 @@ int rtlsdr_vga_control( rtlsdr_dev_t* devt, int rc, int rtl_vga_control ) {
 	if ( rtl_vga_control != devt->rtl_vga_control ) {
 		/* enable/disable RF AGC loop */
 
+#if USE_OLD_DAB_IF_GAIN == 0
 		rc = rtlsdr_demod_write_reg(devt, 1, 0x04, rtl_vga_control ? 0x80 : 0x00, 1);
 		if ( devt->verbose )
 			fprintf(stderr, "rtlsdr_vga_control(%s) returned %d\n"
 				, rtl_vga_control ? "activate" : "deactivate", rc );
+#endif
 		devt->rtl_vga_control = rtl_vga_control;
 	}
 	return rc;
@@ -1034,7 +1041,9 @@ void rtlsdr_init_baseband(rtlsdr_dev_t *dev)
 	rtlsdr_demod_write_reg(dev, 1, 0x11, 0x00, 1);
 
 	/* disable RF and IF AGC loop */
+#if USE_OLD_DAB_IF_GAIN == 0
 	rtlsdr_demod_write_reg(dev, 1, 0x04, 0x00, 1);
+#endif
 	dev->rtl_vga_control = 0;
 
 	/* disable PID filter (enable_PID = 0) */
@@ -3069,20 +3078,97 @@ found:
 	dev->tuner = &tuners[dev->tuner_type];
 
 	switch (dev->tuner_type) {
+	case RTLSDR_TUNER_FC2580:
+#if USE_OLD_DAB_IF_GAIN
+		dev->tun_xtal = FC2580_XTAL_FREQ;
+#endif
+		break;
+	case RTLSDR_TUNER_E4000:
+#if USE_OLD_DAB_IF_GAIN
+		rtlsdr_demod_write_reg(dev, 1, 0x12, 0x5a, 1);//DVBT_DAGC_TRG_VAL
+		rtlsdr_demod_write_reg(dev, 1, 0x02, 0x40, 1);//DVBT_AGC_TARG_VAL_0
+		rtlsdr_demod_write_reg(dev, 1, 0x03, 0x5a, 1);//DVBT_AGC_TARG_VAL_8_1
+		rtlsdr_demod_write_reg(dev, 1, 0xc7, 0x30, 1);//DVBT_AAGC_LOOP_GAIN
+		rtlsdr_demod_write_reg(dev, 1, 0x04, 0xd0, 1);//DVBT_LOOP_GAIN2_3_0
+		rtlsdr_demod_write_reg(dev, 1, 0x05, 0xbe, 1);//DVBT_LOOP_GAIN2_4
+		rtlsdr_demod_write_reg(dev, 1, 0xc8, 0x18, 1);//DVBT_LOOP_GAIN3
+		rtlsdr_demod_write_reg(dev, 1, 0x06, 0x35, 1);//DVBT_VTOP1
+		rtlsdr_demod_write_reg(dev, 1, 0xc9, 0x21, 1);//DVBT_VTOP2
+		rtlsdr_demod_write_reg(dev, 1, 0xca, 0x21, 1);//DVBT_VTOP3
+		rtlsdr_demod_write_reg(dev, 1, 0xcb, 0x00, 1);//DVBT_KRF1
+		rtlsdr_demod_write_reg(dev, 1, 0x07, 0x40, 1);//DVBT_KRF2
+		rtlsdr_demod_write_reg(dev, 1, 0xcd, 0x10, 1);//DVBT_KRF3
+		rtlsdr_demod_write_reg(dev, 1, 0xce, 0x10, 1);//DVBT_KRF4
+		rtlsdr_demod_write_reg(dev, 0, 0x11, 0xe9d4, 2);//DVBT_AD7_SETTING
+		rtlsdr_demod_write_reg(dev, 1, 0xe5, 0xf0, 1);//DVBT_EN_GI_PGA
+		rtlsdr_demod_write_reg(dev, 1, 0xd9, 0x00, 1);//DVBT_THD_LOCK_UP
+		rtlsdr_demod_write_reg(dev, 1, 0xdb, 0x00, 1);//DVBT_THD_LOCK_DW
+		rtlsdr_demod_write_reg(dev, 1, 0xdd, 0x14, 1);//DVBT_THD_UP1
+		rtlsdr_demod_write_reg(dev, 1, 0xde, 0xec, 1);//DVBT_THD_DW1
+		rtlsdr_demod_write_reg(dev, 1, 0xd8, 0x0c, 1);//DVBT_INTER_CNT_LEN
+		rtlsdr_demod_write_reg(dev, 1, 0xe6, 0x02, 1);//DVBT_GI_PGA_STATE
+		rtlsdr_demod_write_reg(dev, 1, 0xd7, 0x09, 1);//DVBT_EN_AGC_PGA
+		rtlsdr_demod_write_reg(dev, 0, 0x10, 0x49, 1);//DVBT_REG_GPO
+		rtlsdr_demod_write_reg(dev, 0, 0x0d, 0x85, 1);//DVBT_REG_MON,DVBT_REG_MONSEL
+		rtlsdr_demod_write_reg(dev, 0, 0x13, 0x02, 1);
+#endif
+		break;
+	case RTLSDR_TUNER_FC0012:
+	case RTLSDR_TUNER_FC0013:
+#if USE_OLD_DAB_IF_GAIN
+		rtlsdr_demod_write_reg(dev, 1, 0x12, 0x5a, 1);//DVBT_DAGC_TRG_VAL
+		rtlsdr_demod_write_reg(dev, 1, 0x02, 0x40, 1);//DVBT_AGC_TARG_VAL_0
+		rtlsdr_demod_write_reg(dev, 1, 0x03, 0x5a, 1);//DVBT_AGC_TARG_VAL_8_1
+		rtlsdr_demod_write_reg(dev, 1, 0xc7, 0x2c, 1);//DVBT_AAGC_LOOP_GAIN
+		rtlsdr_demod_write_reg(dev, 1, 0x04, 0xcc, 1);//DVBT_LOOP_GAIN2_3_0
+		rtlsdr_demod_write_reg(dev, 1, 0x05, 0xbe, 1);//DVBT_LOOP_GAIN2_4
+		rtlsdr_demod_write_reg(dev, 1, 0xc8, 0x16, 1);//DVBT_LOOP_GAIN3
+		rtlsdr_demod_write_reg(dev, 1, 0x06, 0x35, 1);//DVBT_VTOP1
+		rtlsdr_demod_write_reg(dev, 1, 0xc9, 0x21, 1);//DVBT_VTOP2
+		rtlsdr_demod_write_reg(dev, 1, 0xca, 0x21, 1);//DVBT_VTOP3
+		rtlsdr_demod_write_reg(dev, 1, 0xcb, 0x00, 1);//DVBT_KRF1
+		rtlsdr_demod_write_reg(dev, 1, 0x07, 0x40, 1);//DVBT_KRF2
+		rtlsdr_demod_write_reg(dev, 1, 0xcd, 0x10, 1);//DVBT_KRF3
+		rtlsdr_demod_write_reg(dev, 1, 0xce, 0x10, 1);//DVBT_KRF4
+		rtlsdr_demod_write_reg(dev, 0, 0x11, 0xe9bf, 2);//DVBT_AD7_SETTING
+		rtlsdr_demod_write_reg(dev, 1, 0xe5, 0xf0, 1);//DVBT_EN_GI_PGA
+		rtlsdr_demod_write_reg(dev, 1, 0xd9, 0x00, 1);//DVBT_THD_LOCK_UP
+		rtlsdr_demod_write_reg(dev, 1, 0xdb, 0x00, 1);//DVBT_THD_LOCK_DW
+		rtlsdr_demod_write_reg(dev, 1, 0xdd, 0x11, 1);//DVBT_THD_UP1
+		rtlsdr_demod_write_reg(dev, 1, 0xde, 0xef, 1);//DVBT_THD_DW1
+		rtlsdr_demod_write_reg(dev, 1, 0xd8, 0x0c, 1);//DVBT_INTER_CNT_LEN
+		rtlsdr_demod_write_reg(dev, 1, 0xe6, 0x02, 1);//DVBT_GI_PGA_STATE
+		rtlsdr_demod_write_reg(dev, 1, 0xd7, 0x09, 1);//DVBT_EN_AGC_PGA
+#endif
+		break;
 	case RTLSDR_TUNER_R828D:
 		dev->tun_xtal = R828D_XTAL_FREQ;
 		/* fall-through */
 	case RTLSDR_TUNER_R820T:
+#if USE_OLD_DAB_IF_GAIN
+		rtlsdr_demod_write_reg(dev, 1, 0x12, 0x5a, 1);//DVBT_DAGC_TRG_VAL
+		rtlsdr_demod_write_reg(dev, 1, 0x02, 0x40, 1);//DVBT_AGC_TARG_VAL_0
+		rtlsdr_demod_write_reg(dev, 1, 0x03, 0x80, 1);//DVBT_AGC_TARG_VAL_8_1
+		rtlsdr_demod_write_reg(dev, 1, 0xc7, 0x24, 1);//DVBT_AAGC_LOOP_GAIN
+		rtlsdr_demod_write_reg(dev, 1, 0x04, 0xcc, 1);//DVBT_LOOP_GAIN2_3_0
+		rtlsdr_demod_write_reg(dev, 1, 0x05, 0xbe, 1);//DVBT_LOOP_GAIN2_4
+		rtlsdr_demod_write_reg(dev, 1, 0xc8, 0x14, 1);//DVBT_LOOP_GAIN3
+		rtlsdr_demod_write_reg(dev, 1, 0x06, 0x35, 1);//DVBT_VTOP1
+		rtlsdr_demod_write_reg(dev, 1, 0xc9, 0x21, 1);//DVBT_VTOP2
+		rtlsdr_demod_write_reg(dev, 1, 0xca, 0x21, 1);//DVBT_VTOP3
+		rtlsdr_demod_write_reg(dev, 1, 0xcb, 0x00, 1);//DVBT_KRF1
+		rtlsdr_demod_write_reg(dev, 1, 0x07, 0x40, 1);//DVBT_KRF2
+		rtlsdr_demod_write_reg(dev, 1, 0xcd, 0x10, 1);//DVBT_KRF3
+		rtlsdr_demod_write_reg(dev, 1, 0xce, 0x10, 1);//DVBT_KRF4
+		rtlsdr_demod_write_reg(dev, 0, 0x11, 0xe9f4, 2);//DVBT_AD7_SETTING
+#endif
 		/* disable Zero-IF mode */
 		rtlsdr_demod_write_reg(dev, 1, 0xb1, 0x1a, 1);
-
 		/* only enable In-phase ADC input */
 		rtlsdr_demod_write_reg(dev, 0, 0x08, 0x4d, 1);
-
 		/* the R82XX use 3.57 MHz IF for the DVB-T 6 MHz mode, and
 		 * 4.57 MHz for the 8 MHz mode */
 		rtlsdr_set_if_freq(dev, R82XX_IF_FREQ);
-
 		/* enable spectrum inversion */
 		rtlsdr_demod_write_reg(dev, 1, 0x15, 0x01, 1);
 		break;
