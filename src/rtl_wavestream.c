@@ -108,9 +108,6 @@ int main(int argc, char **argv)
 	int inputFmt = 0;   /* PCM16 = 0, FLOAT32 = 1 */
 	int16_t formatTag;
 	uint32_t numFrames;
-	time_t tim = 0;
-	double fraction = 0.0;
-	struct tm *ptm = NULL;
 
 	while ((opt = getopt(argc, argv, "f:w:vh")) != -1) {
 		switch (opt) {
@@ -271,8 +268,8 @@ int main(int argc, char **argv)
 			else if ( inputFmt == 0 && targetFmt == 1 ) {
 				const int16_t *ai = (const int16_t*)pvInp;
 				float * ao = (float*)pvOut;
-				size_t w;
-				for ( size_t k = 0; k < numRead; ++k )
+				size_t w, k;
+				for ( k = 0; k < numRead; ++k )
 					ao[k] = ai[k] * (1.0F / 32768.0F);
 				w = fwrite(pvOut, outSmpSize, numRead, stdout);
 				if ( w != numRead ) {
@@ -284,8 +281,8 @@ int main(int argc, char **argv)
 			else if ( inputFmt == 1 && targetFmt == 0 ) {
 				const float *ai = (const float*)pvInp;
 				int16_t * ao = (int16_t*)pvOut;
-				size_t w;
-				for ( size_t k = 0; k < numRead; ++k )
+				size_t w, k;
+				for ( k = 0; k < numRead; ++k )
 					ao[k] = (int16_t)( ai[k] * 32768.0F );
 				w = fwrite(pvOut, outSmpSize, numRead, stdout);
 				if ( w != numRead ) {
