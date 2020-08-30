@@ -210,9 +210,16 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Opened '%s' for input\n", rawfilename);
 		if (!haveTime) {
 			int gotmodtim = 0;
-#ifdef _WIN32
+#if defined(_WIN32)
 			struct _stat attr;
 			if (!_stat(rawfilename, &attr)) {
+				tim = attr.st_mtime;
+				fraction = 0.0;
+				gotmodtim = 1;
+			}
+#elif defined(__APPLE__)
+			struct stat attr;
+			if (!stat(rawfilename, &attr)) {
 				tim = attr.st_mtime;
 				fraction = 0.0;
 				gotmodtim = 1;
