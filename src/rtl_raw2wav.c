@@ -221,7 +221,7 @@ int main(int argc, char **argv)
 			struct stat attr;
 			if (!stat(rawfilename, &attr)) {
 				tim = attr.st_mtime;
-				fraction = 0.0;
+				fraction = attr.st_mtimespec.tv_nsec / 1E9;
 				gotmodtim = 1;
 			}
 #else
