@@ -50,31 +50,50 @@ void usage(void)
 	fprintf(stderr,
 		"Usage:\trtl_biast [-options]\n"
 		"\t[-d device_index (default: 0)]\n"
-		"\t[-b bias_on (default: 0)]\n"
-		"\t[-g GPIO select (default: 0)]\n");
+		"\t[-g GPIO select (default: 0)]\n"
+		"\t[-b set write bias_on (default: 0, in output mode)]\n"
+		"\t[-r read pin (in input mode)]\n"
+		"\t[-w write pin (in output mode)]\n"
+		"\t[-s read all GPIO pins status (0 = write, 1 = read ?? )]\n"
+		"\t[-R read all GPIO pins ?? ]\n");
 	exit(1);
 }
 
 int main(int argc, char **argv)
 {
-	int i, r, opt;
+	int i, r, opt, val;
 	int dev_index = 0;
 	int dev_given = 0;
+	int write_pin_given = 0;
+	int read_pin_given = 0;
+	int read_all_given = 0;
+	int req_status = 0;
 	uint32_t bias_on = 0;
-	uint32_t gpio_pin = 0;
+	int gpio_pin = 0;
 	int device_count;
 
-	while ((opt = getopt(argc, argv, "d:b:g:h?")) != -1) {
+	while ((opt = getopt(argc, argv, "d:b:w:g:srRh?")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
 			dev_given = 1;
 			break;
 		case 'b':
+		case 'w':
 			bias_on = atoi(optarg);
+			write_pin_given = 1;
 			break;
 		case 'g':
 			gpio_pin = atoi(optarg);
+			break;
+		case 'r':
+			read_pin_given = 1;
+			break;
+		case 'R':
+			read_all_given = 1;
+			break;
+		case 's':
+			req_status = 1;
 			break;
 		default:
 			usage();
@@ -91,7 +110,71 @@ int main(int argc, char **argv)
 	}
 
 	r = rtlsdr_open(&dev, dev_index);
-	rtlsdr_set_bias_tee_gpio(dev, gpio_pin, bias_on);
+	if (r < 0)
+	{
+		fprintf(stderr, "error opening device with index %d\n", dev_index);
+		return -r;
+	}
+
+	if (write_pin_given)
+	{
+		r = rtlsdr_set_bias_tee_gpio(dev, gpio_pin, bias_on);
+		if (r < 0)
+			fprintf(stderr, "error setting value %d on pin %d\n", bias_on, gpio_pin);
+	}
+
+	else if (read_pin_given)
+	{
+		r = rtlsdr_set_gpio_input(dev, gpio_pin);
+		if (r < 0)
+			fprintf(stderr, "error configuring pin %d to input\n", gpio_pin);
+
+		r = rtlsdr_get_gpio_bit(dev, gpio_pin, &val);
+		if (r < 0)
+			fprintf(stderr, "error reading value for pin %d\n", gpio_pin);
+		else
+			printf("value %d at pin %d\n", val, gpio_pin);
+	}
+
+	else if (read_all_given)
+	{
+		r = rtlsdr_get_gpio_byte(dev, &val);
+		if (r < 0)
+			fprintf(stderr, "error reading value for all pins\n");
+		else
+		{
+			printf("GPIO 0x%02x = bin ", val);
+			for (gpio_pin = 7; gpio_pin >= 4; --gpio_pin)
+				printf("%d", ((val >> gpio_pin) & 1));
+			printf(" ");
+			for (gpio_pin = 3; gpio_pin >= 0; --gpio_pin)
+				printf("%d", ((val >> gpio_pin) & 1));
+			printf("\n");
+		}
+	}
+
+	else if (req_status)
+	{
+		r = rtlsdr_set_gpio_status(dev, &val);
+		if (r < 0)
+			fprintf(stderr, "error reading status for all pins\n");
+		else
+		{
+			printf("STATUS 0x%02x = bin ", val);
+			for (gpio_pin = 7; gpio_pin >= 4; --gpio_pin)
+				printf("%d", ((val >> gpio_pin) & 1));
+			printf(" ");
+			for (gpio_pin = 3; gpio_pin >= 0; --gpio_pin)
+				printf("%d", ((val >> gpio_pin) & 1));
+			printf("\n");
+		}
+	}
+
+	else
+	{
+		usage();
+		r = -1;
+	}
 
 exit:
 	/*

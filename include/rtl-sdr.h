@@ -535,8 +535,10 @@ RTLSDR_API int rtlsdr_ir_query(rtlsdr_dev_t *dev, uint8_t *buf, size_t buf_len);
 
 
 /*!
- * Enable or disable (the bias tee on) GPIO PIN 0. (Works for rtl-sdr.com v3 dongles)
- * See: http://www.rtl-sdr.com/rtl-sdr-blog-v-3-dongles-user-guide/
+ * Enable or disable (the bias tee on) GPIO PIN 0 - if not reconfigured.
+ * See rtlsdr_set_opt_string() option 'T'.
+ * This works for rtl-sdr.com v3 dongles, see
+ *   http://www.rtl-sdr.com/rtl-sdr-blog-v-3-dongles-user-guide/
  * Note: rtlsdr_close() does not clear GPIO lines,
  * so it leaves the (bias tee) line enabled if a client program
  * doesn't explictly disable it.
@@ -554,11 +556,29 @@ RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
  * doesn't explictly disable it.
  *
  * \param dev the device handle given by rtlsdr_open()
- * \param gpio the gpio pin to configure as a Bias T control.
+ * \param gpio the gpio pin -- assuming this line is connected to Bias T.
+ *        gpio needs to be in 0 .. 7. BUT pin 4 is connected to Tuner RESET.
+ *        and for FC0012 is already connected/reserved pin 6 for switching V/U-HF.
  * \param on  1 for Bias T on. 0 for Bias T off.
  * \return -1 if device is not initialized. 0 otherwise.
  */
 RTLSDR_API int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on);
+
+
+/* from http://lea.hamradio.si/~s57uuu/mischam/rtlsdr/ports.html
+ * added return of error/status */
+RTLSDR_API int rtlsdr_set_gpio_output(rtlsdr_dev_t *dev, uint8_t gpio);
+RTLSDR_API int rtlsdr_set_gpio_input(rtlsdr_dev_t *dev, uint8_t gpio);
+
+RTLSDR_API int rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val);
+RTLSDR_API int rtlsdr_get_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int *val);
+
+RTLSDR_API int rtlsdr_set_gpio_byte(rtlsdr_dev_t *dev, int val);
+RTLSDR_API int rtlsdr_get_gpio_byte(rtlsdr_dev_t *dev, int *val);
+
+/* added for testing: */
+RTLSDR_API int rtlsdr_set_gpio_status(rtlsdr_dev_t *dev, int *status );
+
 
 /*!
  * Sets multiple options from a string encoded like "bw=300:agc=0:gain=27.3:dagc=0:T=1".
