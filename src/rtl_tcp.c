@@ -451,6 +451,45 @@ static void *command_worker(void *arg)
 				tmp = 1;
 			ctrldata.report_i2c = tmp;  /* (de)activate reporting */
 			break;
+
+		case GPIO_SET_OUTPUT_MODE:	/* rtlsdr_set_gpio_output() */
+			itmp = ntohl(cmd.param);
+			if ( 0 <= itmp && itmp < 8 )
+			{
+				printf("set gpio pin %d to output\n", itmp);
+				rtlsdr_set_gpio_output(dev, (uint8_t)itmp);
+			}
+			else
+				printf("set gpio pin %d to output: error: pin has to be in 0 .. 7\n", itmp);
+			break;
+		case GPIO_SET_INPUT_MODE:	/* rtlsdr_set_gpio_input() */
+			itmp = ntohl(cmd.param);
+			if ( 0 <= itmp && itmp < 8 )
+			{
+				printf("set gpio pin %d to input\n", itmp);
+				rtlsdr_set_gpio_input(dev, (uint8_t)itmp);
+			}
+			else
+				printf("set gpio pin %d to input: error: pin has to be in 0 .. 7\n", itmp);
+			break;
+		case GPIO_GET_IO_STATUS:	/* rtlsdr_set_gpio_status() */
+			/* int rtlsdr_set_gpio_status(rtlsdr_dev_t *dev, int *status ); */
+			break;
+		case GPIO_WRITE_PIN:		/* rtlsdr_set_gpio_bit() */
+			itmp = ntohl(cmd.param);
+			if ( 0 <= ((itmp >> 16) & 0xffff) && ((itmp >> 16) & 0xffff) < 8 )
+			{
+				printf("write %d to gpio %d\n", itmp & 0xffff, (itmp >> 16) & 0xffff);
+				rtlsdr_set_gpio_output(dev, (uint8_t)((itmp >> 16) & 0xffff));
+				rtlsdr_set_gpio_bit(dev, (uint8_t)((itmp >> 16) & 0xffff), itmp & 0xffff);
+			}
+			else
+				printf("write %d to gpio %d: error: pin has to be in 0 .. 7\n", itmp & 0xffff, (itmp >> 16) & 0xffff);
+			break;
+		case GPIO_READ_PIN:			/* rtlsdr_get_gpio_bit() */
+			break;
+		case GPIO_GET_BYTE:			/* rtlsdr_get_gpio_byte() */
+			break;
 		default:
 			break;
 		}

@@ -254,6 +254,9 @@ struct rtlsdr_dev {
 #endif
 
 	int biast_gpio_pin_no;
+	uint32_t gpio_state_known; /* bitmask over pins 0 .. 7 */
+	uint32_t gpio_state; /* bitmask over pins 0 .. 7: = 0 == write, 1 == read */
+
 	int called_set_opt;
 
 	/* status */
@@ -941,15 +944,25 @@ int rtlsdr_set_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int val)
 
 int rtlsdr_set_gpio_output(rtlsdr_dev_t *dev, uint8_t gpio)
 {
-	int r, retval;
+	int r, retval = 0;
 	gpio = 1 << gpio;
 
-	r = rtlsdr_read_reg(dev, SYSB, GPD, 1);
-	retval = rtlsdr_write_reg(dev, SYSB, GPD, r & ~gpio, 1);
-	if (retval < 0)
-		return retval;
-	r = rtlsdr_read_reg(dev, SYSB, GPOE, 1);
-	retval = rtlsdr_write_reg(dev, SYSB, GPOE, r | gpio, 1);
+	/* state: bitmask over pins 0 .. 7: = 0 == write, 1 == read */
+	if ( !(dev->gpio_state_known & gpio) || (dev->gpio_state & gpio) )
+	{
+		r = rtlsdr_read_reg(dev, SYSB, GPD, 1);
+		retval = rtlsdr_write_reg(dev, SYSB, GPD, r & ~gpio, 1);
+		if (retval < 0)
+			return retval;
+		r = rtlsdr_read_reg(dev, SYSB, GPOE, 1);
+		retval = rtlsdr_write_reg(dev, SYSB, GPOE, r | gpio, 1);
+		if (retval < 0)
+			return retval;
+
+		dev->gpio_state_known |= gpio;
+		dev->gpio_state &= ~( (uint32_t)gpio );
+	}
+
 	return retval;
 }
 
@@ -965,15 +978,25 @@ int rtlsdr_get_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int *val)
 
 int rtlsdr_set_gpio_input(rtlsdr_dev_t *dev, uint8_t gpio)
 {
-	int r, retval;
+	int r, retval = 0;
 	gpio = 1 << gpio;
 
-	r = rtlsdr_read_reg(dev, SYSB, GPD, 1);
-	retval = rtlsdr_write_reg(dev, SYSB, GPD, r | gpio, 1);
-	if (retval < 0)
-		return retval;
-	r = rtlsdr_read_reg(dev, SYSB, GPOE, 1);
-	retval = rtlsdr_write_reg(dev, SYSB, GPOE, r & ~gpio, 1);
+	/* state: bitmask over pins 0 .. 7: = 0 == write, 1 == read */
+	if ( !(dev->gpio_state_known & gpio) || !(dev->gpio_state & gpio) )
+	{
+		r = rtlsdr_read_reg(dev, SYSB, GPD, 1);
+		retval = rtlsdr_write_reg(dev, SYSB, GPD, r | gpio, 1);
+		if (retval < 0)
+			return retval;
+		r = rtlsdr_read_reg(dev, SYSB, GPOE, 1);
+		retval = rtlsdr_write_reg(dev, SYSB, GPOE, r & ~gpio, 1);
+		if (retval < 0)
+			return retval;
+
+		dev->gpio_state_known |= gpio;
+		dev->gpio_state |= ( (uint32_t)gpio );
+	}
+
 	return retval;
 }
 
@@ -2972,6 +2995,8 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 
 	dev->rtl_vga_control = 0;
 	dev->biast_gpio_pin_no = 0;
+	dev->gpio_state_known = 0;
+	dev->gpio_state = 0;
 	dev->called_set_opt = 0;
 
 	/* dev->softagc.command_thread; */

@@ -68,6 +68,14 @@ enum RTL_TCP_COMMANDS {
     SET_SIDEBAND              = 0x47,   /* Mixer Sideband for R820T */
     REPORT_I2C_REGS           = 0x48,   /* perodically report I2C registers
                                          * - if reverse channel is enabled */
+
+    GPIO_SET_OUTPUT_MODE      = 0x49,   /* rtlsdr_set_gpio_output() */
+    GPIO_SET_INPUT_MODE       = 0x50,   /* rtlsdr_set_gpio_input() */
+    GPIO_GET_IO_STATUS        = 0x51,   /* rtlsdr_set_gpio_status() */
+    GPIO_WRITE_PIN            = 0x52,   /* rtlsdr_set_gpio_output() and rtlsdr_set_gpio_bit() */
+    GPIO_READ_PIN             = 0x53,   /* rtlsdr_get_gpio_bit() */
+    GPIO_GET_BYTE             = 0x54,   /* rtlsdr_get_gpio_byte() */
+
 };
 
 #ifdef __cplusplus
