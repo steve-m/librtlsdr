@@ -565,8 +565,27 @@ RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
 RTLSDR_API int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on);
 
 
-/* from http://lea.hamradio.si/~s57uuu/mischam/rtlsdr/ports.html
- * added return of error/status */
+/*
+ * GPIO 0 .. 7 correspond to RTL2832U's pins as follows:
+ * Pin information from http://lea.hamradio.si/~s57uuu/mischam/rtlsdr/ports.html
+ *
+ *   GPIO0 (=pin 37): BiasT for RTL-SDR.com V3
+ *   GPIO1 (=pin 32): usually free - on RTL-SDR.com V3's Expansion Ports
+ *   GPIO2 (=pin 31): usually free - on RTL-SDR.com V3's Expansion Ports
+ *   GPIO3 (=pin 36): usually free
+ *   GPIO4 (=pin 30): RESET for Tuners FC2580 and FC0012 /  on RTL-SDR.com V3's Expansion Ports
+ *   GPIO5 (=pin 29): usually free - on RTL-SDR.com V3's Expansion Ports
+ *   GPIO6 (=pin 22): select V-band/U-band filter for FC0012-Tuner
+ *   GPIO7 (=pin 21): usually free
+ *
+ * CAUTION: The port pins use 3.3V logic levels and are static sensitive!
+ *
+ * most of following functions are also copied from Marko Cebokli's site
+ * http://lea.hamradio.si/~s57uuu/mischam/rtlsdr/ports.html
+ * but added return of error/status.
+ * GPIO numbers 'gpio' in range 0 .. 7 for the following gpio functions
+ * all \return negative values, on error
+ */
 RTLSDR_API int rtlsdr_set_gpio_output(rtlsdr_dev_t *dev, uint8_t gpio);
 RTLSDR_API int rtlsdr_set_gpio_input(rtlsdr_dev_t *dev, uint8_t gpio);
 
@@ -576,7 +595,6 @@ RTLSDR_API int rtlsdr_get_gpio_bit(rtlsdr_dev_t *dev, uint8_t gpio, int *val);
 RTLSDR_API int rtlsdr_set_gpio_byte(rtlsdr_dev_t *dev, int val);
 RTLSDR_API int rtlsdr_get_gpio_byte(rtlsdr_dev_t *dev, int *val);
 
-/* added for testing: */
 RTLSDR_API int rtlsdr_set_gpio_status(rtlsdr_dev_t *dev, int *status );
 
 
