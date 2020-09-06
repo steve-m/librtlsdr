@@ -1,0 +1,47 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master, development ]
+  pull_request:
+    branches: [ master, development ]
+
+jobs:
+  build_ubuntu-amd64_latest:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: prerequisites
+    # pre-installed on ubuntu-1804: build-essential, git 2.28.0, cmake 3.10/3.17, make
+    # pre-installed: clang 6.0 / 8 / 9, gcc/++ 7.5.0/8.4.0/9.3.0
+      run: sudo apt -qq update && sudo apt -yqq install libusb-1.0-0-dev
+    - name: cmake_make
+      run: mkdir build && cmake -S . -B build && cd build && make
+    - name: compress
+      run: tar zcvf librtlsdr_build_ubuntu-amd64_latest.tar.gz --directory=build/src --exclude=CMakeFiles --exclude=*.cmake --exclude=Makefile --exclude=rtl_app_ver.h .
+    - name: 'Upload Artifact'
+      uses: actions/upload-artifact@v2
+      with:
+        name: ubuntu_latest_build
+        path: librtlsdr_build_ubuntu-amd64_latest.tar.gz
+
+  build_macos_latest:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    #- name: prerequisites
+    # pre-installed on macos-10.15: git 2.28.0, cmake 3.18.2, libusb 1.0.23
+    # pre-installed: clang/LLVM 10.0.1, gcc/++ 8.4.0/9.3.0
+    #  run: brew install libusb
+    - name: cmake_make
+      run: mkdir build && cmake -S . -B build && cd build && make
+    - name: compress
+      run: tar zcvf librtlsdr_build_macos-latest.tar.gz --directory=build/src --exclude=CMakeFiles --exclude=*.cmake --exclude=Makefile --exclude=rtl_app_ver.h .
+    - name: 'Upload Artifact'
+      uses: actions/upload-artifact@v2
+      with:
+        name: macos_latest_build
+        path: librtlsdr_build_macos-latest.tar.gz
+
