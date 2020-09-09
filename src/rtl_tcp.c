@@ -289,15 +289,22 @@ static int set_gain_by_index(rtlsdr_dev_t *_dev, unsigned int index)
 	int* gains;
 	int count = rtlsdr_get_tuner_gains(_dev, NULL);
 
-	if (count > 0 && (unsigned int)count > index) {
+	if (count > 0 && index < (unsigned int)count) {
 		gains = malloc(sizeof(int) * count);
 		count = rtlsdr_get_tuner_gains(_dev, gains);
 
-		res = rtlsdr_set_tuner_gain(_dev, gains[index]);
 		if (verbosity)
-			fprintf(stderr, "set tuner gain to %.1f dB\n", gains[index] / 10.0);
+			printf("set tuner gain to %.1f dB\n", gains[index] / 10.0);
+		res = rtlsdr_set_tuner_gain(_dev, gains[index]);
+		if (res < 0)
+		printf("  error setting tuner gain index failed\n");
 
 		free(gains);
+	}
+	else
+	{
+		printf("set tuner gain index to %u\n", index);
+		printf("  error setting tuner gain index failed: valid range: 0 .. %d\n", count-1);
 	}
 
 	return res;
@@ -324,6 +331,7 @@ static void *command_worker(void *arg)
 	uint32_t tmp;
 	int32_t itmp;
 	int32_t if_band_center_freq;
+	int iitmp;
 
 	while(1) {
 		left=sizeof(cmd);
@@ -347,61 +355,84 @@ static void *command_worker(void *arg)
 		case SET_FREQUENCY:
 			tmp = ntohl(cmd.param);
 			printf("set freq %u\n", tmp);
-			rtlsdr_set_center_freq(dev, tmp);
+			r = rtlsdr_set_center_freq(dev, tmp);
+			if (r < 0)
+				printf("  error setting frequency!\n");
 			break;
 		case SET_SAMPLE_RATE:
 			tmp = ntohl(cmd.param);
 			printf("set sample rate %u\n", tmp);
-			rtlsdr_set_sample_rate(dev, tmp);
-			/*verbose_set_bandwidth(dev, bandwidth);*/
+			r = rtlsdr_set_sample_rate(dev, tmp);
+			if (r < 0)
+				printf("  error setting sample rate! sample rate is %u\n", rtlsdr_get_sample_rate(dev));
 			break;
 		case SET_GAIN_MODE:
 			tmp = ntohl(cmd.param);
-			printf("set gain mode %u\n", tmp);
-			rtlsdr_set_tuner_gain_mode(dev, tmp);
+			printf("set gain mode %u (=%s)\n", tmp, tmp?"manual":"automatic");
+			r = rtlsdr_set_tuner_gain_mode(dev, tmp);
+			if (r < 0)
+				printf("  error setting gain mode!\n");
 			break;
 		case SET_GAIN:
 			tmp = ntohl(cmd.param);
-			printf("set gain %u\n", tmp);
-			rtlsdr_set_tuner_gain(dev, tmp);
+			printf("set manual tuner gain %.1f dB\n", tmp/10.0);
+			r = rtlsdr_set_tuner_gain(dev, tmp);
+			if (r < 0)
+				printf("  error setting tuner gain!\n");
 			break;
 		case SET_FREQUENCY_CORRECTION:
 			itmp = ntohl(cmd.param);
-			printf("set freq correction %d\n", itmp);
-			rtlsdr_set_freq_correction(dev, itmp);
+			printf("set freq correction %d ppm\n", itmp);
+			r = rtlsdr_set_freq_correction(dev, itmp);
+			if (r < 0)
+				printf("  error setting frequency correction!\n");
 			break;
 		case SET_IF_STAGE:
 			tmp = ntohl(cmd.param);
-			printf("set if stage %d gain %d\n", tmp >> 16, (short)(tmp & 0xffff));
-			rtlsdr_set_tuner_if_gain(dev, tmp >> 16, (short)(tmp & 0xffff));
+			printf("set if stage %d gain %.1f dB\n", tmp >> 16, ((short)(tmp & 0xffff))/10.0);
+			r = rtlsdr_set_tuner_if_gain(dev, tmp >> 16, (short)(tmp & 0xffff));
+			if (r < 0)
+				printf("  error setting gain for stage!\n");
 			break;
 		case SET_TEST_MODE:
 			tmp = ntohl(cmd.param);
-			printf("set test mode %d\n", tmp);
-			rtlsdr_set_testmode(dev, tmp);
+			printf("set test mode %d (=%s)\n", tmp, tmp?"active":"inactive");
+			r = rtlsdr_set_testmode(dev, tmp);
+			if (r < 0)
+				printf("  error setting test mode!\n");
 			break;
 		case SET_AGC_MODE:
 			tmp = ntohl(cmd.param);
-			printf("set agc mode %d\n", tmp);
-			rtlsdr_set_agc_mode(dev, tmp);
+			printf("set rtl2832's digital agc mode %d (=%s)\n", tmp, tmp?"enabled":"disabled");
+			r = rtlsdr_set_agc_mode(dev, tmp);
+			if (r < 0)
+				printf("  error setting digital agc mode!\n");
 			break;
 		case SET_DIRECT_SAMPLING:
 			tmp = ntohl(cmd.param);
-			printf("set direct sampling %u\n", tmp);
-			rtlsdr_set_direct_sampling(dev, tmp);
+			printf("set direct sampling %u (=%s)\n", tmp, (!tmp) ? "disabled": (tmp==1)?"pin I-ADC": (tmp==2)? "pin Q-ADC":"unknown!");
+			r = rtlsdr_set_direct_sampling(dev, tmp);
+			if (r < 0)
+				printf("  error setting direct sampling!\n");
 			break;
 		case SET_OFFSET_TUNING:
 			itmp = ntohl(cmd.param);
 			printf("set offset tuning %d\n", itmp);
-			rtlsdr_set_offset_tuning(dev, itmp);
+			r = rtlsdr_set_offset_tuning(dev, itmp);
+			if (r < 0)
+				printf("  error setting offset tuning!\n");
 			break;
 		case SET_RTL_CRYSTAL:
-			printf("set rtl xtal %d\n", ntohl(cmd.param));
-			rtlsdr_set_xtal_freq(dev, ntohl(cmd.param), 0);
+			printf("set rtl xtal frequency %d\n", ntohl(cmd.param));
+			r = rtlsdr_set_xtal_freq(dev, ntohl(cmd.param), 0);
+			if (r < 0)
+				printf("  error setting rtl xtal frequency!\n");
 			break;
 		case SET_TUNER_CRYSTAL:
 			printf("set tuner xtal %d\n", ntohl(cmd.param));
-			rtlsdr_set_xtal_freq(dev, 0, ntohl(cmd.param));
+			r = rtlsdr_set_xtal_freq(dev, 0, ntohl(cmd.param));
+			if (r < 0)
+				printf("  error setting tuner xtal frequency!\n");
 			break;
 		case SET_TUNER_GAIN_BY_INDEX:
 			tmp = ntohl(cmd.param);
@@ -410,8 +441,10 @@ static void *command_worker(void *arg)
 			break;
 		case SET_BIAS_TEE:
 			tmp = ntohl(cmd.param);
-			printf("set bias tee %u\n", tmp);
-			rtlsdr_set_bias_tee(dev, tmp);
+			printf("set bias T %u (%s)\n", tmp, tmp?"on":"off");
+			r = rtlsdr_set_bias_tee(dev, tmp);
+			if (r < 0)
+				printf("  error setting bias tee!\n");
 			break;
 		case SET_TUNER_BANDWIDTH:
 			bandwidth = ntohl(cmd.param);
@@ -421,29 +454,49 @@ static void *command_worker(void *arg)
 		case SET_I2C_TUNER_REGISTER:
 			tmp = ntohl(cmd.param);
 			printf("set i2c register x%03X to x%03X with mask x%02X\n", (tmp >> 20) & 0xfff, tmp & 0xfff, (tmp >> 12) & 0xff );
-			rtlsdr_set_tuner_i2c_register(dev, (tmp >> 20) & 0xfff, (tmp >> 12) & 0xff, tmp & 0xfff);
+			r = rtlsdr_set_tuner_i2c_register(dev, (tmp >> 20) & 0xfff, (tmp >> 12) & 0xff, tmp & 0xfff);
+			if (r < 0)
+				printf("  error setting i2c register!\n");
 			break;
 		case SET_I2C_TUNER_OVERRIDE:
 			tmp = ntohl(cmd.param);
 			printf("set i2c override register x%03X to x%03X with mask x%02X\n", (tmp >> 20) & 0xfff, tmp & 0xfff, (tmp >> 12) & 0xff );
-			rtlsdr_set_tuner_i2c_override(dev, (tmp >> 20) & 0xfff, (tmp >> 12) & 0xff, tmp & 0xfff);
+			r = rtlsdr_set_tuner_i2c_override(dev, (tmp >> 20) & 0xfff, (tmp >> 12) & 0xff, tmp & 0xfff);
+			if (r < 0)
+				printf("  error setting i2c register!\n");
 			break;
 		case SET_TUNER_BW_IF_CENTER:
 			if_band_center_freq = ntohl(cmd.param);
 			printf("set tuner band to IF frequency %i Hz from center\n", if_band_center_freq);
-			rtlsdr_set_tuner_band_center(dev, if_band_center_freq );
+			r = rtlsdr_set_tuner_band_center(dev, if_band_center_freq );
+			if (r < 0)
+				printf("  error setting tuner band's IF center frequency!\n");
 			break;
 		case SET_TUNER_IF_MODE:
 			itmp = ntohl(cmd.param);
-			printf("set tuner IF mode to %i\n", itmp);
-			rtlsdr_set_tuner_if_mode(dev, itmp);
+			printf("set tuner IF mode to %i: ", itmp);
+			if (!itmp)
+				printf("automatic gain of VGA controlled from RTL2832\n");
+			else if (-2500 <= itmp && itmp <= 2500)
+				printf("VGA nearest to %.1f dB)\n", itmp/10.0);
+			else if (10000 <=itmp && itmp <= 10015)
+				printf("VGA gain idx %d\n", itmp - 10000);
+			else if (10016 <= itmp && itmp <= 10031)
+				printf("VGA gain idx %d - but with automatic gain of VGA controlled from RTL2832\n", itmp-10016);
+			else
+				printf("unknown!\n");
+			r = rtlsdr_set_tuner_if_mode(dev, itmp);
+			if (r < 0)
+				printf("  error setting tuner IF mode!\n");
 			break;
 		case SET_SIDEBAND:
 			tmp = ntohl(cmd.param);
 			if(tmp)
 				tmp = 1;
-			printf("set to %s sideband\n", (tmp ? "upper" : "lower") );
-			rtlsdr_set_tuner_sideband(dev, tmp);
+			printf("set tuner sideband %d: %s sideband\n", tmp, (tmp ? "upper" : "lower") );
+			r = rtlsdr_set_tuner_sideband(dev, tmp);
+			if (r < 0)
+				printf("  error setting tuner sideband!\n");
 			break;
 		case REPORT_I2C_REGS:
 			tmp = ntohl(cmd.param);
@@ -451,13 +504,14 @@ static void *command_worker(void *arg)
 				tmp = 1;
 			ctrldata.report_i2c = tmp;  /* (de)activate reporting */
 			break;
-
 		case GPIO_SET_OUTPUT_MODE:	/* rtlsdr_set_gpio_output() */
 			itmp = ntohl(cmd.param);
 			if ( 0 <= itmp && itmp < 8 )
 			{
 				printf("set gpio pin %d to output\n", itmp);
-				rtlsdr_set_gpio_output(dev, (uint8_t)itmp);
+				r = rtlsdr_set_gpio_output(dev, (uint8_t)itmp);
+				if (r < 0)
+					printf("  error setting gpio pin to output mode!\n");
 			}
 			else
 				printf("set gpio pin %d to output: error: pin has to be in 0 .. 7\n", itmp);
@@ -467,13 +521,22 @@ static void *command_worker(void *arg)
 			if ( 0 <= itmp && itmp < 8 )
 			{
 				printf("set gpio pin %d to input\n", itmp);
-				rtlsdr_set_gpio_input(dev, (uint8_t)itmp);
+				r = rtlsdr_set_gpio_input(dev, (uint8_t)itmp);
+				if (r < 0)
+					printf("  error setting gpio pin to input mode!\n");
 			}
 			else
 				printf("set gpio pin %d to input: error: pin has to be in 0 .. 7\n", itmp);
 			break;
 		case GPIO_GET_IO_STATUS:	/* rtlsdr_set_gpio_status() */
-			/* int rtlsdr_set_gpio_status(rtlsdr_dev_t *dev, int *status ); */
+			r = rtlsdr_set_gpio_status(dev, &iitmp );
+			if (r < 0)
+				printf("error at requesting gpio io status!\n");
+			else
+				printf("request for gpio io status: 0x%02x = %d%d%d%d %d%d%d%d for bits 7 .. 0\n",
+					iitmp & 0xff,
+					(iitmp >>7) & 1, (iitmp >>6) & 1, (iitmp >>5) & 1, (iitmp >>4) & 1,
+					(iitmp >>3) & 1, (iitmp >>2) & 1, (iitmp >>1) & 1, iitmp & 1 );
 			break;
 		case GPIO_WRITE_PIN:		/* rtlsdr_set_gpio_bit() */
 			itmp = ntohl(cmd.param);
@@ -486,11 +549,31 @@ static void *command_worker(void *arg)
 			else
 				printf("write %d to gpio %d: error: pin has to be in 0 .. 7\n", itmp & 0xffff, (itmp >> 16) & 0xffff);
 			break;
-		case GPIO_READ_PIN:			/* rtlsdr_get_gpio_bit() */
+		case GPIO_READ_PIN:
+			itmp = ntohl(cmd.param);
+			if ( 0 <= itmp && itmp < 8 )
+			{
+				r = rtlsdr_get_gpio_bit(dev, itmp, &iitmp);
+				if (r < 0)
+					printf("  error reading gpio pin!\n");
+				else
+					printf("read gpio pin %d: %d\n", itmp, iitmp);
+			}
+			else
+				printf("read gpio pin %d out of range: pin has to be in 0 .. 7\n", itmp);
 			break;
-		case GPIO_GET_BYTE:			/* rtlsdr_get_gpio_byte() */
+		case GPIO_GET_BYTE:
+			r = rtlsdr_get_gpio_byte(dev, &iitmp);
+			if (r < 0)
+				printf("error reading gpio byte!\n");
+			else
+				printf("read gpio byte: 0x%02x = %d%d%d%d %d%d%d%d for bits 7 .. 0\n",
+					iitmp & 0xff,
+					(iitmp >>7) & 1, (iitmp >>6) & 1, (iitmp >>5) & 1, (iitmp >>4) & 1,
+					(iitmp >>3) & 1, (iitmp >>2) & 1, (iitmp >>1) & 1, iitmp & 1 );
 			break;
 		default:
+			printf("unknown command 0x%02x\n", cmd.cmd);
 			break;
 		}
 		cmd.cmd = 0xff;
