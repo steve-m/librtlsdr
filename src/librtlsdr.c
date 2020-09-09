@@ -99,6 +99,8 @@
 #define LOG_API_SET_FREQ		0
 
 #define INIT_R820T_TUNER_GAIN	0
+#define ENABLE_VCO_OPTIONS		1
+
 
 /* activate/use RTL's IF AGC control .. from  https://github.com/old-dab/rtlsdr
  * purpose: make AGC more smooth .. and NOT freeze
@@ -378,6 +380,10 @@ int r820t_init(void *dev) {
 		devt->r82xx_c.i2c_addr = R820T_I2C_ADDR;
 		devt->r82xx_c.rafael_chip = CHIP_R820T;
 	}
+
+	devt->r82xx_c.vco_curr_min = 0xff;  /* VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
+	devt->r82xx_c.vco_curr_max = 0xff;  /* value is inverted: programmed is 7-value, that 0 is lowest current */
+	devt->r82xx_c.vco_algo = 0x00;
 
 	rtlsdr_get_xtal_freq(devt, NULL, &devt->r82xx_c.xtal);
 
@@ -4184,6 +4190,11 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t\t                        0: use I & Q; 1: use I; 2: use Q; 3: use I below threshold frequency;\n"
 		"\t\t                        4: use Q below threshold frequency (=RTL-SDR v3)\n"
 		"\t\t                        other values set the threshold frequency\n"
+#if ENABLE_VCO_OPTIONS
+		"\t\tvcocmin=<current>     set R820T/2 VCO current min: 0..7: higher value is more current\n"
+		"\t\tvcocmax=<current>     set R820T/2 VCO current max: 0..7\n"
+		"\t\tvcoalgo=<algo>        set R820T/2 VCO algorithm. 0: default. 1: with vcomax=3.9G. 2: Youssef/Carl\n"
+#endif
 		"\t\tTp=<gpio_pin>         set GPIO pin for Bias T, default =0 for rtl-sdr.com compatible V3\n"
 		"\t\tT=<bias_tee>          1 activates power at antenna one some dongles, e.g. rtl-sdr.com's V3\n"
 #ifdef WITH_UDP_SERVER
@@ -4196,7 +4207,12 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t[-O\tset RTL options string seperated with ':', e.g. -O 'bc=30000:agc=0' ]\n"
 		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>:sb=<sideband>\n"
 		"\t\tagc=<tuner_gain_mode>:gain=<tenth_dB>:ifm=<tuner_if_mode>:dagc=<rtl_agc>\n"
+#if ENABLE_VCO_OPTIONS
+		"\t\tds=<direct_sampling>:dm=<ds_mode_thresh>:vcocmin=<c>:vcocmax=<c>:vcoalgo=<a>\n"
+		"\t\tT=<bias_tee>\n"
+#else
 		"\t\tds=<direct_sampling>:dm=<ds_mode_thresh>:T=<bias_tee>\n"
+#endif
 #ifdef WITH_UDP_SERVER
 		"\t\tport=<udp_port default with 1>\n"
 #endif
@@ -4314,6 +4330,47 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 				dev->direct_sampling_threshold = dm;
 			ret = rtlsdr_set_ds_mode(dev, dev->direct_sampling_mode, dev->direct_sampling_threshold);
 		}
+#if ENABLE_VCO_OPTIONS
+		else if (!strncmp(optPart, "vcocmin=", 8)) {
+			int current = atoi(optPart +8);
+			if ( 0 <= current && current <= 7 )
+			{
+				dev->r82xx_c.vco_curr_min = 7 - current;
+				ret = 0;
+				if (verbose)
+					fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed vcocmin config %d\n", current);
+			} else if (verbose) {
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): error parsing vcocmin config: valid range 0 .. 7\n");
+				ret = 1;
+			}
+		}
+		else if (!strncmp(optPart, "vcocmax=", 8)) {
+			int current = atoi(optPart +8);
+			if ( 0 <= current && current <= 7 )
+			{
+				dev->r82xx_c.vco_curr_max = 7 - current;
+				ret = 0;
+				if (verbose)
+					fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed vcocmax config %d\n", current);
+			} else if (verbose) {
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): error parsing vcocmax config: valid range 0 .. 7\n");
+				ret = 1;
+			}
+		}
+		else if (!strncmp(optPart, "vcoalgo=", 8)) {
+			int algo = atoi(optPart +8);
+			if ( 0 <= algo && algo <= 2 )
+			{
+				dev->r82xx_c.vco_curr_max = algo;
+				ret = 0;
+				if (verbose)
+					fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed vcoalgo config %d\n", algo);
+			} else if (verbose) {
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): error parsing vcoalgo config: valid range 0 .. 2\n");
+				ret = 1;
+			}
+		}
+#endif
 		else if (!strncmp(optPart, "tp=", 3) || !strncmp(optPart, "Tp=", 3) || !strncmp(optPart, "TP=", 3) ) {
 			int gpio_pin_no = atoi(optPart +3);
 			if (verbose)

@@ -33,6 +33,9 @@
 #define WITH_ASYM_FILTER	0
 #define PRINT_PLL_ERRORS	0
 #define PRINT_VGA_REG		0
+#define PRINT_INITIAL_REGISTERS		0
+#define PRINT_ACTUAL_VCO_AND_ERR	0
+
 
 /* #define VGA_FOR_AGC_MODE	16 */
 #define DEFAULT_IF_VGA_VAL	11
@@ -280,35 +283,35 @@ static const uint8_t r82xx_init_array[] = {
 
 	0xc0,	/* Reg 0x08 */
 	0x40,	/* Reg 0x09 */
-	0xdb, /* Reg 0x0a */
+	0xdb,	/* Reg 0x0a */
 	0x6b,	/* Reg 0x0b */
 
 	/* Reg 0x0c:
 	 * for manual gain was: set fixed VGA gain for now (16.3 dB): 0x08
 	 * with active agc was: set fixed VGA gain for now (26.5 dB): 0x0b */
 	0xe0 | DEFAULT_IF_VGA_VAL, /* Reg 0x0c */
-	0x53, /* Reg 0x0d */
-	0x75, /* Reg 0x0e */
+	0x53,	/* Reg 0x0d */
+	0x75,	/* Reg 0x0e */
 	0x68,	/* Reg 0x0f */
 
-	0x6c, /* Reg 0x10 */
-	0xbb, /* Reg 0x11 */
-	0x80, /* Reg 0x12 */
+	0x6c,	/* Reg 0x10 */
+	0xbb,	/* Reg 0x11 */
+	0x80,	/* Reg 0x12 */
 	VER_NUM & 0x3f,	/* Reg 0x13 */
 
-	0x0f, /* Reg 0x14 */
-	0x00, /* Reg 0x15 */
-	0xc0, /* Reg 0x16 */
+	0x0f,	/* Reg 0x14 */
+	0x00,	/* Reg 0x15 */
+	0xc0,	/* Reg 0x16 */
 	0x30,	/* Reg 0x17 */
 
-	0x48, /* Reg 0x18 */
-	0xec, /* Reg 0x19 */
-	0x60, /* Reg 0x1a */
+	0x48,	/* Reg 0x18 */
+	0xec,	/* Reg 0x19 */
+	0x60,	/* Reg 0x1a */
 	0x00,	/* Reg 0x1b */
 
 	0x24,	/* Reg 0x1c */
-	0xdd, /* Reg 0x1d */
-	0x0e, /* Reg 0x1e */
+	0xdd,	/* Reg 0x1d */
+	0x0e,	/* Reg 0x1e */
 	0x40	/* Reg 0x1f */
 };
 
@@ -711,6 +714,128 @@ static int r82xx_set_mux(struct r82xx_priv *priv, uint32_t freq)
 	return rc;
 }
 
+
+/* function of Youssef (AirSpy) and Carl (RTL-SDR) */
+static int r82xx_set_pll_yc(struct r82xx_priv *priv, uint32_t freq)
+{
+  const uint32_t vco_min = 1770000000;
+  const uint32_t vco_max = 3900000000;
+  uint32_t pll_ref = (priv->cfg->xtal);
+  uint32_t pll_ref_2x = (pll_ref * 2);
+
+  int rc;
+  uint32_t vco_exact;
+  uint32_t vco_frac;
+  uint32_t con_frac;
+  uint32_t div_num;
+  uint32_t n_sdm;
+  uint16_t sdm;
+  uint8_t ni;
+  uint8_t si;
+  uint8_t nint;
+  uint8_t val_dith;
+  uint8_t data[5];
+
+  /* Calculate divider */
+  for (div_num = 0; div_num < 5; div_num++)
+  {
+    vco_exact = freq << (div_num + 1);
+    if (vco_exact >= vco_min && vco_exact <= vco_max)
+    {
+      break;
+    }
+  }
+
+  vco_exact = freq << (div_num + 1);
+  nint = (uint8_t) ((vco_exact + (pll_ref >> 16)) / pll_ref_2x);
+  vco_frac = vco_exact - pll_ref_2x * nint;
+
+  nint -= 13;
+  ni = (nint >> 2);
+  si = nint - (ni << 2);
+
+  /* Set the phase splitter */
+  rc = r82xx_write_reg_mask(priv, 0x10, (uint8_t) (div_num << 5), 0xe0);
+  if(rc < 0)
+    return rc;
+
+  /* Disable Dither */
+  val_dith = (priv->disable_dither) ? 0x10 : 0x00;
+  rc = r82xx_write_reg_mask(priv, 0x12, val_dith, 0x18);
+  if (rc < 0)
+    return rc;
+
+  /* Set the rough VCO frequency */
+  rc = r82xx_write_reg(priv, 0x14, (uint8_t) (ni + (si << 6)));
+  if(rc < 0)
+    return rc;
+
+  if (vco_frac == 0)
+  {
+    /* Disable frac pll */
+    rc = r82xx_write_reg_mask(priv, 0x12, 0x08, 0x08);
+    if(rc < 0)
+      return rc;
+  }
+  else
+  {
+    vco_frac += pll_ref >> 16;
+    sdm = 0;
+    for(n_sdm = 0; n_sdm < 16; n_sdm++)
+    {
+        con_frac = pll_ref >> n_sdm;
+        if (vco_frac >= con_frac)
+        {
+            sdm |= (uint16_t) (0x8000 >> n_sdm);
+            vco_frac -= con_frac;
+            if (vco_frac == 0)
+                break;
+        }
+    }
+
+/*
+    actual_freq = (((nint << 16) + sdm) * (uint64_t) pll_ref_2x) >> (div_num + 1 + 16);
+    delta = freq - actual_freq
+    if (actual_freq != freq)
+    {
+      fprintf(stderr,"Tunning delta: %d Hz", delta);
+    }
+*/
+    rc = r82xx_write_reg(priv, 0x15, (uint8_t)(sdm & 0xff));
+    if (rc < 0)
+      return rc;
+
+    rc = r82xx_write_reg(priv, 0x16, (uint8_t)(sdm >> 8));
+    if (rc < 0)
+      return rc;
+
+    /* Enable frac pll */
+    rc = r82xx_write_reg_mask(priv, 0x12, 0x00, 0x08);
+    if (rc < 0)
+      return rc;
+  }
+
+/***/
+
+  /* Check if PLL has locked */
+  rc = r82xx_read(priv, 0x00, data, 3);
+  if (rc < 0)
+    return rc;
+  if (!(data[2] & 0x40)) {
+#if PRINT_PLL_ERRORS
+    fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
+      freq, priv->rf_freq);
+#endif
+    priv->has_lock = 0;
+    return -1;
+  }
+  priv->has_lock = 1;
+
+  return rc;
+
+}
+
+
 static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 {
 	/* freq == tuner's LO frequency */
@@ -718,7 +843,7 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	uint64_t vco_freq;
 	uint64_t vco_div;
 	uint32_t vco_min = 1770000; /* kHz */
-	uint32_t vco_max = vco_min * 2; /* kHz */
+	uint32_t vco_max = (priv->cfg->vco_algo == 0) ? (vco_min * 2) : 3900000; /* kHz */
 	uint32_t freq_khz, pll_ref;
 	uint32_t sdm = 0;
 	uint8_t mix_div = 2;
@@ -727,7 +852,23 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	uint8_t vco_power_ref = 2;
 	uint8_t refdiv2 = 0;
 	uint8_t ni, si, nint, vco_fine_tune, val;
+	uint8_t vco_curr_min = (priv->cfg->vco_curr_min == 0xff) ? 0x80 : ( priv->cfg->vco_curr_min << 5 );
+	uint8_t vco_curr_max = (priv->cfg->vco_curr_max == 0xff) ? 0x60 : ( priv->cfg->vco_curr_max << 5 );
+	/* devt->r82xx_c.vco_min = 0xff;  * VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
+	/* devt->r82xx_c.vco_max = 0xff;  * value is inverted: programmed is 7-value, that 0 is lowest current */
 	uint8_t data[5];
+
+	if (priv->cfg->vco_algo == 2)
+	{
+		/* r82xx_set_pll_yc() assumes fixed maximum current */
+		if (priv->last_vco_curr != vco_curr_max) {
+			rc = r82xx_write_reg_mask(priv, 0x12, vco_curr_max, 0xe0);
+			if (rc < 0)
+				return rc;
+			priv->last_vco_curr = vco_curr_max;
+		}
+		return r82xx_set_pll_yc(priv, freq);
+	}
 
 	/* Frequency in kHz */
 	freq_khz = (freq + 500) / 1000;
@@ -743,9 +884,12 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		return rc;
 
 	/* set VCO current = 100 */
-	rc = r82xx_write_reg_mask(priv, 0x12, 0x80, 0xe0);
-	if (rc < 0)
-		return rc;
+	if (priv->last_vco_curr != vco_curr_min) {
+		rc = r82xx_write_reg_mask(priv, 0x12, vco_curr_min, 0xe0);
+		if (rc < 0)
+			return rc;
+		priv->last_vco_curr = vco_curr_min;
+	}
 
 	/* Calculate divider */
 	while (mix_div <= 64) {
@@ -802,10 +946,10 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
         nint = (uint32_t) (vco_div / 65536);
 	sdm = (uint32_t) (vco_div % 65536);
 
-#if 0
+#if PRINT_ACTUAL_VCO_AND_ERR
 	{
 	  uint64_t actual_vco = (uint64_t)2 * pll_ref * nint + (uint64_t)2 * pll_ref * sdm / 65536;
-	  fprintf(stderr, "[R82XX] requested %uHz; selected mix_div=%u vco_freq=%lu nint=%u sdm=%u; actual_vco=%lu; tuning error=%+dHz\n",
+	  fprintf(stderr, "[R82XX] requested %u Hz; selected mix_div=%u vco_freq=%lu nint=%u sdm=%u; actual_vco=%lu; tuning error=%+dHz\n",
 		  freq, mix_div, vco_freq, nint, sdm, actual_vco, (int32_t) (actual_vco - vco_freq) / mix_div);
 	}
 #endif
@@ -850,14 +994,17 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		rc = r82xx_read(priv, 0x00, data, 3);
 		if (rc < 0)
 			return rc;
-		if (data[2] & 0x40)
+		if ( (data[2] & 0x40) || vco_curr_max == vco_curr_min )
 			break;
 
 		if (!i) {
 			/* Didn't lock. Increase VCO current */
-			rc = r82xx_write_reg_mask(priv, 0x12, 0x60, 0xe0);
-			if (rc < 0)
-				return rc;
+			if (priv->last_vco_curr != vco_curr_max) {
+				rc = r82xx_write_reg_mask(priv, 0x12, vco_curr_max, 0xe0);
+				if (rc < 0)
+					return rc;
+				priv->last_vco_curr = vco_curr_max;
+			}
 		}
 	}
 
@@ -1752,6 +1899,19 @@ int r82xx_init(struct r82xx_priv *priv)
 {
 	int rc;
 
+#if PRINT_INITIAL_REGISTERS
+#define INIT_NUM_READ_REGS 16
+	uint8_t		initial_register_values[INIT_NUM_READ_REGS];	/* see what is 'default' */
+	int k;
+	/* get initial register values - just to see .. */
+	memset( &(initial_register_values[0]), 0, sizeof(initial_register_values) );
+	printf("R820T/2 initial register settings:\n");
+	r82xx_read(priv, 0x00, initial_register_values, sizeof(initial_register_values));
+	for (k=0; k < INIT_NUM_READ_REGS; ++k)
+		printf("register 0x%02x: 0x%02x\n", k, initial_register_values[k]);
+	printf("\n");
+#endif
+
 	/* TODO: R828D might need r82xx_xtal_check() */
 	priv->xtal_cap_sel = XTAL_HIGH_CAP_0P;
 
@@ -1764,6 +1924,7 @@ int r82xx_init(struct r82xx_priv *priv)
 	priv->last_LNA_value = 0;
 	priv->last_Mixer_value = 0;
 	priv->last_VGA_value = DEFAULT_IF_VGA_VAL;
+	priv->last_vco_curr = 0xff;
 
 	/* Initialize override registers */
 	memset( &(priv->override_data[0]), 0, NUM_REGS * sizeof(uint8_t) );
@@ -1772,6 +1933,8 @@ int r82xx_init(struct r82xx_priv *priv)
 	/* Initialize registers */
 	rc = r82xx_write_arr(priv, 0x05,
 			 r82xx_init_array, sizeof(r82xx_init_array));
+
+	priv->last_vco_curr = r82xx_init_array[0x12 - 0x05] & 0xe0;
 
 	rc = r82xx_set_tv_standard(priv, TUNER_DIGITAL_TV, 0);
 	if (rc < 0)

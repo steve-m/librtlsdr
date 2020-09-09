@@ -107,6 +107,8 @@ void usage(void)
 		"\t[-d device_index or serial (default: 0)]\n"
 		"%s"
 		"\t[-t enable tuner range benchmark]\n"
+		"\t[-f first/begin frequency for tuner range benchmark, default: 0]\n"
+		"\t[-e end frequency for tuner range benchmark, default: 3e9 = 3G ]\n"
 #ifndef _WIN32
 		"\t[-p[seconds] enable PPM error measurement (default: 10 seconds)]\n"
 #endif
@@ -338,9 +340,9 @@ static int set_center_freq_wait(rtlsdr_dev_t *dev, uint32_t freq, const char * s
 }
 
 
-void tuner_benchmark(void)
+void tuner_benchmark(uint32_t beg_freq, uint32_t end_freq)
 {
-	uint32_t current = max_step(0);
+	uint32_t current = beg_freq; /* max_step(0); */
 	uint32_t band_start = 0;
 	uint32_t low_bound = 0, high_bound = 0;
 	int rc;
@@ -357,16 +359,16 @@ void tuner_benchmark(void)
 	 */
 
 	/* handle bands starting at 0Hz */
-	rc = set_center_freq_wait(dev, 0, "FIND_START");
+	rc = set_center_freq_wait(dev, current, "FIND_START");
 	if (rc < 0)
 		state = FIND_START;
 	else {
-		band_start = 0;
+		band_start = current;
 		report_band_start(band_start);
 		state = FIND_END;
 	}
 
-	while (current < 3e9 && !do_exit) {
+	while (current < end_freq && !do_exit) {
 		switch (state) {
 		case FIND_START:
 			/* scanning for the start of a new band */
@@ -508,10 +510,12 @@ int main(int argc, char **argv)
 	int dev_index = 0;
 	int dev_given = 0;
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
+	uint32_t tuner_bench_beg_freq = 0;
+	uint32_t tuner_bench_end_freq = 0;
 	int count;
 	int gains[100];
 
-	while ((opt = getopt(argc, argv, "d:s:b:O:tp::Sh")) != -1) {
+	while ((opt = getopt(argc, argv, "d:s:b:O:tf:e:p::Sh")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -528,6 +532,12 @@ int main(int argc, char **argv)
 			break;
 		case 't':
 			test_mode = TUNER_BENCHMARK;
+			break;
+		case 'f':
+			tuner_bench_beg_freq = (uint32_t)atofs(optarg);
+			break;
+		case 'e':
+			tuner_bench_end_freq = (uint32_t)atofs(optarg);
 			break;
 		case 'p':
 			test_mode = PPM_BENCHMARK;
@@ -598,7 +608,7 @@ int main(int argc, char **argv)
 	}
 
 	if (test_mode == TUNER_BENCHMARK) {
-		tuner_benchmark();
+		tuner_benchmark(tuner_bench_beg_freq, tuner_bench_end_freq);
 		goto exit;
 	}
 

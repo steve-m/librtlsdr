@@ -68,6 +68,9 @@ enum r82xx_xtal_cap_value {
 
 struct r82xx_config {
 	uint8_t i2c_addr;
+	uint8_t vco_curr_min;  /* VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
+	uint8_t vco_curr_max;  /* value is inverted: programmed is 7-value, that 0 is lowest current */
+	uint8_t vco_algo;
 	uint32_t xtal;
 	enum r82xx_chip rafael_chip;
 	unsigned int max_i2c_msg_len;
@@ -89,6 +92,7 @@ struct r82xx_priv {
 														 * on which the band center shall be positioned */
 	uint8_t						fil_cal_code;
 	uint8_t						input;
+	uint8_t						last_vco_curr;
 	int							has_lock;
 	int							init_done;
 	int							sideband;
