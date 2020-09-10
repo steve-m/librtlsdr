@@ -315,7 +315,8 @@ static void check_tuner_pll(rtlsdr_dev_t *dev, int *tuner_unsupported, int *last
 	int r = rtlsdr_is_tuner_PLL_locked(dev);
 	/* printf("performed lock check:\n"); */
 	if (r == 1) {
-		printf("tuner PLL is unlocked!\n");
+		if (*last_lock_report != r)
+			printf("tuner PLL is unlocked!\n");
 		*last_lock_report = r;
 	}
 	else if (r == 0) {

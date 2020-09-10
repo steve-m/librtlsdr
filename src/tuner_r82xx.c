@@ -756,26 +756,38 @@ static int r82xx_set_pll_yc(struct r82xx_priv *priv, uint32_t freq)
 
   /* Set the phase splitter */
   rc = r82xx_write_reg_mask(priv, 0x10, (uint8_t) (div_num << 5), 0xe0);
-  if(rc < 0)
+  if(rc < 0) {
+    if (priv->cfg->verbose)
+      fprintf(stderr, "r82xx_set_pll_yc(): error writing 'phase splitter' into i2c reg 0x10\n");
     return rc;
+  }
 
   /* Disable Dither */
   val_dith = (priv->disable_dither) ? 0x10 : 0x00;
   rc = r82xx_write_reg_mask(priv, 0x12, val_dith, 0x18);
-  if (rc < 0)
+  if (rc < 0) {
+    if (priv->cfg->verbose)
+      fprintf(stderr, "r82xx_set_pll_yc(): error writing 'dither' into i2c reg 0x12\n");
     return rc;
+  }
 
   /* Set the rough VCO frequency */
   rc = r82xx_write_reg(priv, 0x14, (uint8_t) (ni + (si << 6)));
-  if(rc < 0)
+  if(rc < 0) {
+    if (priv->cfg->verbose)
+      fprintf(stderr, "r82xx_set_pll_yc(): error writing 'rough VCO frequency' into i2c reg 0x14\n");
     return rc;
+  }
 
   if (vco_frac == 0)
   {
     /* Disable frac pll */
     rc = r82xx_write_reg_mask(priv, 0x12, 0x08, 0x08);
-    if(rc < 0)
+    if(rc < 0) {
+    if (priv->cfg->verbose)
+      fprintf(stderr, "r82xx_set_pll_yc(): error writing 'disable frac pll' into i2c reg 0x12\n");
       return rc;
+    }
   }
   else
   {
@@ -802,30 +814,45 @@ static int r82xx_set_pll_yc(struct r82xx_priv *priv, uint32_t freq)
     }
 */
     rc = r82xx_write_reg(priv, 0x15, (uint8_t)(sdm & 0xff));
-    if (rc < 0)
+    if (rc < 0) {
+      if (priv->cfg->verbose)
+        fprintf(stderr, "r82xx_set_pll_yc(): error writing 'sdm lo' into i2c reg 0x15\n");
       return rc;
+    }
 
     rc = r82xx_write_reg(priv, 0x16, (uint8_t)(sdm >> 8));
-    if (rc < 0)
+    if (rc < 0) {
+      if (priv->cfg->verbose)
+        fprintf(stderr, "r82xx_set_pll_yc(): error writing 'sdm hi' into i2c reg 0x16\n");
       return rc;
+    }
 
     /* Enable frac pll */
     rc = r82xx_write_reg_mask(priv, 0x12, 0x00, 0x08);
-    if (rc < 0)
+    if (rc < 0) {
+      if (priv->cfg->verbose)
+        fprintf(stderr, "r82xx_set_pll_yc(): error writing 'enable frac pll' into i2c reg 0x12\n");
       return rc;
+    }
   }
+
+  /* all PLL stuff / registers set for this frequency */
+  priv->tuner_pll_set = 1;
 
 /***/
 
   /* Check if PLL has locked */
   rc = r82xx_read(priv, 0x00, data, 3);
-  if (rc < 0)
+  if (rc < 0) {
+      if (priv->cfg->verbose)
+        fprintf(stderr, "r82xx_set_pll_yc(): error reading 'pll lock status' from i2c reg 0x00..0x02\n");
     return rc;
+  }
   if (!(data[2] & 0x40)) {
-#if PRINT_PLL_ERRORS
-    fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
-      freq, priv->rf_freq);
-#endif
+    if (priv->cfg->verbose || PRINT_PLL_ERRORS)
+      //fprintf(stderr, "r82xx_set_pll_yc(): error writing 'sdm lo' into i2c reg 0x15\n");
+      fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
+        freq, priv->rf_freq);
     priv->has_lock = 0;
     return -1;
   }
@@ -858,13 +885,18 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	/* devt->r82xx_c.vco_max = 0xff;  * value is inverted: programmed is 7-value, that 0 is lowest current */
 	uint8_t data[5];
 
+  priv->tuner_pll_set = 0;
+
 	if (priv->cfg->vco_algo == 2)
 	{
 		/* r82xx_set_pll_yc() assumes fixed maximum current */
 		if (priv->last_vco_curr != vco_curr_max) {
 			rc = r82xx_write_reg_mask(priv, 0x12, vco_curr_max, 0xe0);
-			if (rc < 0)
+			if (rc < 0) {
+				if (priv->cfg->verbose)
+					fprintf(stderr, "r82xx_set_pll(): error writing 'vco current' into i2c reg 0x12\n");
 				return rc;
+			}
 			priv->last_vco_curr = vco_curr_max;
 		}
 		return r82xx_set_pll_yc(priv, freq);
@@ -875,19 +907,28 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	pll_ref = priv->cfg->xtal;
 
 	rc = r82xx_write_reg_mask(priv, 0x10, refdiv2, 0x10);
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error writing 'refdiv2' into i2c reg 0x10\n");
 		return rc;
+	}
 
 	/* set pll autotune = 128kHz */
 	rc = r82xx_write_reg_mask(priv, 0x1a, 0x00, 0x0c);
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error writing 'pll autotune 128kHz' into i2c reg 0x1a\n");
 		return rc;
+	}
 
 	/* set VCO current = 100 */
 	if (priv->last_vco_curr != vco_curr_min) {
 		rc = r82xx_write_reg_mask(priv, 0x12, vco_curr_min, 0xe0);
-		if (rc < 0)
+		if (rc < 0) {
+			if (priv->cfg->verbose)
+				fprintf(stderr, "r82xx_set_pll(): error writing 'vco current min' into i2c reg 0x12\n");
 			return rc;
+		}
 		priv->last_vco_curr = vco_curr_min;
 	}
 
@@ -911,8 +952,11 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	}
 
 	rc = r82xx_read(priv, 0x00, data, sizeof(data));
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error reading 'status' from i2c reg 0x00 .. 0x04\n");
 		return rc;
+	}
 
 	if (priv->cfg->rafael_chip == CHIP_R828D)
 		vco_power_ref = 1;
@@ -925,8 +969,11 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		div_num = div_num + 1;
 
 	rc = r82xx_write_reg_mask(priv, 0x10, div_num << 5, 0xe0);
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error writing 'div_num' into i2c reg 0x10\n");
 		return rc;
+	}
 
 	vco_freq = (uint64_t)freq * (uint64_t)mix_div;
 
@@ -960,9 +1007,8 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 #endif
 
 	if (nint > ((128 / vco_power_ref) - 1)) {
-#if PRINT_PLL_ERRORS
-		fprintf(stderr, "[R82XX] No valid PLL values for %u Hz!\n", freq);
-#endif
+		if (priv->cfg->verbose || PRINT_PLL_ERRORS)
+			fprintf(stderr, "[R82XX] No valid PLL values for %u Hz!\n", freq);
 		return -1;
 	}
 
@@ -970,8 +1016,11 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	si = nint - 4 * ni - 13;
 
 	rc = r82xx_write_reg(priv, 0x14, ni + (si << 6));
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error writing 'ni+(si<<6)' into i2c reg 0x14\n");
 		return rc;
+	}
 
 	/* pw_sdm */
 	if (sdm == 0)
@@ -983,22 +1032,37 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		val |= 0x10;
 
 	rc = r82xx_write_reg_mask(priv, 0x12, val, 0x18);
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error writing 'dither' into i2c reg 0x12\n");
 		return rc;
+	}
 
 	rc = r82xx_write_reg(priv, 0x16, sdm >> 8);
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error writing 'sdm hi' into i2c reg 0x16\n");
 		return rc;
+	}
 	rc = r82xx_write_reg(priv, 0x15, sdm & 0xff);
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_pll(): error writing 'sdm lo' into i2c reg 0x12\n");
 		return rc;
+	}
+
+  /* all PLL stuff / registers set for this frequency - except 8 kHz pll autotune */
+  priv->tuner_pll_set = 1;
 
 	for (i = 0; i < 2; i++) {
 
 		/* Check if PLL has locked */
 		rc = r82xx_read(priv, 0x00, data, 3);
-		if (rc < 0)
+		if (rc < 0) {
+			if (priv->cfg->verbose)
+				fprintf(stderr, "r82xx_set_pll(): error reading 'pll lock status' from i2c reg 0x00 .. 0x02\n");
 			return rc;
+		}
 		if ( (data[2] & 0x40) || vco_curr_max == vco_curr_min )
 			break;
 
@@ -1006,18 +1070,20 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 			/* Didn't lock. Increase VCO current */
 			if (priv->last_vco_curr != vco_curr_max) {
 				rc = r82xx_write_reg_mask(priv, 0x12, vco_curr_max, 0xe0);
-				if (rc < 0)
+				if (rc < 0) {
+					if (priv->cfg->verbose)
+						fprintf(stderr, "r82xx_set_pll(): error writing 'vco current max' into i2c reg 0x12\n");
 					return rc;
+				}
 				priv->last_vco_curr = vco_curr_max;
 			}
 		}
 	}
 
 	if (!(data[2] & 0x40)) {
-#if PRINT_PLL_ERRORS
-		fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
-			freq, priv->rf_freq);
-#endif
+		if (priv->cfg->verbose || PRINT_PLL_ERRORS)
+			fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
+				freq, priv->rf_freq);
 		priv->has_lock = 0;
 		return -1;
 	}
@@ -1030,6 +1096,8 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 
 	/* set pll autotune = 8kHz */
 	rc = r82xx_write_reg_mask(priv, 0x1a, 0x08, 0x08);
+	if (rc < 0 && priv->cfg->verbose)
+		fprintf(stderr, "r82xx_set_pll(): error writing 'pll autotune 8kHz' into i2c reg 0x1a\n");
 
 	return rc;
 }
@@ -1039,14 +1107,17 @@ int r82xx_is_tuner_locked(struct r82xx_priv *priv)
 {
 	uint8_t data[5];
 
+	/* was all PLL stuff set for last frequency? */
+	if (! priv->tuner_pll_set)
+		return 1;
+
 	/* Check if PLL has locked */
-	int rc = r82xx_read(priv, 0x00, data, 3);
+	int rc = r82xx_read(priv, 0x00, data, sizeof(data));
 	if (rc < 0)
 		return -3;
 	if (!(data[2] & 0x40)) {
-#if PRINT_PLL_ERRORS
-		fprintf(stderr, "[R82XX] PLL not locked at check!\n");
-#endif
+		if (priv->cfg->verbose || PRINT_PLL_ERRORS)
+			fprintf(stderr, "[R82XX] PLL not locked at check!\n");
 		return 1;
 	}
 	return 0;
@@ -1166,6 +1237,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 			if (rc < 0)
 				return rc;
 
+			priv->tuner_pll_set = 0;
 			rc = r82xx_set_pll(priv, priv->rf_freq);
 			if (rc < 0 || !priv->has_lock)
 				return rc;
@@ -1813,6 +1885,8 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 	uint32_t lo_freq;
 	uint8_t air_cable1_in;
 
+	priv->tuner_pll_set = 0;
+
 	if (!freq)
 		freq = priv->rf_freq;	/* ignore zero frequency; keep last one */
 	else
@@ -1831,8 +1905,11 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 #endif
 
 	rc = r82xx_set_mux(priv, lo_freq);
-	if (rc < 0)
+	if (rc < 0) {
+		if (priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_freq(): error at r82xx_set_mux()\n");
 		goto err;
+	}
 
 	rc = r82xx_set_pll(priv, lo_freq);
 	if (rc < 0 || !priv->has_lock)
@@ -1848,6 +1925,8 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 		(air_cable1_in != priv->input)) {
 		priv->input = air_cable1_in;
 		rc = r82xx_write_reg_mask(priv, 0x05, air_cable1_in, 0x60);
+		if (rc < 0 && priv->cfg->verbose)
+			fprintf(stderr, "r82xx_set_freq(): error writing R828D's 'input selection' into i2c reg 0x05\n");
 	}
 
 err:

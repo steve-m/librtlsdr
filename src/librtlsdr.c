@@ -3028,6 +3028,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->r82xx_c.vco_curr_min = 0xff;  /* VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
 	dev->r82xx_c.vco_curr_max = 0xff;  /* value is inverted: programmed is 7-value, that 0 is lowest current */
 	dev->r82xx_c.vco_algo = 0x00;
+	dev->r82xx_c.verbose = 0;
 
 	/* dev->softagc.command_thread; */
 	dev->softagc.agcState = SOFTSTATE_OFF;
@@ -4267,9 +4268,10 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 		int ret = 0;
 		//if (verbose || dev->verbose)
 		//	fprintf(stderr, "\nrtlsdr_set_opt_string(): parsing option '%s'\n", optPart);
-		if (!strcmp(optPart, "verbose")) {
+		if (!strcmp(optPart, "verbose") || !strcmp(optPart, "v")) {
 			fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed option verbose\n");
-			dev->verbose = verbose = 1;
+			verbose = ++dev->verbose;
+			dev->r82xx_c.verbose = verbose;
 			ret = 0;
 		}
 		else if (!strncmp(optPart, "f=", 2)) {

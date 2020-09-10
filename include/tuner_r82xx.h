@@ -75,6 +75,7 @@ struct r82xx_config {
 	enum r82xx_chip rafael_chip;
 	unsigned int max_i2c_msg_len;
 	int use_predetect;
+	int verbose;
 };
 
 struct r82xx_priv {
@@ -94,6 +95,7 @@ struct r82xx_priv {
 	uint8_t						input;
 	uint8_t						last_vco_curr;
 	int							has_lock;
+	int							tuner_pll_set;
 	int							init_done;
 	int							sideband;
 	int							disable_dither;
