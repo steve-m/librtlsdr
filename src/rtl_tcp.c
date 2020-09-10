@@ -310,16 +310,19 @@ static int set_gain_by_index(rtlsdr_dev_t *_dev, unsigned int index)
 	return res;
 }
 
-static void check_tuner_pll(rtlsdr_dev_t *dev, int *tuner_unsupported)
+static void check_tuner_pll(rtlsdr_dev_t *dev, int *tuner_unsupported, int *last_lock_report)
 {
 	int r = rtlsdr_is_tuner_PLL_locked(dev);
 	/* printf("performed lock check:\n"); */
-	if (r == 1)
+	if (r == 1) {
 		printf("tuner PLL is unlocked!\n");
-#if 0
-	else if (r == 0)
-		printf("tuner PLL is locked.\n");
-#endif
+		*last_lock_report = r;
+	}
+	else if (r == 0) {
+		if (*last_lock_report != r)
+			printf("tuner PLL is locked.\n");
+		*last_lock_report = r;
+	}
 	else if (r == -2) {
 		printf("error at PLL-locked check: tuner not supported! No further tests.\n");
 		*tuner_unsupported = 1;
@@ -352,6 +355,7 @@ static void *command_worker(void *arg)
 	struct command cmd={0, 0};
 	struct timeval tv= {1, 0};
 	unsigned tuner_check_timeout = 0;
+	int last_lock_report = -1;
 	int tuner_unsupported = 0;
 	int r = 0;
 	uint32_t tmp;
@@ -379,7 +383,7 @@ static void *command_worker(void *arg)
 				if (tuner_check_timeout >= 3)
 				{
 					/* automatic check every 3 seconds */
-					check_tuner_pll(dev, &tuner_unsupported);
+					check_tuner_pll(dev, &tuner_unsupported, &last_lock_report);
 					tuner_check_timeout = 0;
 				}
 				fflush(stdout);
@@ -395,8 +399,10 @@ static void *command_worker(void *arg)
 			tmp = ntohl(cmd.param);
 			printf("set freq %u\n", tmp);
 			r = rtlsdr_set_center_freq(dev, tmp);
-			if (r < 0)
+			if (r < 0) {
 				printf("  error setting frequency!\n");
+				last_lock_report = -1;
+			}
 			break;
 		case SET_SAMPLE_RATE:
 			tmp = ntohl(cmd.param);
@@ -423,8 +429,10 @@ static void *command_worker(void *arg)
 			itmp = ntohl(cmd.param);
 			printf("set freq correction %d ppm\n", itmp);
 			r = rtlsdr_set_freq_correction(dev, itmp);
-			if (r < 0)
+			if (r < 0) {
 				printf("  error setting frequency correction!\n");
+				last_lock_report = -1;
+			}
 			break;
 		case SET_IF_STAGE:
 			tmp = ntohl(cmd.param);
@@ -458,8 +466,10 @@ static void *command_worker(void *arg)
 			itmp = ntohl(cmd.param);
 			printf("set offset tuning %d\n", itmp);
 			r = rtlsdr_set_offset_tuning(dev, itmp);
-			if (r < 0)
+			if (r < 0) {
 				printf("  error setting offset tuning!\n");
+				last_lock_report = -1;
+			}
 			break;
 		case SET_RTL_CRYSTAL:
 			printf("set rtl xtal frequency %d\n", ntohl(cmd.param));
@@ -534,8 +544,10 @@ static void *command_worker(void *arg)
 				tmp = 1;
 			printf("set tuner sideband %d: %s sideband\n", tmp, (tmp ? "upper" : "lower") );
 			r = rtlsdr_set_tuner_sideband(dev, tmp);
-			if (r < 0)
+			if (r < 0) {
 				printf("  error setting tuner sideband!\n");
+				last_lock_report = -1;
+			}
 			break;
 		case REPORT_I2C_REGS:
 			tmp = ntohl(cmd.param);
@@ -612,7 +624,10 @@ static void *command_worker(void *arg)
 					(iitmp >>3) & 1, (iitmp >>2) & 1, (iitmp >>1) & 1, iitmp & 1 );
 			break;
 		case IS_TUNER_PLL_LOCKED:
-			check_tuner_pll(dev, &tuner_unsupported);
+			itmp = -1; /* always print lock status */
+			check_tuner_pll(dev, &tuner_unsupported, &itmp);
+			if (itmp != -1)
+				last_lock_report = itmp;
 			tuner_check_timeout = 0;
 			break;
 		default:
