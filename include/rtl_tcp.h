@@ -75,7 +75,8 @@ enum RTL_TCP_COMMANDS {
     GPIO_WRITE_PIN            = 0x52,   /* rtlsdr_set_gpio_output() and rtlsdr_set_gpio_bit() */
     GPIO_READ_PIN             = 0x53,   /* rtlsdr_get_gpio_bit() */
     GPIO_GET_BYTE             = 0x54,   /* rtlsdr_get_gpio_byte() */
-
+    
+    IS_TUNER_PLL_LOCKED       = 0x55,   /* rtlsdr_is_tuner_PLL_locked() */
 };
 
 #ifdef __cplusplus

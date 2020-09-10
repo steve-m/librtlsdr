@@ -310,6 +310,30 @@ static int set_gain_by_index(rtlsdr_dev_t *_dev, unsigned int index)
 	return res;
 }
 
+static void check_tuner_pll(rtlsdr_dev_t *dev, int *tuner_unsupported)
+{
+	int r = rtlsdr_is_tuner_PLL_locked(dev);
+	/* printf("performed lock check:\n"); */
+	if (r == 1)
+		printf("tuner PLL is unlocked!\n");
+#if 0
+	else if (r == 0)
+		printf("tuner PLL is locked.\n");
+#endif
+	else if (r == -2) {
+		printf("error at PLL-locked check: tuner not supported! No further tests.\n");
+		*tuner_unsupported = 1;
+	}
+	else if (r < 0)
+		printf("error checking tuner PLL!\n");
+	else
+		printf("unknown error at tuner PLL check!\n");
+	fflush(stdout);
+}
+
+
+
+
 #ifdef _WIN32
 #define __attribute__(x)
 #pragma pack(push, 1)
@@ -327,6 +351,8 @@ static void *command_worker(void *arg)
 	fd_set readfds;
 	struct command cmd={0, 0};
 	struct timeval tv= {1, 0};
+	unsigned tuner_check_timeout = 0;
+	int tuner_unsupported = 0;
 	int r = 0;
 	uint32_t tmp;
 	int32_t itmp;
@@ -344,6 +370,19 @@ static void *command_worker(void *arg)
 			if(r) {
 				received = recv(s, (char*)&cmd+(sizeof(cmd)-left), left, 0);
 				left -= received;
+				/* printf("received %d bytes\n", received); */
+			}
+			else if (!tuner_unsupported)
+			{
+				/* timeout: nothing happend */
+				++tuner_check_timeout;
+				if (tuner_check_timeout >= 3)
+				{
+					/* automatic check every 3 seconds */
+					check_tuner_pll(dev, &tuner_unsupported);
+					tuner_check_timeout = 0;
+				}
+				fflush(stdout);
 			}
 			if(received == SOCKET_ERROR || do_exit) {
 				printf("comm recv bye\n");
@@ -571,6 +610,10 @@ static void *command_worker(void *arg)
 					iitmp & 0xff,
 					(iitmp >>7) & 1, (iitmp >>6) & 1, (iitmp >>5) & 1, (iitmp >>4) & 1,
 					(iitmp >>3) & 1, (iitmp >>2) & 1, (iitmp >>1) & 1, iitmp & 1 );
+			break;
+		case IS_TUNER_PLL_LOCKED:
+			check_tuner_pll(dev, &tuner_unsupported);
+			tuner_check_timeout = 0;
 			break;
 		default:
 			printf("unknown command 0x%02x\n", cmd.cmd);

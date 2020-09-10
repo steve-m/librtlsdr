@@ -173,12 +173,27 @@ RTLSDR_API int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data,
 RTLSDR_API int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq);
 
 /*!
+ * Check, if tuner PLL (frequency) is still locked.
+ * Tuner/PLL might loose lock (at high frequencies),
+ * e.g. for temperature reasons
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \return   1: PLL is NOT locked
+ * \return   0: PLL HAS lock
+ * \return < 0: if device handle is invalid or some other error
+ * \return -2: not supported for devices' tuner
+ */
+RTLSDR_API int rtlsdr_is_tuner_PLL_locked(rtlsdr_dev_t *dev);
+
+
+/*!
  * Get actual frequency the device is tuned to.
  *
  * \param dev the device handle given by rtlsdr_open()
  * \return 0 on error, frequency in Hz otherwise
  */
 RTLSDR_API uint32_t rtlsdr_get_center_freq(rtlsdr_dev_t *dev);
+
 
 /*!
  * Set the frequency correction value for the device.

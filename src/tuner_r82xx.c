@@ -891,6 +891,11 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 		priv->last_vco_curr = vco_curr_min;
 	}
 
+#if 0
+	fprintf(stderr, "vco_last = 0x%02x; vcocmin << 5 = 0x%02x; vcocmax << 5 = 0x%02x\n",
+		(unsigned)priv->last_vco_curr, (unsigned)vco_curr_min, (unsigned)vco_curr_max);
+#endif
+
 	/* Calculate divider */
 	while (mix_div <= 64) {
 		if (((freq_khz * mix_div) >= vco_min) &&
@@ -1028,6 +1033,25 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 
 	return rc;
 }
+
+
+int r82xx_is_tuner_locked(struct r82xx_priv *priv)
+{
+	uint8_t data[5];
+
+	/* Check if PLL has locked */
+	int rc = r82xx_read(priv, 0x00, data, 3);
+	if (rc < 0)
+		return -3;
+	if (!(data[2] & 0x40)) {
+#if PRINT_PLL_ERRORS
+		fprintf(stderr, "[R82XX] PLL not locked at check!\n");
+#endif
+		return 1;
+	}
+	return 0;
+}
+
 
 static int r82xx_sysfreq_sel(struct r82xx_priv *priv,
 				 enum r82xx_tuner_type type)

@@ -381,10 +381,6 @@ int r820t_init(void *dev) {
 		devt->r82xx_c.rafael_chip = CHIP_R820T;
 	}
 
-	devt->r82xx_c.vco_curr_min = 0xff;  /* VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
-	devt->r82xx_c.vco_curr_max = 0xff;  /* value is inverted: programmed is 7-value, that 0 is lowest current */
-	devt->r82xx_c.vco_algo = 0x00;
-
 	rtlsdr_get_xtal_freq(devt, NULL, &devt->r82xx_c.xtal);
 
 	devt->r82xx_c.max_i2c_msg_len = 8;
@@ -1456,6 +1452,29 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 
 	return r;
 }
+
+
+int rtlsdr_is_tuner_PLL_locked(rtlsdr_dev_t *dev)
+{
+	int r = -1;
+
+	#if LOG_API_CALLS && LOG_API_SET_FREQ
+	fprintf(stderr, "LOG: rtlsdr_is_tuner_PLL_locked()\n");
+	#endif
+
+	if (!dev || !dev->tuner)
+		return -1;
+
+	if (dev->tuner_type != RTLSDR_TUNER_R820T && dev->tuner_type != RTLSDR_TUNER_R828D )
+		return -2;
+
+	rtlsdr_set_i2c_repeater(dev, 1);
+	r = r82xx_is_tuner_locked(&dev->r82xx_p);
+	rtlsdr_set_i2c_repeater(dev, 0);
+
+	return r;
+}
+
 
 uint32_t rtlsdr_get_center_freq(rtlsdr_dev_t *dev)
 {
@@ -3004,6 +3023,11 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->gpio_state_known = 0;
 	dev->gpio_state = 0;
 	dev->called_set_opt = 0;
+
+	/* fprintf(stderr, "\n*********************************\ninit/overwrite tuner VCO settings\n"); */
+	dev->r82xx_c.vco_curr_min = 0xff;  /* VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
+	dev->r82xx_c.vco_curr_max = 0xff;  /* value is inverted: programmed is 7-value, that 0 is lowest current */
+	dev->r82xx_c.vco_algo = 0x00;
 
 	/* dev->softagc.command_thread; */
 	dev->softagc.agcState = SOFTSTATE_OFF;
