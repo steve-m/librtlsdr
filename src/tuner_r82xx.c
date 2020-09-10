@@ -719,7 +719,7 @@ static int r82xx_set_mux(struct r82xx_priv *priv, uint32_t freq)
 static int r82xx_set_pll_yc(struct r82xx_priv *priv, uint32_t freq)
 {
   const uint32_t vco_min = 1770000000;
-  const uint32_t vco_max = 3900000000;
+  const uint32_t vco_max = 3900000000U;
   uint32_t pll_ref = (priv->cfg->xtal);
   uint32_t pll_ref_2x = (pll_ref * 2);
 
