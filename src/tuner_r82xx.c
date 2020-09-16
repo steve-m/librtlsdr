@@ -1652,6 +1652,8 @@ static const struct IFinfo IFi[] = {
 	{ 2, 1100+2, IFB(1100),   0, 0x0F, 0xEF, 0x60 },	/* steep high freq edge */
 #endif
 
+	{ 3, 1200+0,      1350,   0, 0x0F, 0xEE, 0x00 },	/* centered with hpf */
+
 	{ 3, 1300+0,      2050,  -7, 0x0F, 0x8A, 0x00 },	/* centered with hpf */
 #if (WITH_ASYM_FILTER)
 	{ 1, 1300+1, IFA(1300),  26, 0x0F, 0xEF, 0x60 },	/* steep low  freq edge */
@@ -1661,7 +1663,15 @@ static const struct IFinfo IFi[] = {
 	{ 3, 1500+3,      1300, -24, 0x0F, 0xEF, 0x60 },
 	{ 3, 1600+0,      1900,   0, 0x0F, 0x8B, 0x00 },	/* centered with hpf */
 	{ 3, 1750+3,      1400,  12, 0x0F, 0xCF, 0x60 },	/* 20 */
-	{ 3, 1950+3,      1500,  30, 0x0F, 0x8F, 0x60 }
+
+	{ 3, 1800+0,      1400,   0, 0x0F, 0xAF, 0x00 },
+
+	{ 3, 1950+3,      1500,  30, 0x0F, 0x8F, 0x60 },
+
+	{ 3, 2200+0,      1600,   0, 0x0F, 0x8F, 0x00 },
+	{ 3, 3000+0,      2000,   0, 0x04, 0x8F, 0x00 },
+	{ 3, 5000+0,      3570,   0, 0x0B, 0x6B, 0x00 }
+
 };
 
 
