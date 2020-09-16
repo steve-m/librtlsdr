@@ -779,13 +779,12 @@ static int r82xx_set_pll_yc(struct r82xx_priv *priv, uint32_t freq)
     return rc;
   }
 
-  if (vco_frac == 0)
-  {
+  if (vco_frac == 0) {
     /* Disable frac pll */
     rc = r82xx_write_reg_mask(priv, 0x12, 0x08, 0x08);
     if(rc < 0) {
-    if (priv->cfg->verbose)
-      fprintf(stderr, "r82xx_set_pll_yc(): error writing 'disable frac pll' into i2c reg 0x12\n");
+      if (priv->cfg->verbose)
+        fprintf(stderr, "r82xx_set_pll_yc(): error writing 'disable frac pll' into i2c reg 0x12\n");
       return rc;
     }
   }
@@ -1105,6 +1104,7 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 
 int r82xx_is_tuner_locked(struct r82xx_priv *priv)
 {
+	int rc;
 	uint8_t data[5];
 
 	/* was all PLL stuff set for last frequency? */
@@ -1112,7 +1112,7 @@ int r82xx_is_tuner_locked(struct r82xx_priv *priv)
 		return 1;
 
 	/* Check if PLL has locked */
-	int rc = r82xx_read(priv, 0x00, data, sizeof(data));
+	rc = r82xx_read(priv, 0x00, data, sizeof(data));
 	if (rc < 0)
 		return -3;
 	if (!(data[2] & 0x40)) {
