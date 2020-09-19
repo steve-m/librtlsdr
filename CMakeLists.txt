@@ -63,7 +63,7 @@ configure_file(
     @ONLY )
 
 
-if(PROVIDE_UDP_SERVER AND WIN32)
+if(PROVIDE_UDP_SERVER)
     add_definitions(-DWITH_UDP_SERVER)
 endif()
 
