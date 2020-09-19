@@ -36,6 +36,10 @@
 #define PRINT_INITIAL_REGISTERS		0
 #define PRINT_ACTUAL_VCO_AND_ERR	0
 
+/* use fifth harmonic above this frequency in kHz, when PLL does NOT lock */
+#define FIFTH_HARM_FRQ_THRESH_KHZ	1770000
+#define RETRY_WITH_FIFTH_HARM_KHZ	1760000
+
 
 /* #define VGA_FOR_AGC_MODE	16 */
 #define DEFAULT_IF_VGA_VAL	11
@@ -1930,38 +1934,55 @@ int r82xx_set_sideband(struct r82xx_priv *priv, int sideband)
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 {
 	int rc = -1;
-	uint32_t lo_freq;
+	int fifth_harm;
+	uint32_t lo_freq, lo_freqHarm;
 	uint8_t air_cable1_in;
 
-	priv->tuner_pll_set = 0;
+	fifth_harm = ( freq > FIFTH_HARM_FRQ_THRESH_KHZ * 1000 ) ? 1 : 0;
+	for ( ; fifth_harm < 2; ++fifth_harm )
+	{
+		priv->tuner_pll_set = 0;
 
-	if (!freq)
-		freq = priv->rf_freq;	/* ignore zero frequency; keep last one */
-	else
-		priv->rf_freq = freq;
+		if (!freq)
+			freq = priv->rf_freq;	/* ignore zero frequency; keep last one */
+		else
+			priv->rf_freq = freq;
 
-	if(priv->sideband)
-		lo_freq = freq - priv->int_freq + priv->if_band_center_freq;
-	else
-		lo_freq = freq + priv->int_freq + priv->if_band_center_freq;
+		if(priv->sideband)
+			lo_freq = freq - priv->int_freq + priv->if_band_center_freq;
+		else
+			lo_freq = freq + priv->int_freq + priv->if_band_center_freq;
+
+		lo_freqHarm = (fifth_harm) ? ( lo_freq / 5 ) : lo_freq;
 
 #if 0
-	fprintf(stderr, "%s(freq = %u) @ %s--> intfreq %u, ifcenter %d --> f %u\n"
+		fprintf(stderr, "%s(freq = %u) @ %s--> intfreq %u, ifcenter %d --> f %u\n"
 			, __FUNCTION__, (unsigned)freq, (priv->sideband ? "USB" : "LSB")
 			, (unsigned)priv->int_freq, (int)priv->if_band_center_freq
 			, (unsigned)lo_freq );
 #endif
 
-	rc = r82xx_set_mux(priv, lo_freq);
-	if (rc < 0) {
-		if (priv->cfg->verbose)
-			fprintf(stderr, "r82xx_set_freq(): error at r82xx_set_mux()\n");
-		goto err;
-	}
+		rc = r82xx_set_mux(priv, lo_freq);
+		if (rc < 0) {
+			if (priv->cfg->verbose)
+				fprintf(stderr, "r82xx_set_freq(): error at r82xx_set_mux()\n");
+			goto err;
+		}
 
-	rc = r82xx_set_pll(priv, lo_freq);
-	if (rc < 0 || !priv->has_lock)
-		goto err;
+		rc = r82xx_set_pll(priv, lo_freqHarm);
+		if (rc < 0 || !priv->has_lock)
+		{
+			if ( !fifth_harm && lo_freq > RETRY_WITH_FIFTH_HARM_KHZ * 1000 )
+				continue;
+			goto err;
+		}
+#if 0
+		if ( fifth_harm )
+			fprintf(stderr, "r82xx_set_freq(): set up for 5th harmonic\n");
+#endif
+
+		break;
+	}
 
 	/* switch between 'Cable1' and 'Air-In' inputs on sticks with
 	 * R828D tuner. We switch at 345 MHz, because that's where the
