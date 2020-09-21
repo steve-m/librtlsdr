@@ -28,7 +28,6 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <fcntl.h>
@@ -48,8 +47,6 @@
 #include <rtl_tcp.h>
 #include "convenience/convenience.h"
 #include "convenience/rtl_convenience.h"
-
-#include "rtl_app_ver.h"
 
 #ifdef _WIN32
 #pragma comment(lib, "ws2_32.lib")
@@ -297,7 +294,7 @@ static int set_gain_by_index(rtlsdr_dev_t *_dev, unsigned int index)
 			printf("set tuner gain to %.1f dB\n", gains[index] / 10.0);
 		res = rtlsdr_set_tuner_gain(_dev, gains[index]);
 		if (res < 0)
-		printf("  error setting tuner gain index failed\n");
+		printf("  setting tuner gain index failed\n");
 
 		free(gains);
 	}
@@ -514,6 +511,11 @@ static void *command_worker(void *arg)
 			r = rtlsdr_set_tuner_i2c_override(dev, (tmp >> 20) & 0xfff, (tmp >> 12) & 0xff, tmp & 0xfff);
 			if (r < 0)
 				printf("  error setting i2c register!\n");
+			break;
+		case UDP_TERMINATE:
+			printf("comm recv bye\n");
+			sighandler(0);
+			pthread_exit(NULL);
 			break;
 		case SET_TUNER_BW_IF_CENTER:
 			if_band_center_freq = ntohl(cmd.param);
