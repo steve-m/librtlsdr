@@ -39,6 +39,7 @@
 /* use fifth harmonic above this frequency in kHz, when PLL does NOT lock */
 #define FIFTH_HARM_FRQ_THRESH_KHZ	1770000
 #define RETRY_WITH_FIFTH_HARM_KHZ	1760000
+#define DEFAULT_HARMONIC			5
 
 
 /* #define VGA_FOR_AGC_MODE	16 */
@@ -1931,29 +1932,62 @@ int r82xx_set_sideband(struct r82xx_priv *priv, int sideband)
 	return 0;
 }
 
+int r82xx_get_sideband(struct r82xx_priv *priv)
+{
+	return priv->sideband;
+}
+
+
+static const uint32_t harm_sideband_xor[17] = {
+	0	/*  0 - should not happen */
+,	0	/*  1 - default - as without harmonic */
+,	0	/*  2: ( 2 * 90 deg) % 360 = 180 deg */
+,	1	/*  3: ( 3 * 90 deg) % 360 = -90 deg */
+,	0	/*  4: ( 4 * 90 deg) % 360 =   0 deg */
+,	0	/*  5: ( 5 * 90 deg) % 360 = +90 deg */
+,	0	/*  6: ( 6 * 90 deg) % 360 = 180 deg */
+,	1	/*  7: ( 7 * 90 deg) % 360 = -90 deg */
+,	0	/*  8: ( 8 * 90 deg) % 360 =   0 deg */
+,	0	/*  9: ( 9 * 90 deg) % 360 = +90 deg */
+,	0	/* 10: (10 * 90 deg) % 360 = 180 deg */
+,	1	/* 11: (11 * 90 deg) % 360 = -90 deg */
+,	0	/* 12: (12 * 90 deg) % 360 =   0 deg */
+,	0	/* 13: (13 * 90 deg) % 360 = +90 deg */
+,	0	/* 14: (14 * 90 deg) % 360 = 180 deg */
+,	1	/* 15: (15 * 90 deg) % 360 = -90 deg */
+,	0	/* 16: (16 * 90 deg) % 360 = 180 deg */
+};
+
+int r82xx_flip_rtl_sideband(struct r82xx_priv *priv)
+{
+	return harm_sideband_xor[priv->tuner_harmonic];
+}
+
 int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 {
 	int rc = -1;
-	int fifth_harm;
+	int nth_harm;
+	int harm = (priv->cfg->harmonic <= 0) ? DEFAULT_HARMONIC : priv->cfg->harmonic;
 	uint32_t lo_freq, lo_freqHarm;
 	uint8_t air_cable1_in;
 
-	fifth_harm = ( freq > FIFTH_HARM_FRQ_THRESH_KHZ * 1000 ) ? 1 : 0;
-	for ( ; fifth_harm < 2; ++fifth_harm )
+	nth_harm = ( freq > FIFTH_HARM_FRQ_THRESH_KHZ * 1000 ) ? 1 : 0;
+	for ( ; nth_harm < 2; ++nth_harm )
 	{
 		priv->tuner_pll_set = 0;
+		priv->tuner_harmonic = ( nth_harm ) ? harm : 0;
 
 		if (!freq)
 			freq = priv->rf_freq;	/* ignore zero frequency; keep last one */
 		else
 			priv->rf_freq = freq;
 
-		if(priv->sideband)
+		if ( priv->sideband ^ harm_sideband_xor[priv->tuner_harmonic] )
 			lo_freq = freq - priv->int_freq + priv->if_band_center_freq;
 		else
 			lo_freq = freq + priv->int_freq + priv->if_band_center_freq;
 
-		lo_freqHarm = (fifth_harm) ? ( lo_freq / 5 ) : lo_freq;
+		lo_freqHarm = (nth_harm) ? ( lo_freq / harm ) : lo_freq;
 
 #if 0
 		fprintf(stderr, "%s(freq = %u) @ %s--> intfreq %u, ifcenter %d --> f %u\n"
@@ -1972,14 +2006,17 @@ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
 		rc = r82xx_set_pll(priv, lo_freqHarm);
 		if (rc < 0 || !priv->has_lock)
 		{
-			if ( !fifth_harm && lo_freq > RETRY_WITH_FIFTH_HARM_KHZ * 1000 )
+			if ( !nth_harm && lo_freq > RETRY_WITH_FIFTH_HARM_KHZ * 1000 )
 				continue;
 			goto err;
 		}
+
+		if ( nth_harm )
+		{
 #if 0
-		if ( fifth_harm )
-			fprintf(stderr, "r82xx_set_freq(): set up for 5th harmonic\n");
+			fprintf(stderr, "r82xx_set_freq(): set up for %d-th harmonic\n", harm);
 #endif
+		}
 
 		break;
 	}

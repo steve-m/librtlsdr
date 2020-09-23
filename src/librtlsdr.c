@@ -102,6 +102,7 @@ typedef int socklen_t;
 #define PRINT_UDP_SRV_MSGS		0
 
 #define INIT_R820T_TUNER_GAIN	0
+#define ENBALE_R820T_HARM_OPT	1
 #define ENABLE_VCO_OPTIONS		1
 
 
@@ -226,6 +227,7 @@ struct rtlsdr_dev {
 	int32_t  if_band_center_freq; /* Hz - rtlsdr_set_tuner_band_center() */
 	int      tuner_if_freq;
 	int      tuner_sideband;
+	int      rtl_spectrum_sideband;  /* buffered last sideband. 1: LSB; 2: USB */
 	int corr; /* ppm */
 	/* int gain; * tenth dB */
 	enum rtlsdr_ds_mode direct_sampling_mode;
@@ -403,8 +405,20 @@ int r820t_exit(void *dev) {
 }
 
 int r820t_set_freq(void *dev, uint32_t freq) {
+	int r, ri, flip, sideband;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	return r82xx_set_freq(&devt->r82xx_p, freq);
+	r = r82xx_set_freq(&devt->r82xx_p, freq);
+
+	sideband = r82xx_get_sideband(&devt->r82xx_p);
+	flip = r82xx_flip_rtl_sideband(&devt->r82xx_p);
+	ri = rtlsdr_set_spectrum_inversion(devt, sideband ^ flip);
+	if (ri) {
+		if ( devt->verbose )
+			fprintf(stderr, "r820t_set_freq(%u): rtlsdr_set_spectrum_inversion() returned %d\n", freq, r);
+		return ri;
+	}
+
+	return r;
 }
 
 
@@ -538,7 +552,7 @@ int r820t_get_i2c_reg_array(void *dev, unsigned char* data, int len) {
 }
 
 int r820t_set_sideband(void *dev, int sideband) {
-	int r;
+	int r, flip;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
 
 	if ( devt->verbose )
@@ -550,9 +564,11 @@ int r820t_set_sideband(void *dev, int sideband) {
 		return r;
 	}
 
+	flip = r82xx_flip_rtl_sideband(&devt->r82xx_p);
+
 	if ( devt->verbose )
-		fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_spectrum_inversion() ..\n", sideband);
-	r = rtlsdr_set_spectrum_inversion(devt, sideband);
+		fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_spectrum_inversion() ^ %d from tuner ..\n", sideband, flip);
+	r = rtlsdr_set_spectrum_inversion(devt, sideband ^ flip);
 	if (r) {
 		if ( devt->verbose )
 			fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_spectrum_inversion() returned %d\n", sideband, r);
@@ -1201,13 +1217,18 @@ static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq)
 
 static int rtlsdr_set_spectrum_inversion(rtlsdr_dev_t *dev, int sideband)
 {
-	int r;
-	if(sideband)
-		/* disable spectrum inversion */
-		r = rtlsdr_demod_write_reg(dev, 1, 0x15, 0x00, 1);
-	else
-		/* enable spectrum inversion */
-		r = rtlsdr_demod_write_reg(dev, 1, 0x15, 0x01, 1);
+	int r = 0;
+	if ( dev->rtl_spectrum_sideband != sideband + 1 )
+	{
+		if(sideband)
+			/* disable spectrum inversion */
+			r = rtlsdr_demod_write_reg(dev, 1, 0x15, 0x00, 1);
+		else
+			/* enable spectrum inversion */
+			r = rtlsdr_demod_write_reg(dev, 1, 0x15, 0x01, 1);
+
+		dev->rtl_spectrum_sideband = (r) ? 0 : (sideband + 1);
+	}
 	return r;
 }
 
@@ -3047,6 +3068,8 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	dev->gpio_state = 0;
 	dev->called_set_opt = 0;
 
+	dev->r82xx_c.harmonic = 0;
+
 	/* fprintf(stderr, "\n*********************************\ninit/overwrite tuner VCO settings\n"); */
 	dev->r82xx_c.vco_curr_min = 0xff;  /* VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
 	dev->r82xx_c.vco_curr_max = 0xff;  /* value is inverted: programmed is 7-value, that 0 is lowest current */
@@ -4238,6 +4261,9 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t\t                        0: use I & Q; 1: use I; 2: use Q; 3: use I below threshold frequency;\n"
 		"\t\t                        4: use Q below threshold frequency (=RTL-SDR v3)\n"
 		"\t\t                        other values set the threshold frequency\n"
+#if ENBALE_R820T_HARM_OPT
+		"\t\tharm=<Nth_harmonic>   R820T/2: use Nth harmonic for frequencies above 1.76 GHz. default: 5\n"
+#endif
 #if ENABLE_VCO_OPTIONS
 		"\t\tvcocmin=<current>     set R820T/2 VCO current min: 0..7: higher value is more current\n"
 		"\t\tvcocmax=<current>     set R820T/2 VCO current max: 0..7\n"
@@ -4255,6 +4281,9 @@ const char * rtlsdr_get_opt_help(int longInfo)
 		"\t[-O\tset RTL options string seperated with ':', e.g. -O 'bc=30000:agc=0' ]\n"
 		"\t\tverbose:f=<freqHz>:bw=<bw_in_kHz>:bc=<if_in_Hz>:sb=<sideband>\n"
 		"\t\tagc=<tuner_gain_mode>:gain=<tenth_dB>:ifm=<tuner_if_mode>:dagc=<rtl_agc>\n"
+#if ENBALE_R820T_HARM_OPT
+		"\t\tharm=<harmonic>\n"
+#endif
 #if ENABLE_VCO_OPTIONS
 		"\t\tds=<direct_sampling>:dm=<ds_mode_thresh>:vcocmin=<c>:vcocmax=<c>:vcoalgo=<a>\n"
 		"\t\tT=<bias_tee>\n"
@@ -4379,6 +4408,21 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 				dev->direct_sampling_threshold = dm;
 			ret = rtlsdr_set_ds_mode(dev, dev->direct_sampling_mode, dev->direct_sampling_threshold);
 		}
+#if ENBALE_R820T_HARM_OPT
+		else if (!strncmp(optPart, "harm=", 5)) {
+			int harmonic = atoi(optPart +5);
+			if ( 0 <= harmonic && harmonic <= 16 )
+			{
+				dev->r82xx_c.harmonic = harmonic;
+				ret = 0;
+				if (verbose)
+					fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed harmonic config %d\n", harmonic);
+			} else if (verbose) {
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): error parsing harmonic config: valid range 0 .. 16\n");
+				ret = 1;
+			}
+		}
+#endif
 #if ENABLE_VCO_OPTIONS
 		else if (!strncmp(optPart, "vcocmin=", 8)) {
 			int current = atoi(optPart +8);

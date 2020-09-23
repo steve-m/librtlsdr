@@ -71,6 +71,7 @@ struct r82xx_config {
 	uint8_t vco_curr_min;  /* VCO min/max current for R18/0x12 bits [7:5] in 0 .. 7. use 0xff for default */
 	uint8_t vco_curr_max;  /* value is inverted: programmed is 7-value, that 0 is lowest current */
 	uint8_t vco_algo;
+	int harmonic;
 	uint32_t xtal;
 	enum r82xx_chip rafael_chip;
 	unsigned int max_i2c_msg_len;
@@ -96,6 +97,7 @@ struct r82xx_priv {
 	uint8_t						last_vco_curr;
 	int							has_lock;
 	int							tuner_pll_set;
+	int							tuner_harmonic;
 	int							init_done;
 	int							sideband;
 	int							disable_dither;
@@ -166,6 +168,9 @@ int r82xx_set_bandwidth(struct r82xx_priv *priv, int bandwidth,  uint32_t rate, 
 int r82xx_set_bw_center(struct r82xx_priv *priv, int32_t if_band_center_freq);
 /* Mixer Sideband:  0: lower, 1: upper */
 int r82xx_set_sideband(struct r82xx_priv *priv, int sideband);
+int r82xx_get_sideband(struct r82xx_priv *priv);
+/* should rtlsdr flip the spectrum? */
+int r82xx_flip_rtl_sideband(struct r82xx_priv *priv);
 int r82xx_set_dither(struct r82xx_priv *priv, int dither);
 
 int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg);
