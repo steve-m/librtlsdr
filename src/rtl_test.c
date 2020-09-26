@@ -351,6 +351,9 @@ void tuner_benchmark(uint32_t beg_freq, uint32_t end_freq)
 
 	fprintf(stderr, "Testing tuner range. This may take a couple of minutes..\n");
 
+	/* deactivate harmonic reception - in case switched on with cli options */
+	rtlsdr_set_harmonic_rx(dev, 0);
+
 	/* Scan for tuneable frequencies coarsely. When we find something,
 	 * do a binary search to narrow down the exact edge of the band.
 	 *

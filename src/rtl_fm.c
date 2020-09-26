@@ -132,10 +132,10 @@ struct cmd_state
 	char acLine[4096];
 	int checkADCmax;
 	int checkADCrms;
-	uint32_t prevFreq;
+	uint64_t prevFreq;
+	uint64_t freq;
 	int prevGain;
 	uint32_t prevBandwidth;
-	uint32_t freq;
 	int gain;
 	enum trigExpr trigCrit;
 	double refLevel;
@@ -149,7 +149,7 @@ struct cmd_state
 	int omitFirstFreqLevels;
 	int waitTrigger[FREQUENCIES_LIMIT];
 	int statNumLevels[FREQUENCIES_LIMIT];
-	uint32_t statFreq[FREQUENCIES_LIMIT];
+	uint64_t statFreq[FREQUENCIES_LIMIT];
 	double statSumLevels[FREQUENCIES_LIMIT];
 	float statMinLevel[FREQUENCIES_LIMIT];
 	float statMaxLevel[FREQUENCIES_LIMIT];
@@ -161,8 +161,8 @@ struct dongle_state
 	pthread_t thread;
 	rtlsdr_dev_t *dev;
 	int	  dev_index;
-	uint32_t userFreq;
-	uint32_t freq;
+	uint64_t userFreq;
+	uint64_t freq;
 	uint32_t rate;
 	uint32_t bandwidth;
 	int	  bccorner;  /* -1 for low band corner, 0 for band center, +1 for high band corner */
@@ -592,7 +592,7 @@ static int toNextCmdLine(struct cmd_state *c)
 			c->checkADCrms = 1;
 			continue;
 		}
-		c->freq = (uint32_t)atofs(pCmdFreq);
+		c->freq = (uint64_t)atofs(pCmdFreq);
 
 		pCmdGain = strtok(NULL, delim);
 		if (!pCmdGain) { fprintf(stderr, "error parsing gain in line %d of command file!\n", c->lineNo); continue; }
@@ -738,7 +738,7 @@ static void checkTriggerCommand(struct cmd_state *c, unsigned char adcSampleMax,
 			if (triggerCommand && c->command && c->command[0]) {
 				fprintf(stderr, "command to trigger is '%s %s'\n", c->command, c->args);
 				/* prepare search/replace of special parameters for command arguments */
-				snprintf(acRepFreq, 32, "%u", c->freq);
+				snprintf(acRepFreq, 32, "%.0f", (double)c->freq);
 				snprintf(acRepGain, 32, "%d", c->gain);
 				snprintf(acRepMLevel, 32, "%d", (int)(0.5 + triggerLevel*10.0) );
 				execReplaceStrings[3] = aCritStr[c->trigCrit];
@@ -1463,12 +1463,13 @@ static void *output_thread_fn(void *arg)
 	return 0;
 }
 
-static void optimal_settings(uint32_t freq, uint32_t rate)
+static void optimal_settings(uint64_t freq, uint32_t rate)
 {
 	/* giant ball of hacks
 	 * seems unable to do a single pass, 2:1
 	 */
-	uint32_t capture_freq, capture_rate;
+	uint64_t capture_freq;
+	uint32_t capture_rate;
 	struct dongle_state *d = &dongle;
 	struct demod_state *dm = &demod;
 	struct controller_state *cs = &controller;
@@ -1487,11 +1488,11 @@ static void optimal_settings(uint32_t freq, uint32_t rate)
 	if (!d->offset_tuning) {
 		capture_freq = freq - capture_rate/4;
 		if (verbosity >= 2)
-			fprintf(stderr, "optimal_settings(freq = %u): capture_freq = freq - capture_rate/4 = %u\n", freq, capture_freq );
+			fprintf(stderr, "optimal_settings(freq = %f MHz): capture_freq = freq - capture_rate/4 = %f MHz\n", freq * 1E-6, capture_freq * 1E-6 );
 	}
 	capture_freq += cs->edge * dm->rate_in / 2;
 	if (verbosity >= 2)
-		fprintf(stderr, "optimal_settings(freq = %u): capture_freq +=  cs->edge * dm->rate_in / 2 = %d * %d / 2 = %u\n", freq, cs->edge, dm->rate_in, capture_freq );
+		fprintf(stderr, "optimal_settings(freq = %f MHz): capture_freq +=  cs->edge * dm->rate_in / 2 = %d * %d / 2 = %f MHz\n", freq * 1E-6, cs->edge, dm->rate_in, capture_freq * 1E-6 );
 	dm->output_scale = (1<<15) / (128 * dm->downsample);
 	if (dm->output_scale < 1) {
 		dm->output_scale = 1;}
@@ -1501,7 +1502,7 @@ static void optimal_settings(uint32_t freq, uint32_t rate)
 	d->freq = capture_freq;
 	d->rate = capture_rate;
 	if (verbosity >= 2)
-		fprintf(stderr, "optimal_settings(freq = %u) delivers freq %.0f, rate %.0f\n", freq, (double)d->freq, (double)d->rate );
+		fprintf(stderr, "optimal_settings(freq = %f MHz) delivers freq %f MHz, rate %.0f\n", freq * 1E-6, d->freq * 1E-6, (double)d->rate );
 }
 
 static void *controller_thread_fn(void *arg)
@@ -1538,7 +1539,7 @@ static void *controller_thread_fn(void *arg)
 
 	/* Set the frequency */
 	if (verbosity) {
-		fprintf(stderr, "verbose_set_frequency(%.3f kHz)\n", (double)dongle.userFreq /1000.0);
+		fprintf(stderr, "verbose_set_frequency(%f MHz)\n", dongle.userFreq * 1E-6);
 		if (!dongle.offset_tuning)
 			fprintf(stderr, "  frequency is away from parametrized one, to avoid negative impact from dc\n");
 	}
@@ -1584,7 +1585,7 @@ static void *controller_thread_fn(void *arg)
 			/* hacky hopping */
 			s->freq_now = (s->freq_now + 1) % s->freq_len;
 			optimal_settings(s->freqs[s->freq_now], demod.rate_in);
-			rtlsdr_set_center_freq(dongle.dev, dongle.freq);
+			rtlsdr_set_center_freq64(dongle.dev, dongle.freq);
 			if ( dongle.bandwidth ) {
 				if_band_center_freq = dongle.userFreq - dongle.freq;
 				if ( prev_if_band_center_freq != if_band_center_freq ) {
@@ -1608,7 +1609,7 @@ static void *controller_thread_fn(void *arg)
 			optimal_settings(c->freq, demod.rate_in);
 			/* 1- set center frequency */
 			if (c->prevFreq != dongle.freq) {
-				rtlsdr_set_center_freq(dongle.dev, dongle.freq);
+				rtlsdr_set_center_freq64(dongle.dev, dongle.freq);
 				c->prevFreq = dongle.freq;
 			}
 			/* 2- Set the tuner gain */
@@ -2169,7 +2170,7 @@ int main(int argc, char **argv)
 		/* output scan statistics */
 		for (k = 0; k < FREQUENCIES_LIMIT; k++) {
 			if (cmd.statNumLevels[k] > 0)
-				fprintf(stderr, "%u, %.1f, %.2f, %.1f\n", cmd.statFreq[k], cmd.statMinLevel[k], cmd.statSumLevels[k] / cmd.statNumLevels[k], cmd.statMaxLevel[k] );
+				fprintf(stderr, "%.0f, %.1f, %.2f, %.1f\n", (double)(cmd.statFreq[k]), cmd.statMinLevel[k], cmd.statSumLevels[k] / cmd.statNumLevels[k], cmd.statMaxLevel[k] );
 		}
 	}
 

@@ -31,7 +31,8 @@ extern "C" {
  * commands >= 0x40 are extensions
  */
 enum RTL_TCP_COMMANDS {
-    SET_FREQUENCY             = 0x01,
+    SET_FREQUENCY             = 0x01,   /* sets frequency - amending hi word of SET_FREQ_HI32 if present */
+    SET_FREQ_HI32             = 0x56,   /* in addition to SET_FREQUENCY */
     SET_SAMPLE_RATE           = 0x02,
     SET_GAIN_MODE             = 0x03,
     SET_GAIN                  = 0x04,
@@ -77,6 +78,8 @@ enum RTL_TCP_COMMANDS {
     GPIO_GET_BYTE             = 0x54,   /* rtlsdr_get_gpio_byte() */
     
     IS_TUNER_PLL_LOCKED       = 0x55,   /* rtlsdr_is_tuner_PLL_locked() */
+
+    /* SET_FREQ_HI32          = 0x56,    * rtlsdr_set_center_freq64() */
 };
 
 #ifdef __cplusplus

@@ -94,7 +94,7 @@ int *window_coefs;
 struct tuning_state
 /* one per tuning range */
 {
-	int freq;
+	uint64_t freq;
 	int rate;
 	int bin_e;
 	int64_t *avg;  /* length == 2^bin_e */
@@ -446,7 +446,8 @@ void frequency_range(char *arg, double crop)
 // do we want the fewest ranges (easy) or the fewest bins (harder)?
 {
 	char *start, *stop, *step;
-	int i, j, upper, lower, max_size, bw_seen, bw_used, bin_e, buf_len;
+	uint64_t upper, lower;
+	int i, j, max_size, bw_seen, bw_used, bin_e, buf_len;
 	int downsample, downsample_passes;
 	double bin_size;
 	struct tuning_state *ts;
@@ -456,8 +457,8 @@ void frequency_range(char *arg, double crop)
 	stop[-1] = '\0';
 	step = strchr(stop, ':') + 1;
 	step[-1] = '\0';
-	lower = (int)atofs(start);
-	upper = (int)atofs(stop);
+	lower = (uint64_t)(atofs(start) + 0.5);
+	upper = (uint64_t)(atofs(stop) + 0.5);
 	max_size = (int)atofs(step);
 	stop[-1] = ':';
 	step[-1] = ':';
@@ -545,11 +546,11 @@ void frequency_range(char *arg, double crop)
 	fprintf(stderr, "Buffer size: %i bytes (%0.2fms)\n", buf_len, 1000 * 0.5 * (float)buf_len / (float)bw_used);
 }
 
-void retune(rtlsdr_dev_t *d, int freq)
+void retune(rtlsdr_dev_t *d, uint64_t freq)
 {
 	uint8_t dump[BUFFER_DUMP];
 	int n_read;
-	rtlsdr_set_center_freq(d, (uint32_t)freq);
+	rtlsdr_set_center_freq64(d, freq);
 	/* wait for settling and flush buffer */
 	usleep(5000);
 	rtlsdr_read_sync(d, &dump, BUFFER_DUMP, &n_read);
@@ -647,7 +648,8 @@ int64_t real_conj(int16_t real, int16_t imag)
 
 void scanner(void)
 {
-	int i, j, j2, f, n_read, offset, bin_e, bin_len, buf_len, ds, ds_p;
+	int i, j, j2, n_read, offset, bin_e, bin_len, buf_len, ds, ds_p;
+	uint64_t f;
 	int32_t w;
 	struct tuning_state *ts;
 	bin_e = tunes[0].bin_e;
@@ -657,7 +659,7 @@ void scanner(void)
 		if (do_exit >= 2)
 			{return;}
 		ts = &tunes[i];
-		f = (int)rtlsdr_get_center_freq(dev);
+		f = rtlsdr_get_center_freq64(dev);
 		if (f != ts->freq) {
 			retune(dev, ts->freq);}
 		rtlsdr_read_sync(dev, ts->buf8, buf_len, &n_read);
@@ -746,7 +748,7 @@ void csv_dbm(struct tuning_state *ts)
 	/* Hz low, Hz high, Hz step, samples, dbm, dbm, ... */
 	bin_count = (int)((double)len * (1.0 - ts->crop));
 	bw2 = (int)(((double)ts->rate * (double)bin_count) / (len * 2 * ds));
-	fprintf(file, "%i, %i, %.2f, %i, ", ts->freq - bw2, ts->freq + bw2,
+	fprintf(file, "%.0f, %.0f, %.2f, %i, ", (double)(ts->freq - bw2), (double)(ts->freq + bw2),
 		(double)ts->rate / (double)(len*ds), ts->samples);
 	// something seems off with the dbm math
 	i1 = 0 + (int)((double)len * ts->crop * 0.5);

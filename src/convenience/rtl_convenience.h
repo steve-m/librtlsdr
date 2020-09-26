@@ -44,7 +44,7 @@ int nearest_gain(rtlsdr_dev_t *dev, int target_gain);
  * \return 0 on success
  */
 
-int verbose_set_frequency(rtlsdr_dev_t *dev, uint32_t frequency);
+int verbose_set_frequency(rtlsdr_dev_t *dev, uint64_t frequency);
 
 /*!
  * Set device sample rate and report status on stderr

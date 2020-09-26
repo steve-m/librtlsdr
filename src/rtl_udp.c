@@ -352,6 +352,8 @@ static void *command_worker(void *arg)
 	int last_lock_report = -1;
 	int tuner_unsupported = 0;
 	int r = 0;
+	uint32_t freqhi = 0;
+	uint64_t tmp64;
 	uint32_t tmp;
 	int32_t itmp;
 	int32_t if_band_center_freq;
@@ -391,12 +393,29 @@ static void *command_worker(void *arg)
 		switch(cmd.cmd) {
 		case SET_FREQUENCY:
 			tmp = ntohl(cmd.param);
-			printf("set freq %u\n", tmp);
-			r = rtlsdr_set_center_freq(dev, tmp);
-			if (r < 0) {
-				printf("  error setting frequency!\n");
-				last_lock_report = -1;
+			if (!freqhi)
+			{
+				printf("set freq %f MHz\n", tmp * 1E-6);
+				r = rtlsdr_set_center_freq(dev, tmp);
+				if (r < 0) {
+					printf("  error setting frequency!\n");
+					last_lock_report = -1;
+				}
 			}
+			else
+			{
+				tmp64 = ( ((uint64_t)freqhi) << 32 ) | (uint64_t)tmp;
+				printf("set freq64 %f MHz\n", tmp64 * 1E-6);
+				r = rtlsdr_set_center_freq64(dev, tmp64);
+				if (r < 0) {
+					printf("  error setting frequency!\n");
+					last_lock_report = -1;
+				}
+			}
+			freqhi = 0;
+			break;
+		case SET_FREQ_HI32:
+			freqhi = ntohl(cmd.param);
 			break;
 		case SET_SAMPLE_RATE:
 			tmp = ntohl(cmd.param);

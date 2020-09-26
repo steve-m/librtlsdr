@@ -893,8 +893,8 @@ static int r82xx_set_pll_yc(struct r82xx_priv *priv, uint32_t freq)
   if (!(data[2] & 0x40)) {
     if (priv->cfg->verbose || PRINT_PLL_ERRORS)
       //fprintf(stderr, "r82xx_set_pll_yc(): error writing 'sdm lo' into i2c reg 0x15\n");
-      fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
-        freq, priv->rf_freq);
+      fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %f MHz!\n",
+        freq, priv->rf_freq * 1E-6);
     priv->has_lock = 0;
     return -1;
   }
@@ -1124,14 +1124,14 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 
 	if (!(data[2] & 0x40)) {
 		if (priv->cfg->verbose || PRINT_PLL_ERRORS)
-			fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %u Hz!\n",
-				freq, priv->rf_freq);
+			fprintf(stderr, "[R82XX] PLL not locked at Tuner LO %u Hz for RF %f MHz!\n",
+				freq, priv->rf_freq * 1E-6);
 		priv->has_lock = 0;
 		return -1;
 	}
 #if 0
 	else
-		fprintf(stderr, "[R82XX] PLL locked at Tuner LO %u Hz for RF %u Hz!\n", freq, priv->rf_freq);
+		fprintf(stderr, "[R82XX] PLL locked at Tuner LO %u Hz for RF %f MHz!\n", freq, priv->rf_freq * 1E-6);
 #endif
 
 	priv->has_lock = 1;
@@ -1963,15 +1963,17 @@ int r82xx_flip_rtl_sideband(struct r82xx_priv *priv)
 	return harm_sideband_xor[priv->tuner_harmonic];
 }
 
-int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
+
+int r82xx_set_freq64(struct r82xx_priv *priv, uint64_t freq)
 {
 	int rc = -1;
 	int nth_harm;
 	int harm = (priv->cfg->harmonic <= 0) ? DEFAULT_HARMONIC : priv->cfg->harmonic;
-	uint32_t lo_freq, lo_freqHarm;
+	uint64_t lo_freq;
+	uint32_t lo_freqHarm;
 	uint8_t air_cable1_in;
 
-	nth_harm = ( freq > FIFTH_HARM_FRQ_THRESH_KHZ * 1000 ) ? 1 : 0;
+	nth_harm = ( freq > FIFTH_HARM_FRQ_THRESH_KHZ * (uint64_t)1000 ) ? 1 : 0;
 	for ( ; nth_harm < 2; ++nth_harm )
 	{
 		priv->tuner_pll_set = 0;
@@ -2041,6 +2043,11 @@ err:
 		fprintf(stderr, "%s: failed=%d\n", __FUNCTION__, rc);
 #endif
 	return rc;
+}
+
+int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq)
+{
+	return r82xx_set_freq64(priv, (uint64_t)freq);
 }
 
 int r82xx_set_dither(struct r82xx_priv *priv, int dither)

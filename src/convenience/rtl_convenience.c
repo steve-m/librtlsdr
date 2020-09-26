@@ -68,14 +68,14 @@ int nearest_gain(rtlsdr_dev_t *dev, int target_gain)
 	return nearest;
 }
 
-int verbose_set_frequency(rtlsdr_dev_t *dev, uint32_t frequency)
+int verbose_set_frequency(rtlsdr_dev_t *dev, uint64_t frequency)
 {
 	int r;
-	r = rtlsdr_set_center_freq(dev, frequency);
+	r = rtlsdr_set_center_freq64(dev, frequency);
 	if (r < 0) {
 		fprintf(stderr, "WARNING: Failed to set center freq.\n");
 	} else {
-		fprintf(stderr, "Tuned to %u Hz.\n", frequency);
+		fprintf(stderr, "Tuned to %f MHz.\n", frequency * 1E-6);
 	}
 	return r;
 }

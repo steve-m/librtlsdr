@@ -356,6 +356,8 @@ static void *command_worker(void *arg)
 	int last_lock_report = -1;
 	int tuner_unsupported = 0;
 	int r = 0;
+	uint32_t freqhi = 0;
+	uint64_t tmp64;
 	uint32_t tmp;
 	int32_t itmp;
 	int32_t if_band_center_freq;
@@ -395,12 +397,29 @@ static void *command_worker(void *arg)
 		switch(cmd.cmd) {
 		case SET_FREQUENCY:
 			tmp = ntohl(cmd.param);
-			printf("set freq %u\n", tmp);
-			r = rtlsdr_set_center_freq(dev, tmp);
-			if (r < 0) {
-				printf("  error setting frequency!\n");
-				last_lock_report = -1;
+			if (!freqhi)
+			{
+				printf("set freq %f MHz\n", tmp * 1E-6);
+				r = rtlsdr_set_center_freq(dev, tmp);
+				if (r < 0) {
+					printf("  error setting frequency!\n");
+					last_lock_report = -1;
+				}
 			}
+			else
+			{
+				tmp64 = ( ((uint64_t)freqhi) << 32 ) | (uint64_t)tmp;
+				printf("set freq64 %f MHz\n", tmp64 * 1E-6);
+				r = rtlsdr_set_center_freq64(dev, tmp64);
+				if (r < 0) {
+					printf("  error setting frequency!\n");
+					last_lock_report = -1;
+				}
+			}
+			freqhi = 0;
+			break;
+		case SET_FREQ_HI32:
+			freqhi = ntohl(cmd.param);
 			break;
 		case SET_SAMPLE_RATE:
 			tmp = ntohl(cmd.param);
@@ -726,7 +745,8 @@ int main(int argc, char **argv)
 	int report_i2c = 0;
 	int do_exit_thrd_ctrl = 0;
 
-	uint32_t frequency = 100000000, samp_rate = 2048000;
+	uint64_t frequency = 100000000;
+	uint32_t samp_rate = 2048000;
 	enum rtlsdr_ds_mode ds_mode = RTLSDR_DS_IQ;
 	uint32_t ds_temp, ds_threshold = 0;
 	struct sockaddr_in local, remote;
@@ -775,7 +795,7 @@ int main(int argc, char **argv)
 			dev_given = 1;
 			break;
 		case 'f':
-			frequency = (uint32_t)atofs(optarg);
+			frequency = (uint64_t)( atofs(optarg) + 0.5 );
 			break;
 		case 'g':
 			gain = (int)(atof(optarg) * 10); /* tenths of a dB */
@@ -885,11 +905,11 @@ int main(int argc, char **argv)
 	rtlsdr_set_ds_mode(dev, ds_mode, ds_threshold);
 
 	/* Set the frequency */
-	r = rtlsdr_set_center_freq(dev, frequency);
+	r = rtlsdr_set_center_freq64(dev, frequency);
 	if (r < 0)
 		fprintf(stderr, "WARNING: Failed to set center freq.\n");
 	else
-		fprintf(stderr, "Tuned to %i Hz.\n", frequency);
+		fprintf(stderr, "Tuned to %f MHz.\n", frequency * 1E-6);
 
 	if (0 == gain) {
 		 /* Enable automatic gain */

@@ -153,7 +153,7 @@ int main(int argc, char **argv)
 	int dev_index = 0;
 	int dev_given = 0;
 	int writeWav = 0;
-	uint32_t frequency = 100000000;
+	uint64_t frequency = 100000000;
 	uint32_t bandwidth = DEFAULT_BANDWIDTH;
 	uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
 			dev_given = 1;
 			break;
 		case 'f':
-			frequency = (uint32_t)atofs(optarg);
+			frequency = (uint64_t)atofs(optarg);
 			break;
 		case 'g':
 			gain = (int)(atof(optarg) * 10); /* tenths of a dB */

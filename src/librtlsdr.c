@@ -117,6 +117,7 @@ typedef struct rtlsdr_tuner_iface {
 	int (*init)(void *);
 	int (*exit)(void *);
 	int (*set_freq)(void *, uint32_t freq /* Hz */);
+	int (*set_freq64)(void *, uint64_t freq /* Hz */);
 	int (*set_bw)(void *, int bw /* Hz */, uint32_t *applied_bw /* configured bw in Hz */, int apply /* 1 == configure it!, 0 == deliver applied_bw */);
 	int (*set_bw_center)(void *, int32_t if_band_center_freq);
 	int (*set_gain)(void *, int gain /* tenth dB */);
@@ -221,7 +222,7 @@ struct rtlsdr_dev {
 	enum rtlsdr_tuner tuner_type;
 	rtlsdr_tuner_iface_t *tuner;
 	uint32_t tun_xtal; /* Hz */
-	uint32_t freq; /* Hz */
+	uint64_t freq; /* Hz */
 	uint32_t bw;
 	uint32_t offs_freq; /* Hz */
 	int32_t  if_band_center_freq; /* Hz - rtlsdr_set_tuner_band_center() */
@@ -283,7 +284,7 @@ struct rtlsdr_dev {
 
 static int rtlsdr_demod_write_reg(rtlsdr_dev_t *dev, uint8_t page, uint16_t addr, uint16_t val, uint8_t len);
 static int rtlsdr_set_if_freq(rtlsdr_dev_t *dev, uint32_t freq);
-static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq);
+static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint64_t freq);
 static int rtlsdr_set_spectrum_inversion(rtlsdr_dev_t *dev, int sideband);
 
 static void softagc_init(rtlsdr_dev_t *dev);
@@ -404,21 +405,25 @@ int r820t_exit(void *dev) {
 	return r82xx_standby(&devt->r82xx_p);
 }
 
-int r820t_set_freq(void *dev, uint32_t freq) {
+int r820t_set_freq64(void *dev, uint64_t freq) {
 	int r, ri, flip, sideband;
 	rtlsdr_dev_t* devt = (rtlsdr_dev_t*)dev;
-	r = r82xx_set_freq(&devt->r82xx_p, freq);
+	r = r82xx_set_freq64(&devt->r82xx_p, freq);
 
 	sideband = r82xx_get_sideband(&devt->r82xx_p);
 	flip = r82xx_flip_rtl_sideband(&devt->r82xx_p);
 	ri = rtlsdr_set_spectrum_inversion(devt, sideband ^ flip);
 	if (ri) {
 		if ( devt->verbose )
-			fprintf(stderr, "r820t_set_freq(%u): rtlsdr_set_spectrum_inversion() returned %d\n", freq, r);
+			fprintf(stderr, "r820t_set_freq(%f MHz): rtlsdr_set_spectrum_inversion() returned %d\n", freq * 1E-6, r);
 		return ri;
 	}
 
 	return r;
+}
+
+int r820t_set_freq(void *dev, uint32_t freq) {
+	return r820t_set_freq64(dev, (uint64_t)freq);
 }
 
 
@@ -448,9 +453,9 @@ int r820t_set_bw(void *dev, int bw, uint32_t *applied_bw, int apply) {
 		return r;
 	}
 
-	r = rtlsdr_set_center_freq(devt, devt->freq);
+	r = rtlsdr_set_center_freq64(devt, devt->freq);
 	if ( r && devt->verbose )
-		fprintf(stderr, "r820t_set_bw(%d): rtlsdr_set_center_freq(%d) returned error %d\n", bw, devt->freq, r);
+		fprintf(stderr, "r820t_set_bw(%d): rtlsdr_set_center_freq(%f MHz) returned error %d\n", bw, devt->freq * 1E-6, r);
 	return r;
 }
 
@@ -479,9 +484,9 @@ int r820t_set_bw_center(void *dev, int32_t if_band_center_freq) {
 		return r;
 	}
 
-	r = rtlsdr_set_center_freq(devt, devt->freq);
+	r = rtlsdr_set_center_freq64(devt, devt->freq);
 	if ( r && devt->verbose )
-		fprintf(stderr, "r820t_set_bw_center(%d): rtlsdr_set_center_freq(%d) returned error %d\n", if_band_center_freq, devt->freq, r);
+		fprintf(stderr, "r820t_set_bw_center(%d): rtlsdr_set_center_freq(%f MHz) returned error %d\n", if_band_center_freq, devt->freq * 1E-6, r);
 	return r;
 }
 
@@ -579,11 +584,11 @@ int r820t_set_sideband(void *dev, int sideband) {
 		return r;
 
 	if ( devt->verbose )
-		fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_center_freq(%d) ..\n", sideband, devt->freq);
-	r = rtlsdr_set_center_freq(devt, devt->freq);
+		fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_center_freq(%f MHz) ..\n", sideband, devt->freq * 1E-6);
+	r = rtlsdr_set_center_freq64(devt, devt->freq);
 	if (r) {
 		if ( devt->verbose )
-			fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_center_freq(%d) returned %d\n", sideband, devt->freq, r);
+			fprintf(stderr, "r820t_set_sideband(%d): rtlsdr_set_center_freq(%f MHz) returned %d\n", sideband, devt->freq * 1E-6, r);
 	}
 	return r;
 }
@@ -597,38 +602,38 @@ int r820t_set_i2c_override(void *dev, unsigned i2c_register, unsigned data, unsi
 /* definition order must match enum rtlsdr_tuner */
 static rtlsdr_tuner_iface_t tuners[] = {
 	{
-		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL /* dummy for unknown tuners */
 	},
 	{
 		e4000_init, e4000_exit,
-		e4000_set_freq, e4000_set_bw, NULL, e4000_set_gain, e4000_set_if_gain,
+		e4000_set_freq, NULL, e4000_set_bw, NULL, e4000_set_gain, e4000_set_if_gain,
 		e4000_set_gain_mode, NULL, NULL, NULL, NULL, NULL
 	},
 
 	{
 		fc0012_init, fc0012_exit,
-		fc0012_set_freq, fc0012_set_bw, NULL, fc0012_set_gain, NULL,
+		fc0012_set_freq, NULL, fc0012_set_bw, NULL, fc0012_set_gain, NULL,
 		fc0012_set_gain_mode, _fc0012_set_i2c_register, NULL, NULL, fc0012_get_i2c_register, NULL
 	},
 	{
 		_fc0013_init, fc0013_exit,
-		fc0013_set_freq, fc0013_set_bw, NULL, _fc0013_set_gain, NULL,
+		fc0013_set_freq, NULL, fc0013_set_bw, NULL, _fc0013_set_gain, NULL,
 		fc0013_set_gain_mode, NULL, NULL, NULL, NULL, NULL
 	},
 	{
 		fc2580_init, fc2580_exit,
-		_fc2580_set_freq, fc2580_set_bw, NULL, fc2580_set_gain, NULL,
+		_fc2580_set_freq, NULL, fc2580_set_bw, NULL, fc2580_set_gain, NULL,
 		fc2580_set_gain_mode, NULL, NULL, NULL, NULL, NULL
 	},
 	{
 		r820t_init, r820t_exit,
-		r820t_set_freq, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
+		r820t_set_freq, r820t_set_freq64, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
 		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register, r820t_get_i2c_reg_array,
 		r820t_set_sideband
 	},
 	{
 		r820t_init, r820t_exit,
-		r820t_set_freq, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
+		r820t_set_freq, r820t_set_freq64, r820t_set_bw, r820t_set_bw_center, r820t_set_gain, NULL,
 		r820t_set_gain_mode, r820t_set_i2c_register, r820t_set_i2c_override, r820t_get_i2c_register, r820t_get_i2c_reg_array,
 		r820t_set_sideband
 	},
@@ -1289,7 +1294,7 @@ int rtlsdr_set_xtal_freq(rtlsdr_dev_t *dev, uint32_t rtl_freq, uint32_t tuner_fr
 
 		/* update xtal-dependent settings */
 		if (dev->freq)
-			r = rtlsdr_set_center_freq(dev, dev->freq);
+			r = rtlsdr_set_center_freq64(dev, dev->freq);
 	}
 
 	return r;
@@ -1451,7 +1456,7 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 	int r = -1;
 
 	#if LOG_API_CALLS && LOG_API_SET_FREQ
-	fprintf(stderr, "LOG: rtlsdr_set_center_freq(freq %u)\n", (unsigned)freq);
+	fprintf(stderr, "LOG: rtlsdr_set_center_freq(freq %f MHz)\n", freq * 1E-6);
 	#endif
 
 	#ifdef _ENABLE_RPC
@@ -1471,6 +1476,46 @@ int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
 	} else if (dev->tuner && dev->tuner->set_freq) {
 		rtlsdr_set_i2c_repeater(dev, 1);
 		r = dev->tuner->set_freq(dev, freq - dev->offs_freq);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	}
+
+	if (!r)
+		dev->freq = freq;
+	else
+		dev->freq = 0;
+
+	return r;
+}
+
+int rtlsdr_set_center_freq64(rtlsdr_dev_t *dev, uint64_t freq)
+{
+	int r = -1;
+
+	#if LOG_API_CALLS && LOG_API_SET_FREQ
+	fprintf(stderr, "LOG: rtlsdr_set_center_freq64(freq %f MHz)\n", freq * 1E-6);
+	#endif
+
+	#ifdef _ENABLE_RPC
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_set_center_freq(dev, freq);
+	}
+	#endif
+	if (!dev || !dev->tuner)
+		return -1;
+
+	if (dev->direct_sampling_mode > RTLSDR_DS_Q)
+		rtlsdr_update_ds(dev, freq);
+
+	if (dev->direct_sampling) {
+		r = rtlsdr_set_if_freq(dev, freq);
+	} else if (dev->tuner && dev->tuner->set_freq64) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = dev->tuner->set_freq64(dev, freq - dev->offs_freq);
+		rtlsdr_set_i2c_repeater(dev, 0);
+	} else if (dev->tuner && dev->tuner->set_freq) {
+		rtlsdr_set_i2c_repeater(dev, 1);
+		r = dev->tuner->set_freq(dev, (uint32_t)freq - dev->offs_freq);
 		rtlsdr_set_i2c_repeater(dev, 0);
 	}
 
@@ -1520,6 +1565,21 @@ uint32_t rtlsdr_get_center_freq(rtlsdr_dev_t *dev)
 	return dev->freq;
 }
 
+uint64_t rtlsdr_get_center_freq64(rtlsdr_dev_t *dev)
+{
+	#ifdef _ENABLE_RPC
+	if (rtlsdr_rpc_is_enabled())
+	{
+	  return rtlsdr_rpc_get_center_freq(dev);
+	}
+	#endif
+
+	if (!dev)
+		return 0;
+
+	return dev->freq;
+}
+
 int rtlsdr_set_freq_correction(rtlsdr_dev_t *dev, int ppm)
 {
 	int r = 0;
@@ -1551,7 +1611,7 @@ int rtlsdr_set_freq_correction(rtlsdr_dev_t *dev, int ppm)
 		return -3;
 
 	if (dev->freq) /* retune to apply new correction value */
-		r |= rtlsdr_set_center_freq(dev, dev->freq);
+		r |= rtlsdr_set_center_freq64(dev, dev->freq);
 
 	return r;
 }
@@ -1942,10 +2002,10 @@ int rtlsdr_set_tuner_sideband(rtlsdr_dev_t *dev, int sideband)
 		if (!devt->freq)
 			return r;
 		if (devt->verbose )
-			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_center_freq(%d) ..\n", sideband, devt->freq);
-		r = rtlsdr_set_center_freq(devt, devt->freq);
+			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_center_freq64(%f MHz) ..\n", sideband, devt->freq * 1E-6);
+		r = rtlsdr_set_center_freq64(devt, devt->freq);
 		if (r && devt->verbose )
-			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_center_freq(%d) returned error %d\n", sideband, devt->freq, r);
+			fprintf(stderr, "rtlsdr_set_tuner_sideband(%d): rtlsdr_set_center_freq(%f MHz) returned error %d\n", sideband, devt->freq * 1E-6, r);
 
 		return r;
 	}
@@ -2208,7 +2268,7 @@ int rtlsdr_set_direct_sampling(rtlsdr_dev_t *dev, int on)
 		dev->direct_sampling = 0;
 	}
 
-	r |= rtlsdr_set_center_freq(dev, dev->freq);
+	r |= rtlsdr_set_center_freq64(dev, dev->freq);
 
 	return r;
 }
@@ -2230,7 +2290,7 @@ int rtlsdr_get_direct_sampling(rtlsdr_dev_t *dev)
 
 int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t freq_threshold)
 {
-	uint32_t center_freq;
+	uint64_t center_freq;
 	if (!dev)
 		return -1;
 
@@ -2239,7 +2299,7 @@ int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t fre
 		(int)mode, (unsigned)freq_threshold);
 	#endif
 
-	center_freq = rtlsdr_get_center_freq(dev);
+	center_freq = rtlsdr_get_center_freq64(dev);
 	if ( !center_freq )
 		return -2;
 
@@ -2262,10 +2322,10 @@ int rtlsdr_set_ds_mode(rtlsdr_dev_t *dev, enum rtlsdr_ds_mode mode, uint32_t fre
 	if (mode <= RTLSDR_DS_Q)
 		rtlsdr_set_direct_sampling(dev, mode);
 
-	return rtlsdr_set_center_freq(dev, center_freq);
+	return rtlsdr_set_center_freq64(dev, center_freq);
 }
 
-static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint32_t freq)
+static int rtlsdr_update_ds(rtlsdr_dev_t *dev, uint64_t freq)
 {
 	int new_ds = 0;
 	int curr_ds = rtlsdr_get_direct_sampling(dev);
@@ -2336,7 +2396,7 @@ int rtlsdr_set_offset_tuning(rtlsdr_dev_t *dev, int on)
 	}
 
 	if (dev->freq > dev->offs_freq)
-		r |= rtlsdr_set_center_freq(dev, dev->freq);
+		r |= rtlsdr_set_center_freq64(dev, dev->freq);
 
 	return r;
 }
@@ -2667,6 +2727,7 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 	uint32_t applied_bw = 0;
 	uint8_t mask = 0xff, reg=0;
 	uint32_t freq;
+	uint64_t freq64;
 	int32_t bandcenter;
 	int sideband;
 	int retCode;
@@ -2850,7 +2911,7 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 		}
 		/* set last bandwidth .. which also has to set the IF frequency */
 		rtlsdr_set_and_get_tuner_bandwidth(dev, dev->bw, &applied_bw, 1 );
-		rtlsdr_set_center_freq(dev, dev->freq);
+		rtlsdr_set_center_freq64(dev, dev->freq);
 	}
 	else if ( comm & 256 ) {
 		token = strtok_r(NULL, " \t", &saveptr);
@@ -2858,10 +2919,10 @@ static int parse(char *message, rtlsdr_dev_t *dev)
 		retCode = -1;
 		switch (comm & 63) {
 		case 1: /* frequency */
-			freq = (uint32_t)freqVal;
+			freq64 = (uint64_t)(freqVal + 0.5);
 			if ( dev->verbose && PRINT_UDP_SRV_MSGS )
-				fprintf(stderr, "parsed RF frequency = %u Hz from token '%s'\n", (unsigned)freq, token);
-			retCode = rtlsdr_set_center_freq(dev, freq);
+				fprintf(stderr, "parsed RF frequency = %f MHz from token '%s'\n", freq64 * 1E-6, token);
+			retCode = rtlsdr_set_center_freq64(dev, freq64);
 			if ( dev->verbose && PRINT_UDP_SRV_MSGS )
 				fprintf(stderr, "  rtlsdr_set_center_freq() returned %d\n", retCode);
 			break;
@@ -4236,6 +4297,24 @@ int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on)
 	return rtlsdr_set_bias_tee_gpio(dev, dev->biast_gpio_pin_no, on);
 }
 
+int rtlsdr_set_harmonic_rx(rtlsdr_dev_t *dev, int harmonic)
+{
+	if (!dev)
+		return -1;
+
+	if ( dev->tuner_type == RTLSDR_TUNER_R820T )
+	{
+		if ( 0 <= harmonic && harmonic <= 16 )
+		{
+			dev->r82xx_c.harmonic = harmonic;
+			return 0;
+		}
+		return -2;
+	}
+	else
+		return -3;
+}
+
 
 const char * rtlsdr_get_opt_help(int longInfo)
 {
@@ -4328,10 +4407,10 @@ int rtlsdr_set_opt_string(rtlsdr_dev_t *dev, const char *opts, int verbose)
 		}
 		else if (!strncmp(optPart, "f=", 2)) {
 			double freqDbl = parseFreq(optPart + 2);
-			uint32_t freq = (uint32_t)(freqDbl + 0.5);
+			uint64_t freq = (uint64_t)(freqDbl + 0.5);
 			if (verbose)
-				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed frequency %u\n", (unsigned)freq);
-			ret = rtlsdr_set_center_freq(dev, freq);
+				fprintf(stderr, "\nrtlsdr_set_opt_string(): parsed frequency %f MHz\n", freq * 1E-6);
+			ret = rtlsdr_set_center_freq64(dev, freq);
 		}
 		else if (!strncmp(optPart, "bw=", 3)) {
 			uint32_t bw = (uint32_t)( atol(optPart +3) * 1000 );

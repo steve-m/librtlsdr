@@ -173,6 +173,26 @@ RTLSDR_API int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data,
 RTLSDR_API int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq);
 
 /*!
+ * Set the frequency the device is tuned to: allow frequency > 32 bit ~= 4.29 GHz
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param frequency in Hz in 64 bit
+ * \return 0 on success
+ * \return < 0 if device handle is invalid or some other error
+ */
+RTLSDR_API int rtlsdr_set_center_freq64(rtlsdr_dev_t *dev, uint64_t freq);
+
+/*!
+ * Set harmonic reception - for R820T/2 tuner
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param harmonic - receive n'th harmonic. 0 = default for disabling this
+ * \return 0 on success
+ * \return < 0 if device handle is invalid or some other error
+ */
+RTLSDR_API int rtlsdr_set_harmonic_rx(rtlsdr_dev_t *dev, int harmonic);
+
+/*!
  * Check, if tuner PLL (frequency) is still locked.
  * Tuner/PLL might loose lock (at high frequencies),
  * e.g. for temperature reasons
@@ -193,6 +213,14 @@ RTLSDR_API int rtlsdr_is_tuner_PLL_locked(rtlsdr_dev_t *dev);
  * \return 0 on error, frequency in Hz otherwise
  */
 RTLSDR_API uint32_t rtlsdr_get_center_freq(rtlsdr_dev_t *dev);
+
+/*!
+ * Get actual frequency the device is tuned to.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \return 0 on error, frequency in Hz otherwise
+ */
+RTLSDR_API uint64_t rtlsdr_get_center_freq64(rtlsdr_dev_t *dev);
 
 
 /*!
