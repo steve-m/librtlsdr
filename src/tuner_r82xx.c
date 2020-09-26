@@ -40,6 +40,7 @@
 #define FIFTH_HARM_FRQ_THRESH_KHZ	1770000
 #define RETRY_WITH_FIFTH_HARM_KHZ	1760000
 #define DEFAULT_HARMONIC			5
+#define PRINT_HARMONICS				0
 
 
 /* #define VGA_FOR_AGC_MODE	16 */
@@ -705,7 +706,7 @@ static void print_registers(struct r82xx_priv *priv)
  * r82xx tuning logic
  */
 
-static int r82xx_set_mux(struct r82xx_priv *priv, uint32_t freq)
+static int r82xx_set_mux(struct r82xx_priv *priv, uint64_t freq)
 {
 	const struct r82xx_freq_range *range;
 	int rc;
@@ -1991,11 +1992,11 @@ int r82xx_set_freq64(struct r82xx_priv *priv, uint64_t freq)
 
 		lo_freqHarm = (nth_harm) ? ( lo_freq / harm ) : lo_freq;
 
-#if 0
-		fprintf(stderr, "%s(freq = %u) @ %s--> intfreq %u, ifcenter %d --> f %u\n"
-			, __FUNCTION__, (unsigned)freq, (priv->sideband ? "USB" : "LSB")
+#if PRINT_HARMONICS
+		fprintf(stderr, "%s(freq = %f MHz) @ %s--> intfreq %u Hz, ifcenter %d --> f %f MHz, PLL %f MHz\n"
+			, __FUNCTION__, freq * 1E-6, (priv->sideband ? "USB" : "LSB")
 			, (unsigned)priv->int_freq, (int)priv->if_band_center_freq
-			, (unsigned)lo_freq );
+			, lo_freq * 1E-6, lo_freqHarm * 1E-6 );
 #endif
 
 		rc = r82xx_set_mux(priv, lo_freq);
