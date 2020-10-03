@@ -50,5 +50,7 @@ if /bin/true; then
       -DLIBUSB_LIBRARIES=${REPO_DIR}/mingw_libusb_${WN}/lib/libusb-1.0.a \
       ../  && \
     make && make install
+  md5sum  ${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST}/bin/* >${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST}/bin/md5sums.txt
+  sha1sum ${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST}/bin/* >${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST}/bin/sha1sums.txt
 fi
 
