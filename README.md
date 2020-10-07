@@ -74,6 +74,7 @@ Cross-builds for Windows from a Linux machine: see [cross_build_mingw32.sh](cros
 # For more information see:
 
 http://superkuh.com/rtlsdr.html
+
 https://osmocom.org/projects/rtl-sdr/wiki/Rtl-sdr
 
 
