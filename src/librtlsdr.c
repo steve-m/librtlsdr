@@ -104,6 +104,8 @@ struct rtlsdr_dev {
 	enum rtlsdr_async_status async_status;
 	int async_cancel;
 	int use_zerocopy;
+	int keep_biast_on;
+	int biast_gpio;
 	/* rtl demod context */
 	uint32_t rate; /* Hz */
 	uint32_t rtl_xtal; /* Hz */
@@ -1658,6 +1660,14 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 		rtlsdr_deinit_baseband(dev);
 	}
 
+	/*
+	 * Disable bias-tee unless we're explicitly asked
+	 * to keep it on.
+	 */
+	if (dev->keep_biast_on == 0) {
+		rtlsdr_set_bias_tee(dev, 0);
+	}
+
 	libusb_release_interface(dev->devh, 0);
 
 #ifdef DETACH_KERNEL_DRIVER
@@ -2014,6 +2024,7 @@ int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on)
 	if (!dev)
 		return -1;
 
+	dev->biast_gpio = gpio;
 	rtlsdr_set_gpio_output(dev, gpio);
 	rtlsdr_set_gpio_bit(dev, gpio, on);
 
@@ -2022,5 +2033,17 @@ int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on)
 
 int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on)
 {
+	if (!dev)
+		return -1;
+
 	return rtlsdr_set_bias_tee_gpio(dev, 0, on);
+}
+
+int rtlsdr_set_bias_tee_leave_on(rtlsdr_dev_t *dev, int leave_on)
+{
+	if (!dev)
+		return -1;
+
+	dev->keep_biast_on = leave_on;
+	return 0;
 }

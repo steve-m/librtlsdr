@@ -261,13 +261,6 @@ int verbose_device_search(char *s)
 		fprintf(stderr, "  %d:  %s, %s, SN: %s\n", i, vendor, product, serial);
 	}
 	fprintf(stderr, "\n");
-	/* does string look like raw id number */
-	device = (int)strtol(s, &s2, 0);
-	if (s2[0] == '\0' && device >= 0 && device < device_count) {
-		fprintf(stderr, "Using device %d: %s\n",
-			device, rtlsdr_get_device_name((uint32_t)device));
-		return device;
-	}
 	/* does string exact match a serial */
 	for (i = 0; i < device_count; i++) {
 		rtlsdr_get_device_usb_strings(i, vendor, product, serial);
@@ -297,6 +290,13 @@ int verbose_device_search(char *s)
 		if (strncmp(s, serial+offset, strlen(s)) != 0) {
 			continue;}
 		device = i;
+		fprintf(stderr, "Using device %d: %s\n",
+			device, rtlsdr_get_device_name((uint32_t)device));
+		return device;
+	}
+	/* does string look like raw id number */
+	device = (int)strtol(s, &s2, 0);
+	if (s2[0] == '\0' && device >= 0 && device < device_count) {
 		fprintf(stderr, "Using device %d: %s\n",
 			device, rtlsdr_get_device_name((uint32_t)device));
 		return device;

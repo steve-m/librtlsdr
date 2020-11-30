@@ -399,6 +399,14 @@ RTLSDR_API int rtlsdr_set_bias_tee(rtlsdr_dev_t *dev, int on);
  */
 RTLSDR_API int rtlsdr_set_bias_tee_gpio(rtlsdr_dev_t *dev, int gpio, int on);
 
+/*!
+ * Control whether the bias tee is left on after rtlsdr_close() is called.
+ *
+ * \param dev the device handle given by rtlsdr_open()
+ * \param leave_on 1 to leave Bias T on upon library close; 0 otherwise
+ * \return -1 if device is not initialized. 0 otherwise.
+ */
+RTLSDR_API int rtlsdr_set_bias_tee_leave_on(rtlsdr_dev_t *dev, int leave_on);
 
 #ifdef __cplusplus
 }
