@@ -43,6 +43,28 @@ static waveFileHeader waveHdr;
 static uint32_t	waveDataSize = 0;
 int	waveHdrStarted = 0;
 
+#ifdef _WIN32
+int gettimeofday(struct timeval *tv, void* ignored)
+{
+	FILETIME ft;
+	unsigned __int64 tmp = 0;
+	if (NULL != tv) {
+		GetSystemTimeAsFileTime(&ft);
+		tmp |= ft.dwHighDateTime;
+		tmp <<= 32;
+		tmp |= ft.dwLowDateTime;
+		tmp /= 10;
+#ifdef _MSC_VER
+		tmp -= 11644473600000000Ui64;
+#else
+		tmp -= 11644473600000000ULL;
+#endif
+		tv->tv_sec = (long)(tmp / 1000000UL);
+		tv->tv_usec = (long)(tmp % 1000000UL);
+	}
+	return 0;
+}
+#endif
 
 static void waveSetCurrTime(Wind_SystemTime *p)
 {
