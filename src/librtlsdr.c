@@ -715,7 +715,7 @@ static rtlsdr_dongle_t known_devices[] = {
 #define CTRL_IN			(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_IN)
 #define CTRL_OUT		(LIBUSB_REQUEST_TYPE_VENDOR | LIBUSB_ENDPOINT_OUT)
 #define CTRL_TIMEOUT	300
-#define BULK_TIMEOUT	0
+#define BULK_TIMEOUT	10000
 
 #define EEPROM_ADDR	0xa0
 
@@ -3477,6 +3477,10 @@ int rtlsdr_close(rtlsdr_dev_t *dev)
 
 		rtlsdr_deinit_baseband(dev);
 	}
+	else {
+		fprintf(stderr, "Resetting device...\n");
+		libusb_reset_device(dev->devh);
+	}
 
 	softagc_uninit(dev);
 	pthread_mutex_destroy(&dev->cs_mutex);
@@ -3823,7 +3827,8 @@ static void LIBUSB_CALL _libusb_callback(struct libusb_transfer *xfer)
 		dev->xfer_errors = 0;
 	} else if (LIBUSB_TRANSFER_CANCELLED != xfer->status) {
 #ifndef _WIN32
-		if (LIBUSB_TRANSFER_ERROR == xfer->status)
+		if (LIBUSB_TRANSFER_ERROR == xfer->status ||
+				LIBUSB_TRANSFER_TIMED_OUT == xfer->status)
 			dev->xfer_errors++;
 
 		if (dev->xfer_errors >= dev->xfer_buf_num ||
