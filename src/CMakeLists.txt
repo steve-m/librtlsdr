@@ -40,7 +40,7 @@ endif()
 # Set up Windows DLL resource files
 ########################################################################
 IF(MSVC)
-    include(${CMAKE_SOURCE_DIR}/cmake/Modules/Version.cmake)
+    include(${PROJECT_SOURCE_DIR}/cmake/Modules/Version.cmake)
 
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/rtlsdr.rc.in
