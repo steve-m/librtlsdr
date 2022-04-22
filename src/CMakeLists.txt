@@ -20,7 +20,7 @@
 ########################################################################
 add_library(rtlsdr SHARED librtlsdr.c
   tuner_e4k.c tuner_fc0012.c tuner_fc0013.c tuner_fc2580.c tuner_r82xx.c)
-target_link_libraries(rtlsdr ${LIBUSB_LIBRARIES} ${THREADS_PTHREADS_LIBRARY})
+target_link_libraries(rtlsdr ${LIBUSB_LINK_LIBRARIES} ${THREADS_PTHREADS_LIBRARY})
 target_include_directories(rtlsdr PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>  # <prefix>/include
@@ -38,7 +38,7 @@ generate_export_header(rtlsdr)
 ########################################################################
 add_library(rtlsdr_static STATIC librtlsdr.c
   tuner_e4k.c tuner_fc0012.c tuner_fc0013.c tuner_fc2580.c tuner_r82xx.c)
-target_link_libraries(rtlsdr ${LIBUSB_LIBRARIES} ${THREADS_PTHREADS_LIBRARY})
+target_link_libraries(rtlsdr ${LIBUSB_LINK_LIBRARIES} ${THREADS_PTHREADS_LIBRARY})
 target_include_directories(rtlsdr_static PUBLIC
   $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>  # <prefix>/include
@@ -97,35 +97,35 @@ add_executable(rtl_biast rtl_biast.c)
 set(INSTALL_TARGETS rtlsdr rtlsdr_static rtl_sdr rtl_tcp rtl_test rtl_fm rtl_eeprom rtl_adsb rtl_power rtl_biast)
 
 target_link_libraries(rtl_sdr rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_tcp rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_test rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_fm rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_eeprom rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_adsb rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_power rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 target_link_libraries(rtl_biast rtlsdr convenience_static
-    ${LIBUSB_LIBRARIES}
+    ${LIBUSB_LINK_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
 if(UNIX)

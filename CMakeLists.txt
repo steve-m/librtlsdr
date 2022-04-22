@@ -72,7 +72,7 @@ find_package(PkgConfig)
 if(PKG_CONFIG_FOUND)
     pkg_check_modules(LIBUSB libusb-1.0 IMPORTED_TARGET)
 else()
-    set(LIBUSB_LIBRARIES "" CACHE STRING "manual libusb path")
+    set(LIBUSB_LINK_LIBRARIES "" CACHE STRING "manual libusb path")
     set(LIBUSB_INCLUDE_DIRS "" CACHE STRING "manual libusb includepath")
 endif()
 
