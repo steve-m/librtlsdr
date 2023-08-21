@@ -178,5 +178,7 @@ int r82xx_read_cache_reg(struct r82xx_priv *priv, int reg);
 int r82xx_write_reg_mask(struct r82xx_priv *priv, uint8_t reg, uint8_t val,uint8_t bit_mask);
 int r82xx_write_reg_mask_ext(struct r82xx_priv *priv, uint8_t reg, uint8_t val, uint8_t bit_mask, const char * func_name);
 
+int rtlsdr_check_dongle_model(void *dev, char *manufact_check, char *product_check);
+
 #endif
 

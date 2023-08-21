@@ -51,6 +51,10 @@
 #define MHZ(x)		((x)*1000*1000)
 #define KHZ(x)		((x)*1000)
 
+#define HF 1
+#define VHF 2
+#define UHF 3
+
 /*
 Register Description
 many updates from https://github.com/old-dab/rtlsdr
@@ -1504,21 +1508,26 @@ int r82xx_get_if_gain(struct r82xx_priv *priv)
 int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control)
 {
 	int rc = 0, vga_gain_idx = 0;
+	int is_rtlsdr_blog_v4;
 
 	if (rtl_vga_control)
 		*rtl_vga_control = 0;
 
 	if ( 0 == if_mode || 10016 == if_mode ) {
 		vga_gain_idx = 0x10;
+
 	}
 	else if ( -2500 <= if_mode && if_mode <= 2500 ) {
 		vga_gain_idx = r82xx_get_if_gain_index(if_mode);
+
 	}
 	else if ( 2500 < if_mode && if_mode < 10000 ) {
 		vga_gain_idx = r82xx_get_if_gain_index(if_mode - 5000);
+
 	}
 	else if ( 10000 <= if_mode && if_mode <= 10016+15 ) {
 		vga_gain_idx = if_mode -10000;
+
 	}
 	else {	/* assume 0 == default */
 		fprintf(stderr, "%s: invalid if_mode value %d; setting to default: %d\n",
@@ -1537,7 +1546,21 @@ int r82xx_set_if_mode(struct r82xx_priv *priv, int if_mode, int *rtl_vga_control
 		(vga_gain_idx & 0x0f), (-12.0 + 3.5 * (vga_gain_idx & 0x0f)),
 		( (vga_gain_idx & 0x10) && rtl_vga_control ) ? "" : "de" );
 #endif
-	rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain_idx, 0x1f);
+
+	/* VGA auto control does not work on the V4, fix to an appropriate value instead like in Osmocom drivers
+	* Furthermore, this auto VGA needs to be looked at more closely, it appears to cause a lot of spectrum pumping
+	* and intermod on other devices. Fixed VGA gain always seems to yield better results.
+	*/
+	is_rtlsdr_blog_v4 = rtlsdr_check_dongle_model(priv->rtl_dev, "RTLSDRBlog", "Blog V4");
+	if(is_rtlsdr_blog_v4)
+	{
+		rc = r82xx_write_reg_mask(priv, 0x0c, 0x08, 0x9f);
+	}
+	else
+	{
+		rc = r82xx_write_reg_mask(priv, 0x0c, vga_gain_idx, 0x1f);
+	}
+
 	if (rc < 0)
 		return rc;
 	priv->last_if_mode = if_mode;
@@ -1968,13 +1991,26 @@ int r82xx_flip_rtl_sideband(struct r82xx_priv *priv)
 int r82xx_set_freq64(struct r82xx_priv *priv, uint64_t freq)
 {
 	int rc = -1;
-	int nth_harm;
-	int harm = (priv->cfg->harmonic <= 0) ? DEFAULT_HARMONIC : priv->cfg->harmonic;
+	int is_rtlsdr_blog_v4;
+	uint64_t upconvert_freq;
 	uint64_t lo_freq;
 	uint32_t lo_freqHarm;
 	uint8_t air_cable1_in;
+	uint8_t open_d;
+	uint8_t band;
+	uint8_t cable_2_in;
+	uint8_t cable_1_in;
+	uint8_t air_in;
+	int nth_harm;
+	int harm;
 
+	is_rtlsdr_blog_v4 = rtlsdr_check_dongle_model(priv->rtl_dev, "RTLSDRBlog", "Blog V4");
+        /* if it's an RTL-SDR Blog V4, automatically upconvert by 28.8 MHz if we tune to HF
+	 * so that we don't need to manually set any upconvert offset in the SDR software */
+	upconvert_freq = is_rtlsdr_blog_v4 ? ((freq < MHZ(28.8)) ? (freq + MHZ(28.8)) : freq) : freq;
+	harm = (priv->cfg->harmonic <= 0) ? DEFAULT_HARMONIC : priv->cfg->harmonic;
 	nth_harm = ( freq > FIFTH_HARM_FRQ_THRESH_KHZ * (uint64_t)1000 ) ? 1 : 0;
+
 	for ( ; nth_harm < 2; ++nth_harm )
 	{
 		priv->tuner_pll_set = 0;
@@ -1983,18 +2019,18 @@ int r82xx_set_freq64(struct r82xx_priv *priv, uint64_t freq)
 		if (!freq)
 			freq = priv->rf_freq;	/* ignore zero frequency; keep last one */
 		else
-			priv->rf_freq = freq;
+			priv->rf_freq = upconvert_freq;
 
 		if ( priv->sideband ^ harm_sideband_xor[priv->tuner_harmonic] )
-			lo_freq = freq - priv->int_freq + priv->if_band_center_freq;
+			lo_freq = upconvert_freq - priv->int_freq + priv->if_band_center_freq;
 		else
-			lo_freq = freq + priv->int_freq + priv->if_band_center_freq;
+			lo_freq = upconvert_freq + priv->int_freq + priv->if_band_center_freq;
 
 		lo_freqHarm = (nth_harm) ? ( lo_freq / harm ) : lo_freq;
 
 #if PRINT_HARMONICS
 		fprintf(stderr, "%s(freq = %f MHz) @ %s--> intfreq %u Hz, ifcenter %d --> f %f MHz, PLL %f MHz\n"
-			, __FUNCTION__, freq * 1E-6, (priv->sideband ? "USB" : "LSB")
+			, __FUNCTION__, upconvert_freq * 1E-6, (priv->sideband ? "USB" : "LSB")
 			, (unsigned)priv->int_freq, (int)priv->if_band_center_freq
 			, lo_freq * 1E-6, lo_freqHarm * 1E-6 );
 #endif
@@ -2024,20 +2060,61 @@ int r82xx_set_freq64(struct r82xx_priv *priv, uint64_t freq)
 		break;
 	}
 
-	/* switch between 'Cable1' and 'Air-In' inputs on sticks with
-	 * R828D tuner. We switch at 345 MHz, because that's where the
-	 * noise-floor has about the same level with identical LNA
-	 * settings. The original driver used 320 MHz. */
-	air_cable1_in = (freq > MHZ(345)) ? 0x00 : 0x60;
+	if (is_rtlsdr_blog_v4) {
 
-	if ((priv->cfg->rafael_chip == CHIP_R828D) &&
-		(air_cable1_in != priv->input)) {
-		priv->input = air_cable1_in;
-		rc = r82xx_write_reg_mask(priv, 0x05, air_cable1_in, 0x60);
-		if (rc < 0 && priv->cfg->verbose)
-			fprintf(stderr, "r82xx_set_freq(): error writing R828D's 'input selection' into i2c reg 0x05\n");
+		/* determine if notch filters should be on or off notches are turned OFF
+		 * when tuned within the notch band and ON when tuned outside the notch band.
+		 */
+		open_d = (freq <= MHZ(2.2) || (freq >= MHZ(85) && freq <= MHZ(112)) || (freq >= MHZ(172) && freq <= MHZ(242))) ? 0x00 : 0x08;
+		rc = r82xx_write_reg_mask(priv, 0x17, open_d, 0x08);
+
+		if (rc < 0)
+			return rc;
+
+		/* select tuner band based on frequency and only switch if there is a band change
+		 *(to avoid excessive register writes when tuning rapidly)
+		 */
+		band = (freq <= MHZ(28.8)) ? HF : ((freq > MHZ(28.8) && freq < MHZ(250)) ? VHF : UHF);
+		/* switch between tuner inputs on the RTL-SDR Blog V4 */
+		if (band != priv->input) {
+			priv->input = band;
+
+			/* activate cable 2 (HF input) */
+			cable_2_in = (band == HF) ? 0x08 : 0x00;
+			rc = r82xx_write_reg_mask(priv, 0x06, cable_2_in, 0x08);
+
+			if (rc < 0)
+				goto err;
+
+			/* activate cable 1 (VHF input) */
+			cable_1_in = (band == VHF) ? 0x40 : 0x00;
+			rc = r82xx_write_reg_mask(priv, 0x05, cable_1_in, 0x40);
+
+			if (rc < 0)
+				goto err;
+
+			/* activate air_in (UHF input) */
+			air_in = (band == UHF) ? 0x00 : 0x20;
+			rc = r82xx_write_reg_mask(priv, 0x05, air_in, 0x20);
+
+			if (rc < 0)
+				goto err;
+		}
 	}
+	else
+	{
+		/* switch between 'Cable1' and 'Air-In' inputs on sticks with
+		* R828D tuner. We switch at 345 MHz, because that's where the
+		* noise-floor has about the same level with identical LNA
+		* settings. The original driver used 320 MHz. */
+		air_cable1_in = (freq > MHZ(345)) ? 0x00 : 0x60;
 
+		if ((priv->cfg->rafael_chip == CHIP_R828D) &&
+			(air_cable1_in != priv->input)) {
+			priv->input = air_cable1_in;
+			rc = r82xx_write_reg_mask(priv, 0x05, air_cable1_in, 0x60);
+		}
+	}
 err:
 #if PRINT_PLL_ERRORS
 	if (rc < 0)
