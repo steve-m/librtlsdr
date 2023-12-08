@@ -105,6 +105,7 @@ void usage(void)
 	printf("\t[-d device index (default: 0)]\n");
 	printf("\t[-P ppm_error (default: 0)]\n");
 	printf("\t[-T enable bias-T on GPIO PIN 0 (works for rtl-sdr.com v3 dongles)]\n");
+	printf("\t[-D enable direct sampling (default: off)]\n");
 	exit(1);
 }
 
@@ -144,6 +145,7 @@ sighandler(int signum)
 #else
 static void sighandler(int signum)
 {
+	signal(SIGPIPE, SIG_IGN);
 	fprintf(stderr, "Signal caught, exiting!\n");
 	rtlsdr_cancel_async(dev);
 	do_exit = 1;
@@ -384,7 +386,7 @@ int main(int argc, char **argv)
 	struct sockaddr_storage local, remote;
 	struct addrinfo *ai;
 	struct addrinfo *aiHead;
-	struct addrinfo  hints;
+	struct addrinfo  hints = { 0 };
 	char hostinfo[NI_MAXHOST];
 	char portinfo[NI_MAXSERV];
 	char remhostinfo[NI_MAXHOST];
@@ -395,6 +397,7 @@ int main(int argc, char **argv)
 	int dev_given = 0;
 	int gain = 0;
 	int ppm_error = 0;
+	int direct_sampling = 0;
 	struct llist *curelem,*prev;
 	pthread_attr_t attr;
 	void *status;
@@ -412,7 +415,7 @@ int main(int argc, char **argv)
 	struct sigaction sigact, sigign;
 #endif
 
-	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:T")) != -1) {
+	while ((opt = getopt(argc, argv, "a:p:f:g:s:b:n:d:P:TD")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -444,6 +447,9 @@ int main(int argc, char **argv)
 			break;
 		case 'T':
 			enable_biastee = 1;
+			break;
+		case 'D':
+			direct_sampling = 1;
 			break;
 		default:
 			usage();
@@ -480,6 +486,10 @@ int main(int argc, char **argv)
 #else
 	SetConsoleCtrlHandler( (PHANDLER_ROUTINE) sighandler, TRUE );
 #endif
+
+	/* Set direct sampling */
+        if (direct_sampling)
+                verbose_direct_sampling(dev, 2);
 
 	/* Set the tuner error */
 	verbose_ppm_set(dev, ppm_error);
@@ -561,7 +571,7 @@ int main(int argc, char **argv)
 		setsockopt(listensocket, SOL_SOCKET, SO_REUSEADDR, (char *)&r, sizeof(int));
 		setsockopt(listensocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
 
-		if (bind(listensocket, (struct sockaddr *)&local, sizeof(local)))
+		if (bind(listensocket, (struct sockaddr *)&local, aiHead->ai_addrlen))
 			fprintf(stderr, "rtl_tcp bind error: %s", strerror(errno));
 		else
 			break;
