@@ -83,6 +83,9 @@ elseif(MSVC14 OR MSVC14)
 #pthread-w32 issue, timespec is now part of time.h
     ADD_DEFINITIONS(-D_TIMESPEC_DEFINED)
 endif()
+if (APPLE)
+  set(CMAKE_MACOSX_RPATH ON)
+endif (APPLE)
 
 OPTION(RTL_STATIC_BUILD "Build rtl-tools static (except RTLSDR.DLL) on MinGW/Win32" ON)
 if(RTL_STATIC_BUILD)
@@ -113,6 +116,7 @@ ENDIF()
 ########################################################################
 find_package(PkgConfig)
 find_package(LibUSB)
+cmake_policy(SET CMP0075 NEW)
 if(WIN32 AND NOT MINGW)
     set(THREADS_USE_PTHREADS_WIN32 true)
 endif()
