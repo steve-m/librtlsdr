@@ -41,3 +41,5 @@ CMakeCache.txt
 */CMakeFiles
 CMakeFiles
 *.cmake
+build/
+**/.DS_Store
