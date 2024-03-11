@@ -1003,6 +1003,11 @@ int main(int argc, char **argv)
 	if (file != stdout) {
 		fclose(file);}
 
+	if (enable_biastee) {
+		rtlsdr_set_bias_tee(dev, 0);
+		fprintf(stderr, "deactivated bias-T on GPIO PIN 0\n");
+	}
+
 	rtlsdr_close(dev);
 	free(fft_buf);
 	free(window_coefs);

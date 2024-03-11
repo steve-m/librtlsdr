@@ -1283,6 +1283,11 @@ int main(int argc, char **argv)
 	if (output.file != stdout) {
 		fclose(output.file);}
 
+	if (enable_biastee) {
+		rtlsdr_set_bias_tee(dongle.dev, 0);
+		fprintf(stderr, "deactivated bias-T on GPIO PIN 0\n");
+	}
+
 	rtlsdr_close(dongle.dev);
 	return r >= 0 ? r : -r;
 }
