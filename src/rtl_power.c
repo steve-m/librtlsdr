@@ -1039,6 +1039,8 @@ int main(int argc, char **argv)
 	rtlsdr_close(dev);
 	free(fft_buf);
 	free(window_coefs);
+	if (freq_optarg[0])
+		free(freq_optarg);
 	//for (i=0; i<tune_count; i++) {
 	//	free(tunes[i].avg);
 	//	free(tunes[i].buf8);
