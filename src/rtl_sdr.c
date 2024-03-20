@@ -288,7 +288,7 @@ int main(int argc, char **argv)
 	if(strcmp(filename, "-") == 0) { /* Write samples to stdout */
 		file = stdout;
 #ifdef _WIN32
-		_setmode(_fileno(stdin), _O_BINARY);
+		_setmode(_fileno(stdout), _O_BINARY);
 #endif
 	} else {
 		const char * filename_to_open = filename;
