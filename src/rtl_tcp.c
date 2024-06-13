@@ -659,6 +659,11 @@ int main(int argc, char **argv)
 	}
 
 out:
+	if (enable_biastee) {
+		rtlsdr_set_bias_tee(dev, 0);
+		fprintf(stderr, "deactivated bias-T on GPIO PIN 0\n");
+	}
+
 	rtlsdr_close(dev);
 	closesocket(listensocket);
 	closesocket(s);
