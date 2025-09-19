@@ -24,7 +24,8 @@ TOOLCHAIN="mingw-w64-x64_64.cmake"
 # libusb
 if /bin/true; then
   cd ${REPO_DIR} && rm -rf libusb_${WN}
-  cd ${REPO_DIR} && git clone --branch v1.0.23 https://github.com/libusb/libusb.git libusb_${WN}
+#  cd ${REPO_DIR} && git clone --branch v1.0.23 https://github.com/libusb/libusb.git libusb_${WN}
+  cd ${REPO_DIR} && git clone https://github.com/libusb/libusb.git libusb_${WN}
   echo -e "\n\n********************************************************"
   echo "start build of libusb_${WN}"
   cd ${REPO_DIR}/libusb_${WN} && ./bootstrap.sh && \
@@ -50,8 +51,8 @@ if /bin/true; then
   cmake -DCMAKE_TOOLCHAIN_FILE=${REPO_DIR}/${TOOLCHAIN} \
       -DCMAKE_INSTALL_PREFIX=${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST} \
       -DRTL_STATIC_BUILD=ON "$@"  \
-      -DLIBUSB_INCLUDE_DIR=${REPO_DIR}/mingw_libusb_${WN}/include/libusb-1.0 \
-      -DLIBUSB_LIBRARIES=${REPO_DIR}/mingw_libusb_${WN}/lib/libusb-1.0.a \
+      -DLIBUSB_INCLUDE_DIR=${REPO_DIR}/mingw_libusb_${WN}/include/libusb-1.0.1 \
+      -DLIBUSB_LIBRARIES=${REPO_DIR}/mingw_libusb_${WN}/lib/libusb-1.0.1.a \
       -S ${REPO_DIR} -B ${REPO_DIR}/build_${WN} && \
   cmake --build ${REPO_DIR}/build_${WN} && \
   cmake --build ${REPO_DIR}/build_${WN} --target install
