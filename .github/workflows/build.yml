@@ -46,7 +46,7 @@ jobs:
         path: librtlsdr_build_macos-latest.tar.gz
 
   cross_build_win32_win64_latest:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -111,4 +111,5 @@ jobs:
       with:
         name: rtlsdr-bin-w64_dlldep_udpsrv
         path: rtlsdr-bin-w64_dlldep_udpsrv/bin/
+
 
