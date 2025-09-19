@@ -19,7 +19,8 @@ TOOLCHAIN="mingw-w32-i686.cmake"
 # libusb
 if /bin/true; then
   cd ${REPO_DIR} && rm -rf libusb_${WN}
-  cd ${REPO_DIR} && git clone --branch v1.0.23 https://github.com/libusb/libusb.git libusb_${WN}
+#  cd ${REPO_DIR} && git clone --branch v1.0.23 https://github.com/libusb/libusb.git libusb_${WN}
+  cd ${REPO_DIR} && git clone https://github.com/libusb/libusb.git libusb_${WN}
   echo -e "\n\n********************************************************"
   echo "start build of libusb_${WN}"
   cd ${REPO_DIR}/libusb_${WN} && ./bootstrap.sh && \
