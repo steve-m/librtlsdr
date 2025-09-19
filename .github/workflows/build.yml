@@ -21,7 +21,7 @@ jobs:
     - name: compress
       run: tar zcvf librtlsdr_build_ubuntu-amd64_latest.tar.gz --directory=build/src --exclude=CMakeFiles --exclude=*.cmake --exclude=Makefile --exclude=rtl_app_ver.h .
     - name: 'Upload Artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ubuntu_latest_build
         path: librtlsdr_build_ubuntu-amd64_latest.tar.gz
@@ -40,7 +40,7 @@ jobs:
     - name: compress
       run: tar zcvf librtlsdr_build_macos-latest.tar.gz --directory=build/src --exclude=CMakeFiles --exclude=*.cmake --exclude=Makefile --exclude=rtl_app_ver.h .
     - name: 'Upload Artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: macos_latest_build
         path: librtlsdr_build_macos-latest.tar.gz
@@ -71,43 +71,44 @@ jobs:
       run: bash ./cross_build_mingw64.sh dlldep_udpsrv -DPROVIDE_UDP_SERVER=ON
 
     - name: 'upload w32 static artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w32_static
         path: rtlsdr-bin-w32_static/bin/
     - name: 'upload w32 static_udpsrv artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w32_static_udpsrv
         path: rtlsdr-bin-w32_static_udpsrv/bin/
     - name: 'upload w32 dlldep artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w32_dlldep
         path: rtlsdr-bin-w32_dlldep/bin/
     - name: 'upload w32 dlldep_udpsrv artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w32_dlldep_udpsrv
         path: rtlsdr-bin-w32_dlldep_udpsrv/bin/
 
     - name: 'upload w64 static artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w64_static
         path: rtlsdr-bin-w64_static/bin/
     - name: 'upload w64 static_udpsrv artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w64_static_udpsrv
         path: rtlsdr-bin-w64_static_udpsrv/bin/
     - name: 'upload w64 dlldep artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w64_dlldep
         path: rtlsdr-bin-w64_dlldep/bin/
     - name: 'upload w64 dlldep_udpsrv artifact'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: rtlsdr-bin-w64_dlldep_udpsrv
         path: rtlsdr-bin-w64_dlldep_udpsrv/bin/
+
