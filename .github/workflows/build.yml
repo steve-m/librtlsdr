@@ -46,6 +46,8 @@ jobs:
         path: librtlsdr_build_macos-latest.tar.gz
 
   cross_build_win32_win64_latest:
+    strategy:
+      fail-fast: false
     runs-on: ubuntu-latest
 
     steps:
