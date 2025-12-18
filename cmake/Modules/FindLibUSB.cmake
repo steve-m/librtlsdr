@@ -1,4 +1,5 @@
 if(NOT LIBUSB_FOUND)
+  message(STATUS "FindLibUSB.cmake START")
   pkg_check_modules (LIBUSB_PKG libusb-1.0)
   find_path(LIBUSB_INCLUDE_DIR NAMES libusb.h
     PATHS
@@ -53,3 +54,5 @@ endif(LIBUSB_INCLUDE_DIR AND LIBUSB_LIBRARIES)
 mark_as_advanced(LIBUSB_INCLUDE_DIR LIBUSB_LIBRARIES)
 
 endif(NOT LIBUSB_FOUND)
+
+message(STATUS "FindLibUSB.cmake exit")

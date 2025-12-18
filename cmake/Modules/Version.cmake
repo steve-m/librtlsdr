@@ -21,6 +21,7 @@ if(DEFINED __INCLUDED_VERSION_CMAKE)
     return()
 endif()
 set(__INCLUDED_VERSION_CMAKE TRUE)
+message(STATUS "version.cmake start")
 
 # VERSION_INFO_* variables must be provided by user
 set(MAJOR_VERSION ${VERSION_INFO_MAJOR_VERSION})
@@ -58,3 +59,4 @@ else()
     set(VERSION "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
     set(LIBVER "${VERSION}")
 endif()
+message(STATUS "version.cmake exit")
