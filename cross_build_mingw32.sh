@@ -35,6 +35,8 @@ if /bin/true; then
     ls -alh ${REPO_DIR}/mingw_libusb_${WN}
     echo -e "\nlisting of ${REPO_DIR}/mingw_libusb_${WN}/include"
     ls -alh ${REPO_DIR}/mingw_libusb_${WN}/include
+    echo -e "\nlisting of ${REPO_DIR}/mingw_libusb_${WN}/include/libusb-1.0"
+    ls -alh ${REPO_DIR}/mingw_libusb_${WN}/include/libusb-1.0
     echo -e "\nlisting of ${REPO_DIR}/mingw_libusb_${WN}/lib"
     ls -alh ${REPO_DIR}/mingw_libusb_${WN}/lib
     echo -e "\n"
