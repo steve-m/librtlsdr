@@ -16,6 +16,8 @@ CROSS="i686-w64-mingw32"
 WN="w32"
 TOOLCHAIN="mingw-w32-i686.cmake"
 
+echo "REPO_DIR: "${REPO_DIR}
+
 # libusb
 if /bin/true; then
   cd ${REPO_DIR} && rm -rf libusb_${WN}
