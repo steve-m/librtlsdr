@@ -153,7 +153,7 @@ add_subdirectory(src)
 ########################################################################
 # Create Pkg Config File
 ########################################################################
-FOREACH(inc ${LIBUSB_INCLUDEDIR})
+FOREACH(inc ${LIBUSB_INCLUDE_DIR})
     LIST(APPEND RTLSDR_PC_CFLAGS "-I${inc}")
 ENDFOREACH(inc)
 
