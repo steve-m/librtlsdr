@@ -45,7 +45,7 @@ fi
 
 # librtlsdr
 if /bin/true; then
-  cd ${REPO_DIR} && rm -rf build_${WN}
+  cd ${REPO_DIR} && rm -rf build_${WN} && make build_${WN}
   echo -e "\n\n********************************************************"
   echo "start build of librtlsdr_${WN}"
   cmake -DCMAKE_TOOLCHAIN_FILE=${REPO_DIR}/${TOOLCHAIN} \
