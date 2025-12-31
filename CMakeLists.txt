@@ -72,15 +72,15 @@ find_package(LibUSB)
 
 MESSAGE(STATUS "after find_package")
 
-##if(PKG_CONFIG_FOUND)
-##    pkg_check_modules(LIBUSB libusb-1.0 IMPORTED_TARGET)
-##    if(LIBUSB_LINK_LIBRARIES)
-##        set(LIBUSB_LIBRARIES "${LIBUSB_LINK_LIBRARIES}")
-##    endif()
-##else()
-##    set(LIBUSB_LIBRARIES "" CACHE STRING "manual libusb path")
-##    set(LIBUSB_INCLUDE_DIRS "" CACHE STRING "manual libusb includepath")
-##endif()
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(LIBUSB libusb-1.0 IMPORTED_TARGET)
+    if(LIBUSB_LINK_LIBRARIES)
+        set(LIBUSB_LIBRARIES "${LIBUSB_LINK_LIBRARIES}")
+    endif()
+else()
+    set(LIBUSB_LIBRARIES "" CACHE STRING "manual libusb path")
+    set(LIBUSB_INCLUDE_DIRS "" CACHE STRING "manual libusb includepath")
+endif()
 
 if(MSVC)
     set(THREADS_PTHREADS_LIBRARY "" CACHE STRING "manual pthread-win32 path")
@@ -96,7 +96,7 @@ endif()
 if(NOT THREADS_FOUND)
     message(FATAL_ERROR "pthreads(-win32) required to compile rtl-sdr")
 endif()
-
+MESSAGE(STATUS "at create uninstall")
 ########################################################################
 # Create uninstall target
 ########################################################################
