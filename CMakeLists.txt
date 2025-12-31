@@ -70,6 +70,8 @@ find_package(Threads)
 find_package(PkgConfig)
 find_package(LibUSB)
 
+MESSAGE(STATUS "after find_package")
+
 if(PKG_CONFIG_FOUND)
     pkg_check_modules(LIBUSB libusb-1.0 IMPORTED_TARGET)
     if(LIBUSB_LINK_LIBRARIES)
