@@ -1,5 +1,4 @@
 if(NOT LIBUSB_FOUND)
-  message(STATUS "FindLibUSB.cmake START")
   pkg_check_modules (LIBUSB_PKG libusb-1.0)
   find_path(LIBUSB_INCLUDE_DIR NAMES libusb.h
     PATHS
@@ -10,7 +9,7 @@ if(NOT LIBUSB_FOUND)
   )
 
 #standard library name for libusb-1.0
-set(libusb1_library_names libusb-1.0)
+set(libusb1_library_names usb-1.0 libusb-1.0)
 
 #libusb-1.0 compatible library on freebsd
 if((CMAKE_SYSTEM_NAME STREQUAL "FreeBSD") OR (CMAKE_SYSTEM_NAME STREQUAL "kFreeBSD"))
@@ -54,5 +53,3 @@ endif(LIBUSB_INCLUDE_DIR AND LIBUSB_LIBRARIES)
 mark_as_advanced(LIBUSB_INCLUDE_DIR LIBUSB_LIBRARIES)
 
 endif(NOT LIBUSB_FOUND)
-
-message(STATUS "FindLibUSB.cmake exit")

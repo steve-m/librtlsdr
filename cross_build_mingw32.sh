@@ -16,13 +16,10 @@ CROSS="i686-w64-mingw32"
 WN="w32"
 TOOLCHAIN="mingw-w32-i686.cmake"
 
-echo "REPO_DIR: "${REPO_DIR}
-
 # libusb
 if /bin/true; then
   cd ${REPO_DIR} && rm -rf libusb_${WN}
-#  cd ${REPO_DIR} && git clone --branch v1.0.23 https://github.com/libusb/libusb.git libusb_${WN}
-  cd ${REPO_DIR} && git clone https://github.com/libusb/libusb.git libusb_${WN}
+  cd ${REPO_DIR} && git clone --branch v1.0.23 https://github.com/libusb/libusb.git libusb_${WN}
   echo -e "\n\n********************************************************"
   echo "start build of libusb_${WN}"
   cd ${REPO_DIR}/libusb_${WN} && ./bootstrap.sh && \
@@ -35,8 +32,6 @@ if /bin/true; then
     ls -alh ${REPO_DIR}/mingw_libusb_${WN}
     echo -e "\nlisting of ${REPO_DIR}/mingw_libusb_${WN}/include"
     ls -alh ${REPO_DIR}/mingw_libusb_${WN}/include
-    echo -e "\nlisting of ${REPO_DIR}/mingw_libusb_${WN}/include/libusb-1.0"
-    ls -alh ${REPO_DIR}/mingw_libusb_${WN}/include/libusb-1.0
     echo -e "\nlisting of ${REPO_DIR}/mingw_libusb_${WN}/lib"
     ls -alh ${REPO_DIR}/mingw_libusb_${WN}/lib
     echo -e "\n"
@@ -52,7 +47,7 @@ if /bin/true; then
       -DCMAKE_INSTALL_PREFIX=${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST} \
       -DRTL_STATIC_BUILD=ON "$@"  \
       -DLIBUSB_INCLUDE_DIR=${REPO_DIR}/mingw_libusb_${WN}/include/libusb-1.0 \
-      -DLIBUSB_LIBRARIES=${REPO_DIR}/mingw_libusb_${WN}/lib \ ##/libusb-1.0.a \
+      -DLIBUSB_LIBRARIES=${REPO_DIR}/mingw_libusb_${WN}/lib/libusb-1.0.a \
       ../  && \
     make && make install
   md5sum  ${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST}/bin/* >${REPO_DIR}/rtlsdr-bin-${WN}_${ZIP_POST}/bin/md5sums.txt
