@@ -17,6 +17,8 @@
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
 
+cmake_minimum_required(VERSION 4.2)
+
 if(DEFINED __INCLUDED_VERSION_CMAKE)
     return()
 endif()
