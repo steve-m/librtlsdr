@@ -22,7 +22,7 @@
 ########################################################################
 install(FILES
     rtl-sdr.h
-    rtl_tcp.h
+#    rtl_tcp.h
     rtl-sdr_export.h
     DESTINATION include
 )
