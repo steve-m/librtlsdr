@@ -21,7 +21,6 @@ if(DEFINED __INCLUDED_VERSION_CMAKE)
     return()
 endif()
 set(__INCLUDED_VERSION_CMAKE TRUE)
-message(STATUS "version.cmake start")
 
 # VERSION_INFO_* variables must be provided by user
 set(MAJOR_VERSION ${VERSION_INFO_MAJOR_VERSION})
@@ -33,12 +32,12 @@ set(PATCH_VERSION ${VERSION_INFO_PATCH_VERSION})
 ########################################################################
 find_package(Git QUIET)
 
-if(GIT_FOUND)
+if(GIT_FOUND AND EXISTS ${PROJECT_SOURCE_DIR}/.git)
     message(STATUS "Extracting version information from git describe...")
     execute_process(
         COMMAND ${GIT_EXECUTABLE} describe --always --abbrev=4 --long
         OUTPUT_VARIABLE GIT_DESCRIBE OUTPUT_STRIP_TRAILING_WHITESPACE
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
 else()
     set(GIT_DESCRIBE "v${MAJOR_VERSION}.${MINOR_VERSION}.x-xxx-xunknown")
@@ -59,4 +58,3 @@ else()
     set(VERSION "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}")
     set(LIBVER "${VERSION}")
 endif()
-message(STATUS "version.cmake exit")
