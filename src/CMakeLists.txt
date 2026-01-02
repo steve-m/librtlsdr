@@ -134,9 +134,9 @@ add_executable(rtl_biast rtl_biast.c)
 
 if (WITH_RPC)
     add_executable(rtl_rpcd rtl_rpcd.c rtlsdr_rpc_msg.c)
-    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_biast rtl_raw2wav rtl_wavestat rtl_wavestream rtl_rpcd)
+    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_eeprom rtl_adsb rtl_power rtl_biast rtl_rpcd)
 else()
-    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_ir rtl_eeprom rtl_adsb rtl_power rtl_biast rtl_raw2wav rtl_wavestat rtl_wavestream)
+    set(INSTALL_TARGETS rtlsdr_shared rtlsdr_static rtl_sdr rtl_tcp rtl_udp rtl_test rtl_fm rtl_eeprom rtl_adsb rtl_power rtl_biast rtl_rpcd)
 endif()
 
 target_link_libraries(rtl_sdr ${RTLSDR_TOOL_LIB} convenience_static
