@@ -1,0 +1,11 @@
+#ifndef __RTL_APP_VER_H
+#define __RTL_APP_VER_H
+
+#define APP_VER_MAJOR	@MAJOR_VERSION@
+#define APP_VER_MINOR	@MINOR_VERSION@
+#define APP_VER_ID	"github.com/librtlsdr"
+
+#define VER_TO_STRING(x)	#x
+#define VAL_VER_TO_STR(x)	VER_TO_STRING(x)
+
+#endif
