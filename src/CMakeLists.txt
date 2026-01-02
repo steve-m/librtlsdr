@@ -103,7 +103,7 @@ endif()
 # Setup libraries used in executables
 ########################################################################
 add_library(convenience_static STATIC
-    convenience/rtl_convenience.c  convenience/convenience.c  convenience/wavewrite.c
+    convenience/convenience.c
 )
 
 if(WIN32)
@@ -119,7 +119,7 @@ endif()
 # Build utility
 ########################################################################
 add_executable(rtl_sdr rtl_sdr.c)
-add_executable(rtl_tcp rtl_tcp.c controlThread.c)
+add_executable(rtl_tcp rtl_tcp.c)
 #add_executable(rtl_udp rtl_udp.c)
 add_executable(rtl_test rtl_test.c)
 add_executable(rtl_fm rtl_fm.c)
