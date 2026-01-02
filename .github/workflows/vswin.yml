@@ -21,7 +21,8 @@ jobs:
 
       - name: Configure (CMake)
         run: |
-          cmake -S src -B build -G "Visual Studio 19 2024" -A x64
+          #cmake -S src -B build -G "Visual Studio 17 2022" -A x64
+          cmake -S src -B build -G "Visual Studio Enterprise 2022" -A x64
 
       - name: Build
         run: cmake --build build --config Release
