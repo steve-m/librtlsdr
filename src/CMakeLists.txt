@@ -120,17 +120,12 @@ endif()
 ########################################################################
 add_executable(rtl_sdr rtl_sdr.c)
 add_executable(rtl_tcp rtl_tcp.c)
-#add_executable(rtl_udp rtl_udp.c)
 add_executable(rtl_test rtl_test.c)
 add_executable(rtl_fm rtl_fm.c)
-#add_executable(rtl_ir rtl_ir.c)
 add_executable(rtl_eeprom rtl_eeprom.c)
 add_executable(rtl_adsb rtl_adsb.c)
 add_executable(rtl_power rtl_power.c)
 add_executable(rtl_biast rtl_biast.c)
-#add_executable(rtl_raw2wav    rtl_raw2wav.c     convenience/convenience.c  convenience/wavewrite.c)
-#add_executable(rtl_wavestat   rtl_wavestat.c    convenience/convenience.c  convenience/waveread.c)
-#add_executable(rtl_wavestream rtl_wavestream.c  convenience/convenience.c  convenience/waveread.c)
 
 if (WITH_RPC)
     add_executable(rtl_rpcd rtl_rpcd.c rtlsdr_rpc_msg.c)
@@ -155,10 +150,6 @@ target_link_libraries(rtl_fm ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-#target_link_libraries(rtl_ir ${RTLSDR_TOOL_LIB} convenience_static
-#    ${LIBUSB_LIBRARIES}
-#    ${CMAKE_THREAD_LIBS_INIT}
-#)
 target_link_libraries(rtl_eeprom ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
@@ -167,10 +158,6 @@ target_link_libraries(rtl_adsb ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-#target_link_libraries(rtl_udp ${RTLSDR_TOOL_LIB} convenience_static
-#    ${LIBUSB_LIBRARIES}
-#    ${CMAKE_THREAD_LIBS_INIT}
-#)
 target_link_libraries(rtl_power ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
@@ -179,21 +166,11 @@ target_link_libraries(rtl_biast ${RTLSDR_TOOL_LIB} convenience_static
     ${LIBUSB_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
 )
-#if(WITH_RPC)
-#    target_link_libraries(rtl_rpcd ${RTLSDR_TOOL_LIB} convenience_static
-#        ${LIBUSB_LIBRARIES}
-#        ${CMAKE_THREAD_LIBS_INIT}
-#    )
-#endif()
 
 if(UNIX)
     target_link_libraries(rtl_fm m)
-    #target_link_libraries(rtl_ir m)
     target_link_libraries(rtl_adsb m)
     target_link_libraries(rtl_power m)
-    #target_link_libraries(rtl_raw2wav m)
-    #target_link_libraries(rtl_wavestat m)
-    #target_link_libraries(rtl_wavestream m)
     if(APPLE OR CMAKE_SYSTEM MATCHES "OpenBSD")
         target_link_libraries(rtl_test m)
     else()
@@ -204,40 +181,22 @@ endif()
 if(WIN32)
     target_link_libraries(rtl_sdr libgetopt_static)
     target_link_libraries(rtl_tcp ws2_32 libgetopt_static)
-    #target_link_libraries(rtl_udp ws2_32 libgetopt_static)
     target_link_libraries(rtl_test libgetopt_static)
     target_link_libraries(rtl_fm libgetopt_static)
-    #target_link_libraries(rtl_ir libgetopt_static)
     target_link_libraries(rtl_eeprom libgetopt_static)
     target_link_libraries(rtl_adsb libgetopt_static)
     target_link_libraries(rtl_power libgetopt_static)
     target_link_libraries(rtl_biast libgetopt_static)
-    #target_link_libraries(rtl_raw2wav libgetopt_static)
-    #target_link_libraries(rtl_wavestat libgetopt_static)
-    #target_link_libraries(rtl_wavestream libgetopt_static)
     find_library(LIBM NAMES m)
-    #if (LIBM)
-    #target_link_libraries(rtl_raw2wav m)
-    #target_link_libraries(rtl_wavestat m)
-    #target_link_libraries(rtl_wavestream m)
-    #endif (LIBM)
+    
     set_property(TARGET rtl_sdr APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_tcp APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-    #set_property(TARGET rtl_udp APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_test APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_fm APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-    #set_property(TARGET rtl_ir APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_eeprom APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_adsb APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_power APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
     set_property(TARGET rtl_biast APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-    #set_property(TARGET rtl_raw2wav APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-    #set_property(TARGET rtl_wavestat APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-    #set_property(TARGET rtl_wavestream APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-    if (WITH_RPC)
-        target_link_libraries(rtl_rpcd ws2_32 libgetopt_static)
-        set_property(TARGET rtl_rpcd APPEND PROPERTY COMPILE_DEFINITIONS "rtlsdr_STATIC" )
-    endif()
 endif()
 ########################################################################
 # Install built library files & utilities
@@ -247,3 +206,4 @@ install(TARGETS ${INSTALL_TARGETS}
     ARCHIVE DESTINATION ${LIB_INSTALL_DIR} # .lib file
     RUNTIME DESTINATION bin              # .dll file
 )
+
