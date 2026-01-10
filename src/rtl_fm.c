@@ -809,7 +809,11 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 static void *dongle_thread_fn(void *arg)
 {
 	struct dongle_state *s = arg;
-	rtlsdr_read_async(s->dev, rtlsdr_callback, s, 0, s->buf_len);
+	int r = rtlsdr_read_async(s->dev, rtlsdr_callback, s, 0, s->buf_len);
+	if (r != 0 && !do_exit) {
+		fprintf(stderr, "\nDevice error detected, async read returned: %d\n", r);
+		do_exit = 1;
+	}
 	return 0;
 }
 
