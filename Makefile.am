@@ -14,10 +14,10 @@ dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
 install-udev-rules:
-	$(INSTALL_DATA) rtl-sdr.rules /etc/udev/rules.d
+	$(INSTALL_DATA) rtl-sdr.rules $(DESTDIR)/etc/udev/rules.d
 
 uninstall-udev-rules:
-	rm -rf /etc/udev/rules.d/rtl-sdr.rules
+	rm -rf $(DESTDIR)/etc/udev/rules.d/rtl-sdr.rules
 
 EXTRA_DIST = git-version-gen .version
 
