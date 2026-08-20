@@ -169,6 +169,13 @@ RTLSDR_API int rtlsdr_set_freq_correction(rtlsdr_dev_t *dev, int ppm);
  */
 RTLSDR_API int rtlsdr_get_freq_correction(rtlsdr_dev_t *dev);
 
+enum gain_types {
+        lna,
+        mixer,
+        vga,
+	total
+};
+
 enum rtlsdr_tuner {
 	RTLSDR_TUNER_UNKNOWN = 0,
 	RTLSDR_TUNER_E4000,
@@ -214,6 +221,16 @@ RTLSDR_API int rtlsdr_get_tuner_gains(rtlsdr_dev_t *dev, int *gains);
  * \return 0 on success
  */
 RTLSDR_API int rtlsdr_set_tuner_gain(rtlsdr_dev_t *dev, int gain);
+RTLSDR_API int rtlsdr_set_specific_gain(rtlsdr_dev_t *dev, int gain, enum gain_types gain_type);
+RTLSDR_API int rtlsdr_set_lna_gain(rtlsdr_dev_t *dev, int gain);
+RTLSDR_API int rtlsdr_set_mixer_gain(rtlsdr_dev_t *dev, int gain);
+RTLSDR_API int rtlsdr_set_vga_gain(rtlsdr_dev_t *dev, int gain);
+
+RTLSDR_API int rtlsdr_get_lna_gains(rtlsdr_dev_t *dev, int *gains);
+RTLSDR_API int rtlsdr_get_mixer_gains(rtlsdr_dev_t *dev, int *gains);
+RTLSDR_API int rtlsdr_get_vga_gains(rtlsdr_dev_t *dev, int *gains);
+RTLSDR_API int rtlsdr_get_specific_gains(rtlsdr_dev_t *dev, int *gains, enum gain_types gain_type);
+
 
 /*!
  * Set the bandwidth for the device.
