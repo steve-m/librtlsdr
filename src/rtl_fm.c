@@ -53,7 +53,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #ifndef _WIN32
 #include <unistd.h>
 #else
@@ -721,10 +720,19 @@ void arbitrary_downsample(int16_t *buf1, int16_t *buf2, int len1, int len2)
 
 void arbitrary_resample(int16_t *buf1, int16_t *buf2, int len1, int len2)
 /* up to you to calculate lengths and make sure it does not go OOB
- * okay for buffers to overlap, if you are downsampling */
+ * okay for buffers to overlap, if you are downsampling
+ * fix overlapping buffers when upsampling */
 {
+	static int16_t *buftemp=NULL;
 	if (len1 < len2) {
-		arbitrary_upsample(buf1, buf2, len1, len2);
+		if(buf1!=buf2) 
+			arbitrary_upsample(buf1, buf2, len1, len2);
+		else
+		{
+			buftemp=realloc(buftemp,2*len2); /* FIXME: Handle out of memory */
+			arbitrary_upsample(buf1, buftemp, len1, len2);
+			memcpy(buf2,buftemp,2*len2);
+		}
 	} else {
 		arbitrary_downsample(buf1, buf2, len1, len2);
 	}
@@ -775,8 +783,10 @@ void full_demod(struct demod_state *d)
 	if (d->dc_block) {
 		dc_block_filter(d);}
 	if (d->rate_out2 > 0) {
-		low_pass_real(d);
-		//arbitrary_resample(d->result, d->result, d->result_len, d->result_len * d->rate_out2 / d->rate_out);
+//		low_pass_real(d);
+		arbitrary_resample(d->result, d->result, d->result_len, d->result_len * d->rate_out2 / d->rate_out);
+		d->result_len*=d->rate_out2;
+		d->result_len/=d->rate_out;
 	}
 }
 
