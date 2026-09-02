@@ -1712,8 +1712,23 @@ int rtlsdr_reset_buffer(rtlsdr_dev_t *dev)
 
 int rtlsdr_read_sync(rtlsdr_dev_t *dev, void *buf, int len, int *n_read)
 {
+	int r;
+
 	if (!dev)
 		return -1;
+
+	r = libusb_bulk_transfer(dev->devh, 0x81, buf, len, n_read, BULK_TIMEOUT);
+	if (r != LIBUSB_ERROR_PIPE)
+		return r;
+
+	/* A halted bulk endpoint must be cleared before it can accept I/O. */
+	r = libusb_clear_halt(dev->devh, 0x81);
+	if (r < 0)
+		return r;
+
+	r = rtlsdr_reset_buffer(dev);
+	if (r < 0)
+		return r;
 
 	return libusb_bulk_transfer(dev->devh, 0x81, buf, len, n_read, BULK_TIMEOUT);
 }
