@@ -352,6 +352,11 @@ static rtlsdr_dongle_t known_devices[] = {
 };
 
 #define DEFAULT_BUF_NUMBER	15
+
+/* How many times the cancel loop may wait for a transfer that has not yet
+ * reported LIBUSB_TRANSFER_CANCELLED. Normal cancellation settles on the first
+ * round; the bound only stops a transfer which never reports from blocking. */
+#define CANCEL_MAX_ROUNDS	20
 #define DEFAULT_BUF_LENGTH	(16 * 32 * 512)
 
 #define DEF_RTL_XTAL_FREQ	28800000
@@ -1876,6 +1881,7 @@ int rtlsdr_read_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx,
 	struct timeval tv = { 1, 0 };
 	struct timeval zerotv = { 0, 0 };
 	enum rtlsdr_async_status next_status = RTLSDR_INACTIVE;
+	unsigned int cancel_rounds = 0;
 
 	if (!dev)
 		return -1;
@@ -1941,6 +1947,7 @@ int rtlsdr_read_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx,
 
 		if (RTLSDR_CANCELING == dev->async_status) {
 			next_status = RTLSDR_INACTIVE;
+			cancel_rounds++;
 
 			if (!dev->xfer)
 				break;
@@ -1962,10 +1969,15 @@ int rtlsdr_read_async(rtlsdr_dev_t *dev, rtlsdr_read_async_cb_t cb, void *ctx,
 #endif
 					libusb_handle_events_timeout_completed(dev->ctx,
 									       &zerotv, NULL);
-					if (r < 0)
-						continue;
 
-					next_status = RTLSDR_CANCELING;
+					/* A failed cancel does not mean the
+					 * transfer has finished, so keep
+					 * waiting for it rather than freeing
+					 * its buffer. Bounded, so a transfer
+					 * which never reports a terminal
+					 * status cannot block the caller. */
+					if (cancel_rounds < CANCEL_MAX_ROUNDS)
+						next_status = RTLSDR_CANCELING;
 				}
 			}
 
