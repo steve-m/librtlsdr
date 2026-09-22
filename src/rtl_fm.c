@@ -942,8 +942,9 @@ void frequency_range(struct controller_state *s, char *arg)
 	if (step == (char *)1) { // no step given
 		s->freqs[s->freq_len] = (uint32_t) atofs(start);
 		s->freq_len++;
-		s->freqs[s->freq_len] = (uint32_t) atofs(stop);
-		s->freq_len++;
+		if (s->freq_len < FREQUENCIES_LIMIT) {
+			s->freqs[s->freq_len] = (uint32_t) atofs(stop);
+			s->freq_len++;}
 		stop[-1] = ':';
 		return;
 	}
