@@ -1308,6 +1308,10 @@ uint32_t rtlsdr_get_device_count(void)
 		return 0;
 
 	cnt = libusb_get_device_list(ctx, &list);
+	if (cnt < 0) {
+		libusb_exit(ctx);
+		return 0;
+	}
 
 	for (i = 0; i < cnt; i++) {
 		libusb_get_device_descriptor(list[i], &dd);
@@ -1338,6 +1342,10 @@ const char *rtlsdr_get_device_name(uint32_t index)
 		return "";
 
 	cnt = libusb_get_device_list(ctx, &list);
+	if (cnt < 0) {
+		libusb_exit(ctx);
+		return "";
+	}
 
 	for (i = 0; i < cnt; i++) {
 		libusb_get_device_descriptor(list[i], &dd);
@@ -1380,6 +1388,13 @@ int rtlsdr_get_device_usb_strings(uint32_t index, char *manufact,
 		return r;
 
 	cnt = libusb_get_device_list(ctx, &list);
+	if (cnt < 0) {
+		libusb_exit(ctx);
+		return (int)cnt;
+	}
+
+	/* stays -2 unless the device at 'index' is found */
+	r = -2;
 
 	for (i = 0; i < cnt; i++) {
 		libusb_get_device_descriptor(list[i], &dd);
