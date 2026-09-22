@@ -878,7 +878,7 @@ int rtlsdr_read_eeprom(rtlsdr_dev_t *dev, uint8_t *data, uint8_t offset, uint16_
 			return -3;
 	}
 
-	return r;
+	return 0;
 }
 
 int rtlsdr_set_center_freq(rtlsdr_dev_t *dev, uint32_t freq)
