@@ -535,7 +535,8 @@ static int r82xx_set_pll(struct r82xx_priv *priv, uint32_t freq)
 	nint = (uint32_t) (vco_div / 65536);
 	sdm = (uint32_t) (vco_div % 65536);
 
-	if (nint > ((128 / vco_power_ref) - 1)) {
+	/* check the full quotient: nint is 8 bits and may have wrapped */
+	if ((vco_div / 65536) > ((128u / vco_power_ref) - 1)) {
 		fprintf(stderr, "[R82XX] No valid PLL values for %u Hz!\n", freq);
 		return -1;
 	}
