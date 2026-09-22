@@ -88,7 +88,7 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 		if (do_exit)
 			return;
 
-		if ((bytes_to_read > 0) && (bytes_to_read < len)) {
+		if ((bytes_to_read > 0) && (bytes_to_read <= len)) {
 			len = bytes_to_read;
 			do_exit = 1;
 			rtlsdr_cancel_async(dev);
@@ -250,7 +250,7 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			if ((bytes_to_read > 0) && (bytes_to_read < (uint32_t)n_read)) {
+			if ((bytes_to_read > 0) && (bytes_to_read <= (uint32_t)n_read)) {
 				n_read = bytes_to_read;
 				do_exit = 1;
 			}
