@@ -446,7 +446,8 @@ int main(int argc, char **argv)
 
 	if (do_exit) {
 		fprintf(stderr, "\nUser cancel, exiting...\n");
-		fprintf(stderr, "Samples per million lost (minimum): %i\n", (int)(1000000L * dropped_samples / total_samples));
+		if (total_samples)
+			fprintf(stderr, "Samples per million lost (minimum): %i\n", (int)(1000000L * dropped_samples / total_samples));
 	}
 	else
 		fprintf(stderr, "\nLibrary error %d, exiting...\n", r);
