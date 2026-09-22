@@ -1446,7 +1446,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 {
 	int r;
 	int i;
-	libusb_device **list;
+	libusb_device **list = NULL;
 	rtlsdr_dev_t *dev = NULL;
 	libusb_device *device = NULL;
 	uint32_t device_count = 0;
@@ -1487,6 +1487,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	}
 
 	if (!device) {
+		libusb_free_device_list(list, 1);
 		r = -1;
 		goto err;
 	}
