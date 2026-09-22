@@ -93,10 +93,19 @@ int get_string_descriptor(int pos, uint8_t *data, char *str)
 {
 	int len, i, j = 0;
 
+	if (pos + 1 >= EEPROM_SIZE) {
+		str[0] = 0x00;
+		return EEPROM_SIZE;
+	}
+
 	len = data[pos];
 
 	if (data[pos + 1] != 0x03)
 		fprintf(stderr, "Error: invalid string descriptor!\n");
+
+	/* a corrupt or erased (0xff) EEPROM may claim more than is left */
+	if (len > EEPROM_SIZE - pos)
+		len = EEPROM_SIZE - pos;
 
 	for (i = 2; i < len; i += 2)
 		str[j++] = data[pos + i];
