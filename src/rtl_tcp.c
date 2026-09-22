@@ -304,6 +304,12 @@ static void *command_worker(void *arg)
 			r = select(s+1, &readfds, NULL, NULL, &tv);
 			if(r) {
 				received = recv(s, (char*)&cmd+(sizeof(cmd)-left), left, 0);
+				if(received == 0) {
+					/* client shut down its sending side: no more
+					 * commands, but keep streaming samples to it */
+					printf("comm recv closed\n");
+					pthread_exit(NULL);
+				}
 				left -= received;
 			}
 			if(received == SOCKET_ERROR || do_exit) {
