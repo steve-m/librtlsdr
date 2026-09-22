@@ -133,7 +133,8 @@ static void underrun_test(unsigned char *buf, uint32_t len, int mute)
 	}
 	for (i = 0; i < len; i++) {
 		if(bcnt != buf[i]) {
-			lost += (buf[i] > bcnt) ? (buf[i] - bcnt) : (bcnt - buf[i]);
+			/* the counter only runs forward, so the gap is modulo 256 */
+			lost += (uint8_t)(buf[i] - bcnt);
 			bcnt = buf[i];
 		}
 
