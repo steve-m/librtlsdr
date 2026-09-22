@@ -208,12 +208,9 @@ static char *posixly_correct;
    whose names are inconsistent.  */
 
 #ifndef getenv
-#ifdef _MSC_VER
-// DDK will complain if you don't use the stdlib defined getenv
+/* the old-style "extern char *getenv ();" declares a function taking
+   no arguments since C23, use the real prototype everywhere */
 #include <stdlib.h>
-#else
-extern char *getenv ();
-#endif
 #endif
 
 static char *
