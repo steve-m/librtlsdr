@@ -810,7 +810,7 @@ static int r82xx_set_tv_standard(struct r82xx_priv *priv,
 	filt_q = 0x10;		/* r10[4]:low q(1'b1) */
 	hp_cor = 0x6b;		/* 1.7m disable, +2cap, 1.0mhz */
 	ext_enable = 0x60;	/* r30[6]=1 ext enable; r30[5]:1 ext at lna max-1 */
-	loop_through = 0x01;	/* r5[7], lt off */
+	loop_through = 0x80;	/* r5[7], lt off */
 	lt_att = 0x00;		/* r31[7], lt att enable */
 	flt_ext_widest = 0x00;	/* r15[7]: flt_ext_wide off */
 	polyfil_cur = 0x60;	/* r25[6:5]:min */
