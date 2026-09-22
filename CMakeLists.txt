@@ -110,10 +110,12 @@ add_custom_target(uninstall
 # Install udev rules
 ########################################################################
 option(INSTALL_UDEV_RULES "Install udev rules for RTL-SDR" OFF)
+set(UDEV_RULES_PATH "/etc/udev/rules.d" CACHE PATH
+    "Installation path for udev rules (e.g. /usr/lib/udev/rules.d for distros that keep vendor rules out of /etc)")
 if (INSTALL_UDEV_RULES)
     install (
         FILES rtl-sdr.rules
-        DESTINATION "/etc/udev/rules.d"
+        DESTINATION "${UDEV_RULES_PATH}"
         COMPONENT "udev"
         )
 else (INSTALL_UDEV_RULES)
