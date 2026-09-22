@@ -79,8 +79,8 @@ static rtlsdr_dev_t *dev = NULL;
 
 static uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 
-static uint32_t total_samples = 0;
-static uint32_t dropped_samples = 0;
+static uint64_t total_samples = 0;
+static uint64_t dropped_samples = 0;
 
 static unsigned int ppm_duration = PPM_DURATION;
 
@@ -133,7 +133,8 @@ static void underrun_test(unsigned char *buf, uint32_t len, int mute)
 	}
 	for (i = 0; i < len; i++) {
 		if(bcnt != buf[i]) {
-			lost += (buf[i] > bcnt) ? (buf[i] - bcnt) : (bcnt - buf[i]);
+			/* the counter only runs forward, so the gap is modulo 256 */
+			lost += (uint8_t)(buf[i] - bcnt);
 			bcnt = buf[i];
 		}
 
@@ -445,7 +446,8 @@ int main(int argc, char **argv)
 
 	if (do_exit) {
 		fprintf(stderr, "\nUser cancel, exiting...\n");
-		fprintf(stderr, "Samples per million lost (minimum): %i\n", (int)(1000000L * dropped_samples / total_samples));
+		if (total_samples)
+			fprintf(stderr, "Samples per million lost (minimum): %i\n", (int)(1000000L * dropped_samples / total_samples));
 	}
 	else
 		fprintf(stderr, "\nLibrary error %d, exiting...\n", r);
