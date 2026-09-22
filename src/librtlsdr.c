@@ -1349,6 +1349,9 @@ const char *rtlsdr_get_device_name(uint32_t index)
 
 			if (index == device_count - 1)
 				break;
+
+			/* not the one asked for */
+			device = NULL;
 		}
 	}
 
