@@ -79,8 +79,8 @@ static rtlsdr_dev_t *dev = NULL;
 
 static uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 
-static uint32_t total_samples = 0;
-static uint32_t dropped_samples = 0;
+static uint64_t total_samples = 0;
+static uint64_t dropped_samples = 0;
 
 static unsigned int ppm_duration = PPM_DURATION;
 
