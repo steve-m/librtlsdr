@@ -1104,9 +1104,20 @@ int rtlsdr_set_sample_rate(rtlsdr_dev_t *dev, uint32_t samp_rate)
 	}
 
 	rsamp_ratio = (dev->rtl_xtal * TWO_POW(22)) / samp_rate;
-	rsamp_ratio &= 0x0ffffffc;
+	rsamp_ratio &= 0xfffffffc;
 
-	real_rsamp_ratio = rsamp_ratio | ((rsamp_ratio & 0x08000000) << 1);
+	/* Bit 28 of the ratio is not stored, it is implied by bit 27. The
+	 * check above only holds for the nominal 28.8 MHz, a corrected xtal
+	 * frequency (rtlsdr_set_xtal_freq()) moves the limits, so reject any
+	 * ratio the register cannot represent. */
+	real_rsamp_ratio = (rsamp_ratio & 0x0ffffffc) |
+			   ((rsamp_ratio & 0x08000000) << 1);
+	if (real_rsamp_ratio != rsamp_ratio) {
+		fprintf(stderr, "Invalid sample rate: %u Hz\n", samp_rate);
+		return -EINVAL;
+	}
+
+	rsamp_ratio &= 0x0ffffffc;
 	real_rate = (dev->rtl_xtal * TWO_POW(22)) / real_rsamp_ratio;
 
 	if ( ((double)samp_rate) != real_rate )
