@@ -1446,7 +1446,7 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 {
 	int r;
 	int i;
-	libusb_device **list;
+	libusb_device **list = NULL;
 	rtlsdr_dev_t *dev = NULL;
 	libusb_device *device = NULL;
 	uint32_t device_count = 0;
@@ -1478,15 +1478,16 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 
 		if (find_known_device(dd.idVendor, dd.idProduct)) {
 			device_count++;
-		}
 
-		if (index == device_count - 1)
-			break;
+			if (index == device_count - 1)
+				break;
+		}
 
 		device = NULL;
 	}
 
 	if (!device) {
+		libusb_free_device_list(list, 1);
 		r = -1;
 		goto err;
 	}
