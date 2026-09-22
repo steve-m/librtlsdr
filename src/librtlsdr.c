@@ -1712,10 +1712,19 @@ int rtlsdr_reset_buffer(rtlsdr_dev_t *dev)
 
 int rtlsdr_read_sync(rtlsdr_dev_t *dev, void *buf, int len, int *n_read)
 {
+	int r;
+
 	if (!dev)
 		return -1;
 
-	return libusb_bulk_transfer(dev->devh, 0x81, buf, len, n_read, BULK_TIMEOUT);
+	r = libusb_bulk_transfer(dev->devh, 0x81, buf, len, n_read, BULK_TIMEOUT);
+
+	/* a halted endpoint fails every further transfer until the halt is
+	 * cleared, and the caller has no way to do that itself */
+	if (r == LIBUSB_ERROR_PIPE)
+		libusb_clear_halt(dev->devh, 0x81);
+
+	return r;
 }
 
 static void LIBUSB_CALL _libusb_callback(struct libusb_transfer *xfer)
