@@ -1478,10 +1478,10 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 
 		if (find_known_device(dd.idVendor, dd.idProduct)) {
 			device_count++;
-		}
 
-		if (index == device_count - 1)
-			break;
+			if (index == device_count - 1)
+				break;
+		}
 
 		device = NULL;
 	}
