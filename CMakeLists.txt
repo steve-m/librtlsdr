@@ -63,6 +63,10 @@ elseif(MSVC14 OR MSVC14)
     ADD_DEFINITIONS(-D_TIMESPEC_DEFINED)
 endif()
 
+# Large file support: without it, the tools cannot write files larger than
+# 2 GiB on 32-bit systems with glibc (rtl_sdr fills that in under 9 minutes)
+ADD_DEFINITIONS(-D_FILE_OFFSET_BITS=64)
+
 ########################################################################
 # Find build dependencies
 ########################################################################

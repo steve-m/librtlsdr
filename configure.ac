@@ -33,6 +33,10 @@ AC_CHECK_HEADERS(pthread.h,, [AC_MSG_ERROR([pthread.h required])])
 AC_SUBST(RTLSDR_PC_LIBS,["$LIBS"])
 AC_SUBST(RTLSDR_PC_CFLAGS,["$CFLAGS"])
 
+dnl large file support: without it, the tools cannot write files larger
+dnl than 2 GiB on 32-bit systems with glibc
+CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64"
+
 dnl checks for required libraries
 dnl pthreads
 AC_CHECK_LIB(pthread, pthread_create, [LIBS="$LIBS -lpthread"])
